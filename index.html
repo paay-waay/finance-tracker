@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Box Budget Tracker</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Box Budget Tracker</p>
+          <h1 id="pageTitle">Month</h1>
+          <p id="versionBadge" class="version-badge">v5.1.0</p>
+        </div>
+        <div class="top-actions">
+          <label class="month-field">
+            <span>Month</span>
+            <input id="monthInput" type="month" />
+          </label>
+          <button id="globalEditButton" class="edit-toggle" type="button" aria-pressed="false">View Mode</button>
+        </div>
+      </header>
+
+      <div id="walletToggle" class="wallet-toggle" aria-label="Wallet toggle"></div>
+
+      <main id="app" class="app-main" aria-live="polite"></main>
+
+      <nav id="bottomNav" class="bottom-nav" aria-label="Main navigation"></nav>
+    </div>
+
+    <div id="modalRoot"></div>
+
+    <template id="toastTemplate">
+      <div class="toast" role="status"></div>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
