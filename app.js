@@ -1,4 +1,5 @@
-const APP_VERSION = "v5.1.0";
+const APP_VERSION = "v10.0-github-pages";
+const GITHUB_PAGES_BASE = "/finance-tracker/";
 const STORAGE_KEY = "finance-box-budget-v3";
 const APP_MONTH = "2026-04";
 
@@ -8,16 +9,10 @@ const wallets = {
 };
 
 const tabs = [
-  { id: "month", label: "Month" },
-  { id: "boxes", label: "Boxes" },
-  { id: "pool", label: "Reserve" },
-  { id: "more", label: "More" }
-];
-
-const moreViews = [
-  { id: "plan", label: "Plan" },
-  { id: "analysis", label: "Analysis" },
-  { id: "close", label: "Close + CSV" }
+  { id: "overview", label: "Overview" },
+  { id: "review", label: "Review" },
+  { id: "reports", label: "Reports" },
+  { id: "settings", label: "Settings" }
 ];
 
 const boxMeta = {
@@ -38,10 +33,13 @@ const demoState = {
   appVersion: APP_VERSION,
   currentMonth: APP_MONTH,
   activeWallet: "vewu",
-  activeTab: "month",
-  activeMoreView: "plan",
-  editMode: false,
+  activeTab: "overview",
+  manageSettings: false,
+  manageReports: false,
+  settingsSection: "plan",
+  activeReport: "dashboard",
   selectedBox: "",
+  highlightBox: "",
   debtPlans: [
     { debtId: "mortgage", wallet: "vewu", name: "Mortgage", startingBalance: 0, currentBalance: 0, monthlyPayment: 2000, interestRate: 0, status: "active", notes: "Tracked as debt payment with payoff tracking." },
     { debtId: "car-loan", wallet: "vewu", name: "Car Loan", startingBalance: 0, currentBalance: 0, monthlyPayment: 682, interestRate: 0, status: "active", notes: "Tracked as debt payment with payoff tracking." },
@@ -195,7 +193,6 @@ const bottomNav = document.querySelector("#bottomNav");
 const walletToggle = document.querySelector("#walletToggle");
 const pageTitle = document.querySelector("#pageTitle");
 const modalRoot = document.querySelector("#modalRoot");
-const globalEditButton = document.querySelector("#globalEditButton");
 let toastTimer;
 
 init();
@@ -254,13 +251,6 @@ function bindGlobalEvents() {
     render();
   });
 
-  globalEditButton?.addEventListener("click", () => {
-    state.editMode = !state.editMode;
-    save();
-    renderChrome();
-    render();
-  });
-
   walletToggle.addEventListener("click", (event) => {
     const button = event.target.closest("[data-wallet]");
     if (!button) return;
@@ -282,12 +272,6 @@ function bindGlobalEvents() {
 
 function renderChrome() {
   monthInput.value = state.currentMonth;
-  document.body.classList.toggle("is-edit-mode", Boolean(state.editMode));
-  if (globalEditButton) {
-    globalEditButton.textContent = state.editMode ? "Edit Mode" : "View Mode";
-    globalEditButton.classList.toggle("is-active", Boolean(state.editMode));
-    globalEditButton.setAttribute("aria-pressed", state.editMode ? "true" : "false");
-  }
   walletToggle.classList.remove("single-wallet");
   walletToggle.innerHTML = Object.entries(wallets).map(([id, wallet]) => `
       <button class="wallet-button ${state.activeWallet === id ? "is-active" : ""}" type="button" data-wallet="${id}">
@@ -309,19 +293,15 @@ function loadState() {
   if (!saved) return structuredClone(demoState);
   try {
     const loaded = normalizeState(JSON.parse(saved));
-    if (loaded.activeTab === "today") loaded.activeTab = "month";
-    if (loaded.activeTab === "assets") {
-      loaded.activeMoreView = "analysis";
-      loaded.activeTab = "more";
-    }
-    if (["plan", "year", "analysis", "close"].includes(loaded.activeTab)) {
-      loaded.activeMoreView = loaded.activeTab === "year" ? "analysis" : loaded.activeTab;
-      loaded.activeTab = "more";
-    }
-    if (loaded.activeMoreView === "year") loaded.activeMoreView = "analysis";
-    if (!tabs.some((tab) => tab.id === loaded.activeTab)) loaded.activeTab = "month";
-    loaded.activeMoreView ||= "plan";
-    loaded.editMode = Boolean(loaded.editMode);
+    if (loaded.activeTab === "today" || loaded.activeTab === "month") loaded.activeTab = "overview";
+    if (loaded.activeTab === "boxes" || loaded.activeTab === "pool") loaded.activeTab = "overview";
+    if (loaded.activeTab === "assets" || loaded.activeTab === "year" || loaded.activeTab === "analysis") loaded.activeTab = "reports";
+    if (loaded.activeTab === "plan" || loaded.activeTab === "close" || loaded.activeTab === "more") loaded.activeTab = "settings";
+    if (!tabs.some((tab) => tab.id === loaded.activeTab)) loaded.activeTab = "overview";
+    loaded.manageSettings = Boolean(loaded.manageSettings);
+    loaded.manageReports = Boolean(loaded.manageReports);
+    loaded.settingsSection ||= "plan";
+    loaded.activeReport ||= "dashboard";
     loaded.appVersion = APP_VERSION;
     return loaded;
   } catch {
@@ -346,7 +326,10 @@ function normalizeState(next) {
 
 function migrateState(next) {
   next.appVersion = APP_VERSION;
-  next.editMode = Boolean(next.editMode);
+  next.manageSettings = Boolean(next.manageSettings);
+  next.manageReports = Boolean(next.manageReports);
+  next.settingsSection ||= "plan";
+  next.activeReport ||= "dashboard";
   next.yearPlanVersions.forEach((version) => {
     const vewu = version.plan?.vewu;
     const pw = version.plan?.pw;
@@ -387,15 +370,16 @@ function save() {
 }
 
 function render() {
-  pageTitle.textContent = tabs.find((tab) => tab.id === state.activeTab)?.label || "Month";
+  pageTitle.textContent = tabs.find((tab) => tab.id === state.activeTab)?.label || "Overview";
   const routes = {
-    month: renderMonth,
-    today: renderMonth,
-    boxes: renderBoxes,
-    pool: renderPool,
-    more: renderMore
+    overview: renderOverview,
+    month: renderOverview,
+    today: renderOverview,
+    review: renderReview,
+    reports: renderReports,
+    settings: renderSettings
   };
-  app.innerHTML = (routes[state.activeTab] || renderMonth)();
+  app.innerHTML = (routes[state.activeTab] || renderOverview)();
   bindPage();
 }
 
@@ -405,13 +389,54 @@ function bindPage() {
   document.querySelector("#boxSelect")?.addEventListener("change", updateRefundControls);
   document.querySelector("#typeSelect")?.addEventListener("change", updateRefundControls);
   document.querySelector("#refundTarget")?.addEventListener("change", updateRefundControls);
-
-  document.querySelectorAll("[data-more-view]").forEach((button) => {
+  document.querySelector("#advancedTypeSelect")?.addEventListener("change", (event) => {
+    const value = event.target.value;
+    const select = document.querySelector("#boxSelect");
+    if (select) select.value = value;
+    document.querySelectorAll(".category-chip").forEach((chip) => chip.classList.toggle("is-active", chip.dataset.categoryValue === value));
+    updateRefundControls();
+  });
+  document.querySelectorAll(".category-chip").forEach((button) => {
     button.addEventListener("click", () => {
-      state.activeMoreView = button.dataset.moreView;
+      const select = document.querySelector("#boxSelect");
+      const advanced = document.querySelector("#advancedTypeSelect");
+      if (select) select.value = button.dataset.categoryValue;
+      if (advanced) advanced.value = button.dataset.categoryValue;
+      document.querySelectorAll(".category-chip").forEach((chip) => chip.classList.toggle("is-active", chip === button));
+      updateRefundControls();
+    });
+  });
+
+  document.querySelectorAll("[data-settings-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.settingsSection = button.dataset.settingsSection;
       save();
       render();
     });
+  });
+
+  document.querySelectorAll("[data-report]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.activeReport = button.dataset.report;
+      save();
+      render();
+    });
+  });
+
+  document.querySelector("#manageSettingsButton")?.addEventListener("click", () => {
+    state.manageSettings = !state.manageSettings;
+    save();
+    render();
+  });
+
+  document.querySelector("#manageReportsButton")?.addEventListener("click", () => {
+    state.manageReports = !state.manageReports;
+    save();
+    render();
+  });
+
+  document.querySelectorAll("[data-view-box]").forEach((button) => {
+    button.addEventListener("click", () => openCategoryDetail(button.dataset.viewBox));
   });
 
   document.querySelectorAll("[data-set-box]").forEach((button) => {
@@ -464,93 +489,298 @@ function bindPage() {
 
   document.querySelector("#exportButton")?.addEventListener("click", exportCsv);
   document.querySelector("#importCsvInput")?.addEventListener("change", importCsv);
+  document.querySelector("#exportJsonButton")?.addEventListener("click", exportJson);
+  document.querySelector("#importJsonInput")?.addEventListener("change", importJson);
   document.querySelector("#resetButton")?.addEventListener("click", resetDemo);
   document.querySelector("#closeWalletButton")?.addEventListener("click", () => closeWalletMonth(state.activeWallet));
   document.querySelector("#reopenWalletButton")?.addEventListener("click", () => reopenWalletMonth(state.activeWallet));
 }
 
-function renderMonth() {
+function renderOverview() {
   const wallet = state.activeWallet;
   const dashboard = getDashboard(wallet);
-  const warnings = getWarnings(wallet);
+  const warnings = getWarnings(wallet).slice(0, 3);
   const boxes = getBoxes(wallet);
-  const boxesAhead = boxes.filter((box) => box.paceRatio > 1.15 || box.overage > 0).length;
+  const status = getMonthStatus(dashboard);
 
   return `
-    <section class="hero">
+    <section class="hero overview-hero">
       <div class="hero-main">
-        <p class="eyebrow">${escapeHtml(wallets[wallet].label)} Month Outlook</p>
+        <p class="eyebrow">${formatMonthLabel(state.currentMonth)} · ${escapeHtml(wallets[wallet].label)}</p>
         <div class="hero-number">${money(dashboard.monthRemaining)}</div>
-        <p class="hero-sub">${money(dashboard.dailySafeSpend)} spendable per day · expected ${money(dashboard.projectedMonthEnd)} month-end</p>
-        <button id="quickAddButton" class="primary-button month-add-button" type="button">Add Entry</button>
+        <p class="hero-sub">${money(dashboard.dailySafeSpend)} / day available</p>
+        <div class="hero-pills">
+          <span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span>
+          <span>Projected ${money(dashboard.projectedMonthEnd)}</span>
+        </div>
       </div>
       <div class="hero-strip">
-        <div class="strip-item"><span>Reserve Available</span><strong>${money(dashboard.pool.available)}</strong></div>
-        <div class="strip-item"><span>Locked Bills + Debt</span><strong>${money(dashboard.autoLocked)}</strong></div>
-        <div class="strip-item"><span>Not Covered by Reserve</span><strong class="${dashboard.pool.unfundedOverspend ? "risk-text" : ""}">${money(dashboard.pool.unfundedOverspend)}</strong></div>
+        <div class="strip-item"><span>Reserve</span><strong>${money(dashboard.pool.available)}</strong></div>
+        <div class="strip-item"><span>Uncovered</span><strong class="${dashboard.pool.unfundedOverspend ? "risk-text" : ""}">${money(dashboard.pool.unfundedOverspend)}</strong></div>
+        <div class="strip-item"><span>Categories</span><strong>${boxes.length}</strong></div>
       </div>
     </section>
 
-    <section class="metric-grid five-metrics">
-      <article class="metric-card sage"><span>Left This Month</span><strong>${money(dashboard.monthRemaining)}</strong><p>Daily boxes never go negative. Reserve covers overages first.</p></article>
-      <article class="metric-card blue"><span>Spendable Per Day</span><strong>${money(dashboard.dailySafeSpend)}</strong><p>Budget left divided by days left.</p></article>
-      <article class="metric-card olive"><span>Reserve Available</span><strong>${money(dashboard.pool.available)}</strong><p>${money(dashboard.pool.committed)} already used or committed this month.</p></article>
-      <article class="metric-card ${boxesAhead ? "amber" : "grey"}"><span>Boxes Spending Too Fast</span><strong>${boxesAhead}</strong><p>${boxesAhead ? "At least one box is ahead of the month." : "All boxes are on pace."}</p></article>
-      <article class="metric-card ${dashboard.projectedMonthEnd >= 0 ? "blue" : "terra"}"><span>Expected Month-End Balance</span><strong>${money(dashboard.projectedMonthEnd)}</strong><p>Based on current spending pace and locked items.</p></article>
-    </section>
-
-    <section class="desktop-grid">
-      <div class="card">
-        <div class="section-head">
-          <div><h2>Watch These</h2><p>Warnings are based on pace, reserve coverage, and early-month spending.</p></div>
-        </div>
-        <div class="warning-list">
-          ${warnings.length ? warnings.map(renderWarning).join("") : `<div class="warning-item good"><span><strong>This month is on track.</strong><br><span class="muted">No fast-spending or reserve coverage warnings.</span></span><strong>Good</strong></div>`}
-        </div>
+    <section class="card compact-card">
+      <div class="section-head">
+        <div><h2>Watch These</h2></div>
       </div>
-
-      <div class="card">
-        <div class="section-head">
-          <div><h2>Box Pace vs Month Progress</h2><p>Filled bar shows spending. Marker shows how much of the month has passed.</p></div>
-        </div>
-        <div class="box-grid">
-          ${boxes.map(renderBoxCard).join("")}
-        </div>
+      <div class="warning-list compact-list">
+        ${warnings.length ? warnings.map(renderWarning).join("") : `<div class="warning-item good"><span><strong>On track</strong></span><strong>Good</strong></div>`}
       </div>
     </section>
 
     <section class="card">
       <div class="section-head">
-        <div><h2>This Month Breakdown</h2><p>Only ${escapeHtml(state.currentMonth)} progress. Month-over-month review lives in More.</p></div>
+        <div><h2>Category Progress</h2></div>
       </div>
-      ${renderCurrentMonthAnalysis(wallet)}
+      <div class="box-grid overview-categories">
+        ${boxes.length ? boxes.map(renderOverviewCategoryCard).join("") : renderEmptyState("No spending categories yet.", "Add categories in Settings.")}
+      </div>
+    </section>
+
+    <button id="quickAddButton" class="fab-button" type="button" aria-label="Add entry">+</button>
+  `;
+}
+
+function renderReview() {
+  const wallet = state.activeWallet;
+  const dashboard = getDashboard(wallet);
+  const weekly = getWeeklyStats(wallet);
+  const boxes = getBoxes(wallet).slice().sort((a, b) => b.paceRatio - a.paceRatio);
+  const recommendations = getRecommendations(wallet);
+
+  return `
+    <section class="hero review-hero">
+      <div class="hero-main">
+        <p class="eyebrow">This Week · ${escapeHtml(wallets[wallet].label)}</p>
+        <div class="hero-number">${money(weekly.thisWeekSpend)}</div>
+        <p class="hero-sub">${money(weekly.last7Average)} / day recently · ${weekly.last7Average > dashboard.dailySafeSpend ? "above" : "under"} safe pace</p>
+      </div>
+      <div class="hero-strip">
+        <div class="strip-item"><span>Safe Daily</span><strong>${money(dashboard.dailySafeSpend)}</strong></div>
+        <div class="strip-item"><span>Last 7 Days</span><strong>${money(weekly.last7Spend)}</strong></div>
+        <div class="strip-item"><span>Status</span><strong>${weekly.last7Average > dashboard.dailySafeSpend ? "Review" : "OK"}</strong></div>
+      </div>
+    </section>
+
+    <section class="desktop-grid">
+      <div class="card">
+        <div class="section-head"><div><h2>Fastest Categories</h2></div></div>
+        <div class="warning-list compact-list">
+          ${boxes.slice(0, 3).map((box) => `<div class="warning-item ${box.status}"><span><strong>${escapeHtml(box.name)}</strong><br><span class="muted">${paceText(box)} · ${money(box.visibleRemaining)} left</span></span><strong>${escapeHtml(getBoxStatusLabel(box).label)}</strong></div>`).join("")}
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-head"><div><h2>Last 7 Days</h2></div></div>
+        ${renderDailySpendChart(weekly.dailyRows)}
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-head"><div><h2>Budget Suggestions</h2></div></div>
+      <div class="recommendation-list">
+        ${recommendations.length ? recommendations.map((item) => `<div class="recommendation-item">${escapeHtml(item)}</div>`).join("") : renderEmptyState("No budget changes suggested.", "Current category budgets look reasonable.")}
+      </div>
     </section>
   `;
 }
 
-function renderMore() {
-  const active = moreViews.some((item) => item.id === state.activeMoreView) ? state.activeMoreView : "plan";
-  state.activeMoreView = active;
-  const panels = {
-    plan: renderPlan,
-    analysis: renderAnalysis,
-    close: renderMonthClose
-  };
+function renderReports() {
+  const wallet = state.activeWallet;
+  const reportTabs = wallet === "vewu"
+    ? [["dashboard", "Dashboard"], ["year", "Year"], ["networth", "Net Worth"], ["receivables", "Receivables"], ["investments", "Investments"]]
+    : [["dashboard", "Dashboard"], ["year", "Year"], ["saved", "Saved Reserve"]];
+  const active = reportTabs.some(([id]) => id === state.activeReport) ? state.activeReport : "dashboard";
+  state.activeReport = active;
 
   return `
-    <section class="card more-home">
+    <section class="card">
       <div class="section-head">
-        <div><h2>More</h2><p>Low-frequency planning, review, closing, and backup tools live here.</p></div>
+        <div><h2>Reports</h2></div>
+        ${wallet === "vewu" ? `<button id="manageReportsButton" class="ghost-button section-action" type="button">${state.manageReports ? "Done" : "Manage"}</button>` : ""}
       </div>
-      <div class="segmented more-switch" role="tablist" aria-label="More sections">
-        ${moreViews.map((item) => `
-          <button class="segmented-button ${active === item.id ? "is-active" : ""}" type="button" data-more-view="${item.id}">
-            ${escapeHtml(item.label)}
-          </button>
-        `).join("")}
+      <div class="segmented report-switch">
+        ${reportTabs.map(([id, label]) => `<button class="segmented-button ${active === id ? "is-active" : ""}" type="button" data-report="${id}">${escapeHtml(label)}</button>`).join("")}
       </div>
     </section>
-    ${panels[active]()}
+    ${renderReportPanel(active, wallet)}
+  `;
+}
+
+function renderSettings() {
+  const sections = [["plan", "Budget"], ["reserve", "Reserve"], ["close", "Month End"], ["data", "Data"], ["danger", "Danger"]];
+  const active = sections.some(([id]) => id === state.settingsSection) ? state.settingsSection : "plan";
+  state.settingsSection = active;
+  return `
+    <section class="card">
+      <div class="section-head">
+        <div><h2>Settings</h2></div>
+        <button id="manageSettingsButton" class="ghost-button section-action" type="button">${state.manageSettings ? "Done" : "Manage"}</button>
+      </div>
+      <div class="segmented settings-switch">
+        ${sections.map(([id, label]) => `<button class="segmented-button ${active === id ? "is-active" : ""}" type="button" data-settings-section="${id}">${escapeHtml(label)}</button>`).join("")}
+      </div>
+    </section>
+    ${renderSettingsPanel(active)}
+  `;
+}
+
+function renderReportPanel(active, wallet) {
+  if (active === "year") return renderYear();
+  if (wallet === "pw") return renderSavedReserveReport(wallet);
+  if (active === "receivables") return renderReceivableReport();
+  if (active === "investments") return renderInvestmentReport();
+  if (active === "networth") return renderNetWorthReport();
+  return renderAssetDashboard();
+}
+
+function renderSettingsPanel(active) {
+  if (active === "reserve") return renderReserveSettings();
+  if (active === "close") return renderMonthClose();
+  if (active === "data") return renderDataSettings();
+  if (active === "danger") return renderDangerSettings();
+  return renderPlan();
+}
+
+function renderAssetDashboard() {
+  if (state.activeWallet === "pw") return renderSavedReserveReport("pw");
+  const receivables = state.receivables.reduce((acc, item) => acc + Number(item.currentBalance || 0), 0);
+  const latestInvestments = getLatestInvestments();
+  const investments = latestInvestments.reduce((acc, item) => acc + item.marketValue, 0);
+  const pool = getDashboard("vewu").pool.available;
+  const latestNetWorth = state.netWorthSnapshots[state.netWorthSnapshots.length - 1];
+  const computedNetWorth = pool + receivables + investments + (latestNetWorth?.homeEquity || 0) + (latestNetWorth?.otherAssets || 0) - (latestNetWorth?.mortgageBalance || 0) - (latestNetWorth?.carLoanBalance || 0) - (latestNetWorth?.otherLiabilities || 0);
+  return `
+    <section class="card">
+      <div class="section-head"><div><h2>Financial Position</h2></div></div>
+      <div class="asset-grid">
+        <article class="metric-card olive"><span>Cash Reserve</span><strong>${money(pool)}</strong></article>
+        <article class="metric-card blue"><span>Receivables</span><strong>${money(receivables)}</strong></article>
+        <article class="metric-card sage"><span>Investments</span><strong>${money(investments)}</strong></article>
+        <article class="metric-card grey"><span>Net Worth Estimate</span><strong>${money(computedNetWorth)}</strong></article>
+      </div>
+    </section>
+    ${renderYear()}
+  `;
+}
+
+function renderReceivableReport() {
+  return `<section class="card">${renderReceivableTracker()}</section>`;
+}
+
+function renderInvestmentReport() {
+  return `<section class="card">${renderInvestmentTracker()}</section>`;
+}
+
+function renderNetWorthReport() {
+  return renderAssetDashboard();
+}
+
+function renderSavedReserveReport(wallet) {
+  const rows = getPoolMonthSummaries(wallet);
+  return `
+    <section class="card">
+      <div class="section-head"><div><h2>Saved Reserve Trend</h2></div></div>
+      ${renderBarChart(`${wallets[wallet].reserveLabel}`, "Ending balance", rows.map((item) => item.month.slice(5)), rows.map((item) => item.ending), "olive")}
+    </section>
+  `;
+}
+
+function renderReceivableTracker() {
+  const receivables = state.receivables.reduce((acc, item) => acc + Number(item.currentBalance || 0), 0);
+  const manage = Boolean(state.manageReports);
+  return `
+    <div class="section-head">
+      <div><h2>Receivables</h2><p>Total ${money(receivables)}</p></div>
+    </div>
+    <div class="asset-list">
+      ${state.receivables.map((item) => `
+        <div class="asset-row">
+          <span><strong>${escapeHtml(item.debtor)}</strong><br><span class="muted">${escapeHtml(item.status)} · expected ${money(item.expectedPayment)} · ${escapeHtml(getPayoffLabel(item.currentBalance, item.expectedPayment, item.interestRate, item.expectedPayoffMonth))}</span></span>
+          <span><strong>${money(item.currentBalance)}</strong>${manage ? `<br><button class="mini-button" type="button" data-edit-receivable="${item.receivableId}">Edit</button>` : ""}</span>
+        </div>
+      `).join("")}
+    </div>
+    ${manage ? `<form id="receivableForm" class="tracker-form">
+      <h3>Add / Track Receivable</h3>
+      <div class="asset-edit-grid">
+        <label class="field"><span>Debtor</span><input id="receivableDebtor" required /></label>
+        <label class="field"><span>Current Balance</span><input id="receivableBalance" type="number" step="0.01" required /></label>
+        <label class="field"><span>Expected Payment</span><input id="receivableExpected" type="number" step="0.01" value="0" /></label>
+        <label class="field"><span>Interest Rate %</span><input id="receivableInterest" type="number" step="0.01" value="0" /></label>
+        <label class="field"><span>Status</span><select id="receivableStatus"><option value="active">Active</option><option value="paused">Paused</option><option value="archived">Archived</option><option value="paid-off">Paid Off</option></select></label>
+        <label class="field"><span>Notes</span><input id="receivableNotes" /></label>
+      </div>
+      <button class="primary-button" type="submit">Save Receivable</button>
+    </form>` : ""}
+  `;
+}
+
+function renderInvestmentTracker() {
+  const latestInvestments = getLatestInvestments();
+  const investments = latestInvestments.reduce((acc, item) => acc + item.marketValue, 0);
+  const manage = Boolean(state.manageReports);
+  return `
+    <div class="section-head">
+      <div><h2>Investments</h2><p>Total ${money(investments)}</p></div>
+    </div>
+    ${renderInvestmentVisualizer(latestInvestments)}
+    <div class="asset-list" style="margin-top: 12px;">
+      ${latestInvestments.map((item) => `
+        <div class="asset-row">
+          <span><strong>${escapeHtml(item.accountName)}</strong><br><span class="muted">${escapeHtml(item.bucketType)} · ${escapeHtml(item.date)}</span></span>
+          <span><strong>${money(item.marketValue)}</strong>${manage ? `<br><button class="mini-button" type="button" data-edit-investment="${item.snapshotId}">Edit</button>` : ""}</span>
+        </div>
+      `).join("")}
+    </div>
+    ${manage ? `<form id="investmentForm" class="tracker-form">
+      <h3>Add Investment Snapshot</h3>
+      <div class="asset-edit-grid">
+        <label class="field"><span>Date</span><input id="investmentDate" type="date" value="${state.currentMonth}-28" required /></label>
+        <label class="field"><span>Account / Bucket</span><input id="investmentAccount" placeholder="VFV, QQC..." required /></label>
+        <label class="field"><span>Bucket Type</span><select id="investmentType"><option>Emergency</option><option>Low Risk</option><option>Equity</option><option>Other</option></select></label>
+        <label class="field"><span>Market Value</span><input id="investmentValue" type="number" step="0.01" required /></label>
+        <label class="field"><span>Contribution</span><input id="investmentContribution" type="number" step="0.01" value="0" /></label>
+        <label class="field"><span>Withdrawal</span><input id="investmentWithdrawal" type="number" step="0.01" value="0" /></label>
+        <label class="field"><span>Notes</span><input id="investmentNotes" /></label>
+      </div>
+      <button class="primary-button" type="submit">Save Snapshot</button>
+    </form>` : ""}
+  `;
+}
+
+function renderReserveSettings() {
+  return `
+    ${renderPool()}
+  `;
+}
+
+function renderDataSettings() {
+  return `
+    <section class="card">
+      <div class="section-head"><div><h2>Data Backup</h2><p>Export regularly. Safari website data can be cleared by iOS.</p></div></div>
+      <div class="action-row">
+        <button id="exportJsonButton" class="primary-button" type="button">Export JSON</button>
+        <label class="ghost-button">Import JSON<input id="importJsonInput" class="hidden" type="file" accept=".json,application/json" /></label>
+      </div>
+      <div class="action-row" style="margin-top: 10px;">
+        <button id="exportButton" class="ghost-button" type="button">Export CSV</button>
+        <label class="ghost-button">Import CSV<input id="importCsvInput" class="hidden" type="file" accept=".csv,text/csv" /></label>
+      </div>
+    </section>
+  `;
+}
+
+function renderDangerSettings() {
+  return `
+    <section class="card danger-zone">
+      <div class="section-head"><div><h2>Danger Zone</h2><p>These actions change saved local data.</p></div></div>
+      <div class="action-row">
+        <button id="reopenWalletButton" class="ghost-button" type="button">Reopen Current Month</button>
+        <button id="resetButton" class="danger-button" type="button">Reset Demo Data</button>
+      </div>
+    </section>
   `;
 }
 
@@ -569,6 +799,7 @@ function renderAddEntryForm(wallet) {
   const plan = getPlan(state.currentMonth, wallet);
   const closed = isClosed(state.currentMonth, wallet);
   const dailyOptions = Object.entries(plan.boxes).map(([id, box]) => [`spending:${id}`, box.name]);
+  const firstOption = dailyOptions[0]?.[0] || "refund:refund";
   const optionGroups = wallet === "vewu"
     ? [
         { label: "Daily Spend", options: dailyOptions },
@@ -580,20 +811,36 @@ function renderAddEntryForm(wallet) {
       ];
 
   return `
-      ${closed ? `<div class="warning-item risk"><span><strong>This month is closed.</strong><br><span class="muted">Reopen it from More > Close before editing.</span></span><strong>Locked</strong></div>` : ""}
+      ${closed ? `<div class="warning-item risk"><span><strong>This month is closed.</strong></span><strong>Locked</strong></div>` : ""}
       <form id="addForm" class="form-card">
         <label class="field">
           <span>Amount</span>
           <input class="amount-input" id="amountInput" type="number" inputmode="decimal" min="0" step="0.01" required ${closed ? "disabled" : ""} />
         </label>
-        <div class="split-grid">
+        <label class="field">
+          <span>Category</span>
+          <div class="chip-grid category-chip-grid">
+            ${dailyOptions.map(([value, label], index) => `<button class="chip category-chip ${index === 0 ? "is-active" : ""}" type="button" data-category-value="${escapeHtml(value)}">${escapeHtml(label)}</button>`).join("")}
+          </div>
+          <select id="boxSelect" class="hidden" ${closed ? "disabled" : ""}>
+            ${dailyOptions.map(([value, label]) => `<option value="${value}" ${value === firstOption ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}
+            ${optionGroups.slice(1).flatMap((group) => group.options).map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("")}
+          </select>
+        </label>
+        <label class="field">
+          <span>Note</span>
+          <textarea id="noteInput" rows="2" placeholder="Costco, RTO lunch, refund..." ${closed ? "disabled" : ""}></textarea>
+        </label>
+        <label class="field">
+          <span>Date</span>
+          <input id="dateInput" type="date" value="${defaultDate()}" required ${closed ? "disabled" : ""} />
+        </label>
+        <details class="advanced-entry">
+          <summary>Advanced</summary>
           <label class="field">
-            <span>Date</span>
-            <input id="dateInput" type="date" value="${defaultDate()}" required ${closed ? "disabled" : ""} />
-          </label>
-          <label class="field">
-            <span>Box</span>
-            <select id="boxSelect" ${closed ? "disabled" : ""}>
+            <span>Entry type</span>
+            <select id="advancedTypeSelect" ${closed ? "disabled" : ""}>
+              <option value="${escapeHtml(firstOption)}">Regular spending</option>
               ${optionGroups.map((group) => `
                 <optgroup label="${escapeHtml(group.label)}">
                   ${group.options.map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("")}
@@ -601,7 +848,7 @@ function renderAddEntryForm(wallet) {
               `).join("")}
             </select>
           </label>
-        </div>
+        </details>
         <div id="refundControls" class="split-grid hidden">
           <label class="field">
             <span>Refund applies to</span>
@@ -617,10 +864,6 @@ function renderAddEntryForm(wallet) {
             </select>
           </label>
         </div>
-        <label class="field">
-          <span>Note</span>
-          <textarea id="noteInput" rows="3" placeholder="Costco, RTO lunch, refund, reserve spend..." ${closed ? "disabled" : ""}></textarea>
-        </label>
         <button class="primary-button" type="submit" ${closed ? "disabled" : ""}>Add Entry</button>
       </form>
   `;
@@ -741,7 +984,7 @@ function renderAssets() {
   const pool = getDashboard("vewu").pool.available;
   const latestNetWorth = state.netWorthSnapshots[state.netWorthSnapshots.length - 1];
   const computedNetWorth = pool + receivables + investments + (latestNetWorth?.homeEquity || 0) + (latestNetWorth?.otherAssets || 0) - (latestNetWorth?.mortgageBalance || 0) - (latestNetWorth?.carLoanBalance || 0) - (latestNetWorth?.otherLiabilities || 0);
-  const editMode = Boolean(state.editMode);
+  const editMode = Boolean(state.manageReports);
 
   return `
     <section class="card">
@@ -816,12 +1059,12 @@ function renderPlan() {
   const plan = getPlan(state.currentMonth, wallet);
   const base = getEditableYearPlan(wallet);
   const closed = isClosed(state.currentMonth, wallet);
-  const editMode = Boolean(state.editMode);
+  const manage = Boolean(state.manageSettings);
 
   return `
     <section class="card">
       <div class="section-head">
-        <div><h2>Default Monthly Plan</h2><p>${editMode ? "Changes apply from next month forward. Closed months are never overwritten." : "Turn on Edit Mode to change names, categories, or amounts."}</p></div>
+        <div><h2>Monthly Plan</h2><p>${manage ? "Changes apply from next month forward. Closed months are never overwritten." : "Turn on Manage to change names, categories, or amounts."}</p></div>
       </div>
       <div class="plan-section">
         ${renderPlanInputs(base, "year")}
@@ -830,14 +1073,14 @@ function renderPlan() {
 
     <section class="card">
       <div class="section-head">
-        <div><h2>This Month Plan Changes</h2><p>${closed ? "This month is closed. Reopen before editing." : editMode ? "Only changes this month; next month returns to the default plan." : "Current month view. Turn on Edit Mode to make one-month changes."}</p></div>
+        <div><h2>This Month Changes</h2><p>${closed ? "This month is closed. Reopen before editing." : manage ? "Only changes this month; next month returns to the monthly plan." : "Current month view."}</p></div>
       </div>
       <div class="plan-section">
         ${renderPlanInputs(plan, "current", closed)}
       </div>
     </section>
 
-    ${editMode ? `<section class="card">
+    ${manage ? `<section class="card">
       <div class="section-head">
         <div><h2>Add or Change Plan Items</h2><p>Add income, fixed bills, debt payments, spending boxes, or planned saving.</p></div>
       </div>
@@ -852,11 +1095,11 @@ function renderPlan() {
         ${state.debtPlans.filter((item) => item.wallet === wallet).map((item) => `
           <div class="asset-row">
             <span><strong>${escapeHtml(item.name)}</strong><br><span class="muted">${escapeHtml(item.status)} · balance ${money(item.currentBalance)} · monthly ${money(item.monthlyPayment)} · ${escapeHtml(getPayoffLabel(item.currentBalance, item.monthlyPayment, item.interestRate))}</span></span>
-            <span>${editMode ? `<button class="mini-button" type="button" data-edit-debt="${item.debtId}">Edit</button> <button class="mini-button" type="button" data-delete-debt="${item.debtId}">Delete</button>` : `<strong>${money(item.monthlyPayment)}</strong>`}</span>
+            <span>${manage ? `<button class="mini-button" type="button" data-edit-debt="${item.debtId}">Edit</button> <button class="mini-button" type="button" data-delete-debt="${item.debtId}">Delete</button>` : `<strong>${money(item.monthlyPayment)}</strong>`}</span>
           </div>
         `).join("") || `<div class="asset-row"><span>No debt payment items.</span><strong>$0</strong></div>`}
       </div>
-      ${editMode ? `<form id="debtForm" class="tracker-form">
+      ${manage ? `<form id="debtForm" class="tracker-form">
         <h3>Add Debt Payment</h3>
         <div class="asset-edit-grid">
           <label class="field"><span>Name</span><input id="debtName" required /></label>
@@ -879,13 +1122,19 @@ function renderMonthClose() {
   const unclosed = getUnclosedMonths();
   const reminder = getCloseReminder();
   const closeSummary = getCloseSummary(wallet);
-  const editMode = Boolean(state.editMode);
+  const manage = Boolean(state.manageSettings);
 
   return `
     ${reminder ? `<section class="warning-item watch"><span><strong>Close reminder</strong><br><span class="muted">${escapeHtml(reminder)}</span></span><strong>Close</strong></section>` : ""}
     <section class="card">
       <div class="section-head">
         <div><h2>Close This Month</h2><p>Freeze ${escapeHtml(wallets[wallet].label)} budget so future plan changes cannot overwrite it.</p></div>
+      </div>
+      <div class="checklist">
+        <div class="check-item">Review unusual transactions</div>
+        <div class="check-item">Confirm over-budget categories</div>
+        <div class="check-item">Confirm reserve coverage</div>
+        <div class="check-item">Export backup from Data</div>
       </div>
       <div class="metric-grid">
         <article class="metric-card sage"><span>Income / Allowance</span><strong>${money(dashboard.income)}</strong><p>Plan-default monthly inflow.</p></article>
@@ -896,7 +1145,7 @@ function renderMonthClose() {
       </div>
       <div class="action-row" style="margin-top: 14px;">
         <button id="closeWalletButton" class="primary-button" type="button">${closed ? "Closed" : `Close ${wallets[wallet].label}`}</button>
-        ${editMode ? `<button id="reopenWalletButton" class="ghost-button" type="button">Reopen</button>` : ""}
+        ${manage ? `<button id="reopenWalletButton" class="ghost-button" type="button">Reopen</button>` : ""}
       </div>
     </section>
 
@@ -910,17 +1159,6 @@ function renderMonthClose() {
       <div class="unclosed-grid">
         ${unclosed.length ? unclosed.map((item) => `<div class="asset-row"><span>${escapeHtml(item.month)} · ${escapeHtml(wallets[item.wallet].label)}</span><strong>Open</strong></div>`).join("") : `<div class="asset-row"><span>All tracked months are closed.</span><strong>Done</strong></div>`}
       </div>
-    </section>
-
-    <section class="card">
-      <div class="section-head"><div><h2>Backup / Restore CSV</h2><p>CSV is the portable backup. It can be analyzed directly or imported into a blank template.</p></div></div>
-      <div class="action-row">
-        <button id="exportButton" class="ghost-button" type="button">Export CSV</button>
-        ${editMode ? `<label class="ghost-button">Import CSV<input id="importCsvInput" class="hidden" type="file" accept=".csv,text/csv" /></label>` : ""}
-      </div>
-      ${editMode ? `<div class="action-row" style="margin-top: 10px;">
-        <button id="resetButton" class="danger-button" type="button">Reset Demo</button>
-      </div>` : ""}
     </section>
   `;
 }
@@ -947,7 +1185,7 @@ function planGroup(title, rows) {
 }
 
 function planRow(label, typeLabel, key, value, attr, disabled, canDelete = true) {
-  const editable = state.editMode && !disabled;
+  const editable = state.manageSettings && !disabled;
   return `
     <div class="plan-row ${editable ? "is-editable" : "is-readonly"}">
       <span><strong>${escapeHtml(label)}</strong><br><span class="muted">${escapeHtml(typeLabel)}</span></span>
@@ -970,6 +1208,7 @@ function addTransaction(event) {
 
   if (type === "spending") {
     state.transactions.push(t(date, wallet, amount, box, note || boxMeta[box]?.name || "Spending"));
+    state.highlightBox = box;
   }
 
   if (type === "pool_inflow") {
@@ -991,9 +1230,17 @@ function addTransaction(event) {
   }
 
   save();
-  showToast("Entry added");
+  const updatedBox = type === "spending" ? getBoxes(wallet).find((item) => item.boxId === box) : null;
+  showToast(updatedBox ? `Added to ${updatedBox.name} · ${money(updatedBox.visibleRemaining)} left` : "Entry added");
   closeEditModal();
   render();
+  if (state.highlightBox) {
+    window.setTimeout(() => {
+      state.highlightBox = "";
+      save();
+      render();
+    }, 900);
+  }
 }
 
 function updateRefundControls() {
@@ -1029,6 +1276,23 @@ function openAddEntryModal() {
   form?.addEventListener("submit", addTransaction);
   modalRoot.querySelector("#boxSelect")?.addEventListener("change", updateRefundControls);
   modalRoot.querySelector("#refundTarget")?.addEventListener("change", updateRefundControls);
+  modalRoot.querySelector("#advancedTypeSelect")?.addEventListener("change", (event) => {
+    const value = event.target.value;
+    const select = modalRoot.querySelector("#boxSelect");
+    if (select) select.value = value;
+    modalRoot.querySelectorAll(".category-chip").forEach((chip) => chip.classList.toggle("is-active", chip.dataset.categoryValue === value));
+    updateRefundControls();
+  });
+  modalRoot.querySelectorAll(".category-chip").forEach((button) => {
+    button.addEventListener("click", () => {
+      const select = modalRoot.querySelector("#boxSelect");
+      const advanced = modalRoot.querySelector("#advancedTypeSelect");
+      if (select) select.value = button.dataset.categoryValue;
+      if (advanced) advanced.value = button.dataset.categoryValue;
+      modalRoot.querySelectorAll(".category-chip").forEach((chip) => chip.classList.toggle("is-active", chip === button));
+      updateRefundControls();
+    });
+  });
   requestAnimationFrame(() => modalRoot.querySelector("#amountInput")?.focus());
 }
 
@@ -1708,6 +1972,29 @@ function getDashboard(wallet) {
   };
 }
 
+function getMonthStatus(dashboard) {
+  if (dashboard.pool.unfundedOverspend > 0 || dashboard.projectedMonthEnd < 0) return { label: "Review", tone: "terra" };
+  if (dashboard.monthRemaining < dashboard.dailySafeSpend * 3) return { label: "Watch", tone: "amber" };
+  return { label: "On Track", tone: "sage" };
+}
+
+function getBoxStatusLabel(box) {
+  if (box.overage > 0 && box.coveredByPool < box.overage) return { label: "Uncovered", tone: "terra" };
+  if (box.overage > 0) return { label: "Covered", tone: "olive" };
+  if (box.usedPercent >= 1) return { label: "Over Budget", tone: "terra" };
+  if (box.paceRatio > 1.35) return { label: "Over Pace", tone: "terra" };
+  if (box.paceRatio > 1.15) return { label: "Watch", tone: "amber" };
+  return { label: "On Track", tone: "sage" };
+}
+
+function paceText(box) {
+  if (box.overage > 0) return `Over by ${money(box.overage)}`;
+  const delta = Math.round(Math.abs(box.paceRatio - 1) * 100);
+  if (box.paceRatio > 1.08) return `${delta}% faster than pace`;
+  if (box.paceRatio < 0.92) return `${delta}% under pace`;
+  return "On pace";
+}
+
 function getBoxes(wallet) {
   const plan = getPlan(state.currentMonth, wallet);
   const monthElapsed = getMonthElapsedPercent(state.currentMonth);
@@ -1820,6 +2107,29 @@ function getWarnings(wallet) {
   return warnings;
 }
 
+function getWeeklyStats(wallet) {
+  const today = getReferenceDate();
+  const start = new Date(today);
+  start.setDate(today.getDate() - 6);
+  start.setHours(0, 0, 0, 0);
+  const rows = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    const key = date.toISOString().slice(0, 10);
+    const amount = state.transactions
+      .filter((item) => item.wallet === wallet && item.type === "spending" && item.date === key)
+      .reduce((acc, item) => acc + item.amount, 0);
+    return { date: key, label: date.toLocaleDateString("en-CA", { weekday: "short" }), amount };
+  });
+  const last7Spend = rows.reduce((acc, item) => acc + item.amount, 0);
+  return {
+    dailyRows: rows,
+    thisWeekSpend: rows.reduce((acc, item) => acc + item.amount, 0),
+    last7Spend,
+    last7Average: last7Spend / 7
+  };
+}
+
 function getRecommendations(wallet) {
   const months = getRecentActualMonths(wallet, 4);
   const recs = [];
@@ -1905,11 +2215,34 @@ function renderCloseStackRow(label, value, max, tone) {
 }
 
 function renderWarning(item) {
-  return `<div class="warning-item ${item.level}"><span><strong>${escapeHtml(item.title)}</strong><br><span class="muted">${escapeHtml(item.text)}</span></span><strong>${item.level === "risk" ? "Too Fast" : "Watch"}</strong></div>`;
+  return `<div class="warning-item ${item.level}"><span><strong>${escapeHtml(item.title)}</strong>${item.text ? `<br><span class="muted">${escapeHtml(item.text)}</span>` : ""}</span><strong>${item.level === "risk" ? "Review" : "Watch"}</strong></div>`;
 }
 
 function renderBoxCard(box) {
   return `<article class="box-card">${renderBoxCardInner(box)}</article>`;
+}
+
+function renderOverviewCategoryCard(box) {
+  const fill = Math.min(box.usedPercent * 100, 100);
+  const marker = Math.min(box.monthElapsedPercent * 100, 100);
+  const status = getBoxStatusLabel(box);
+  return `
+    <button class="box-card category-card ${state.highlightBox === box.boxId ? "just-updated" : ""}" type="button" data-view-box="${escapeHtml(box.boxId)}">
+      <div class="box-top">
+        <div><span class="${escapeHtml(status.tone)}-text">${escapeHtml(status.label)}</span><strong>${escapeHtml(box.name)}</strong></div>
+        <strong>${money(box.actualSpent)} / ${money(box.budget)}</strong>
+      </div>
+      <div class="box-meta single-line">
+        <span>${money(box.visibleRemaining)} left</span>
+        <span>${paceText(box)}</span>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill ${box.status}" style="width:${fill}%"></div></div>
+        <i class="today-marker" style="left:${marker}%"></i>
+      </div>
+      ${box.overage ? `<span class="covered">${money(box.coveredByPool)} covered</span>` : ""}
+    </button>
+  `;
 }
 
 function renderBoxCardInner(box) {
@@ -1917,7 +2250,7 @@ function renderBoxCardInner(box) {
   const marker = Math.min(box.monthElapsedPercent * 100, 100);
   return `
     <div class="box-top">
-      <div><span>${box.status === "risk" ? "Too Fast" : box.status === "watch" ? "Ahead" : "On Pace"}</span><strong>${escapeHtml(box.name)}</strong></div>
+      <div><span>${escapeHtml(getBoxStatusLabel(box).label)}</span><strong>${escapeHtml(box.name)}</strong></div>
       <strong>${money(box.actualSpent)} / ${money(box.budget)}</strong>
     </div>
     <div class="progress-wrap">
@@ -1927,7 +2260,7 @@ function renderBoxCardInner(box) {
     <div class="box-meta">
       <span>${money(box.visibleRemaining)} left</span>
       <span>${Math.round(box.usedPercent * 100)}% used</span>
-      <span>Speed ${box.paceRatio.toFixed(1)}x</span>
+      <span>${paceText(box)}</span>
       <span>Expected ${money(box.projectedSpend)}</span>
     </div>
     ${box.overage ? `<span class="covered">${money(box.coveredByPool)} covered by reserve</span>` : ""}
@@ -1945,11 +2278,41 @@ function renderBoxDetail(box) {
   `;
 }
 
+function openCategoryDetail(boxId) {
+  const box = getBoxes(state.activeWallet).find((item) => item.boxId === boxId);
+  if (!box) return;
+  const transactions = getBoxTransactions(state.activeWallet, boxId).slice().sort((a, b) => b.date.localeCompare(a.date));
+  modalRoot.innerHTML = `
+    <div class="modal-backdrop" role="presentation">
+      <section class="edit-modal" role="dialog" aria-modal="true" aria-labelledby="categoryDetailTitle">
+        <div class="modal-head">
+          <div>
+            <h2 id="categoryDetailTitle">${escapeHtml(box.name)}</h2>
+            <p>${money(box.actualSpent)} spent of ${money(box.budget)} · ${money(box.visibleRemaining)} left · ${paceText(box)}</p>
+          </div>
+          <button class="icon-button" type="button" data-close-modal aria-label="Close">×</button>
+        </div>
+        ${renderBoxDetail(box)}
+        <div class="transaction-list" style="margin-top: 12px;">
+          ${transactions.length ? transactions.map(renderTransaction).join("") : `<div class="transaction-item"><span>No entries yet.</span><strong>$0</strong></div>`}
+        </div>
+      </section>
+    </div>
+  `;
+  const backdrop = modalRoot.querySelector(".modal-backdrop");
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) closeEditModal();
+  });
+  modalRoot.querySelectorAll("[data-close-modal]").forEach((button) => button.addEventListener("click", closeEditModal));
+  modalRoot.querySelectorAll("[data-edit-txn]").forEach((button) => button.addEventListener("click", () => editTransaction(button.dataset.editTxn)));
+  modalRoot.querySelectorAll("[data-delete-txn]").forEach((button) => button.addEventListener("click", () => deleteTransaction(button.dataset.deleteTxn)));
+}
+
 function renderTransaction(item) {
   return `
     <div class="transaction-item">
       <span><strong>${escapeHtml(item.note || boxMeta[item.box]?.name || "Entry")}</strong><br><span class="muted">${formatDate(item.date)} · ${escapeHtml(item.type)}</span></span>
-      <span><strong>${money(item.amount)}</strong>${state.editMode ? `<br><button class="mini-button" type="button" data-edit-txn="${item.transactionId}">Edit</button> <button class="mini-button" type="button" data-delete-txn="${item.transactionId}">Delete</button>` : ""}</span>
+      <span><strong>${money(item.amount)}</strong><br><button class="mini-button" type="button" data-edit-txn="${item.transactionId}">Edit</button> <button class="mini-button" type="button" data-delete-txn="${item.transactionId}">Delete</button></span>
     </div>
   `;
 }
@@ -2106,6 +2469,19 @@ function renderBudgetVisualRow(box) {
       <small class="muted">Expected ${money(box.projectedSpend)} if this pace continues · marker shows expected month-end</small>
     </div>
   `;
+}
+
+function renderDailySpendChart(rows) {
+  const max = Math.max(...rows.map((row) => row.amount), 1);
+  return `
+    <div class="mini-chart daily-chart">
+      ${rows.map((row) => `<div class="bar-col"><i class="amber" style="height:${Math.max(4, row.amount / max * 72)}px"></i><em>${escapeHtml(row.label)}</em><strong>${money(row.amount)}</strong></div>`).join("")}
+    </div>
+  `;
+}
+
+function renderEmptyState(title, action = "") {
+  return `<div class="empty-state"><strong>${escapeHtml(title)}</strong>${action ? `<span>${escapeHtml(action)}</span>` : ""}</div>`;
 }
 
 function barWidth(value, rows) {
@@ -2547,11 +2923,41 @@ function importCsv(event) {
   reader.readAsText(file);
 }
 
+function exportJson() {
+  const backup = {
+    appVersion: APP_VERSION,
+    exportedAt: new Date().toISOString(),
+    storageKey: STORAGE_KEY,
+    data: state
+  };
+  downloadText(`finance-tracker-${state.currentMonth}-${APP_VERSION}.json`, JSON.stringify(backup, null, 2), "application/json");
+  showToast("JSON export ready");
+}
+
+function importJson(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(String(reader.result || "{}"));
+      state = normalizeState(parsed.data || parsed);
+      save();
+      showToast("JSON import complete");
+      renderChrome();
+      render();
+    } catch {
+      showToast("JSON import failed");
+    }
+  };
+  reader.readAsText(file);
+}
+
 function emptyImportState() {
   return {
     ...structuredClone(demoState),
     appVersion: APP_VERSION,
-    activeTab: "month",
+    activeTab: "overview",
     activeWallet: "vewu",
     selectedBox: "",
     yearPlanVersions: [],
@@ -2732,10 +3138,18 @@ function resetDemo() {
 }
 
 function defaultDate() {
-  const today = new Date();
+  const today = getReferenceDate();
   const month = today.toISOString().slice(0, 7);
   if (month === state.currentMonth) return today.toISOString().slice(0, 10);
   return `${state.currentMonth}-01`;
+}
+
+function getReferenceDate() {
+  const today = new Date();
+  const month = today.toISOString().slice(0, 7);
+  if (month === state.currentMonth) return today;
+  const [year, monthIndex] = state.currentMonth.split("-").map(Number);
+  return new Date(year, monthIndex, 0);
 }
 
 function getDaysInMonth(month) {
@@ -2789,6 +3203,10 @@ function money(value) {
 
 function formatDate(date) {
   return new Date(`${date}T00:00:00`).toLocaleDateString("en-CA", { month: "short", day: "numeric" });
+}
+
+function formatMonthLabel(month) {
+  return new Date(`${month}-01T00:00:00`).toLocaleDateString("en-CA", { month: "long", year: "numeric" });
 }
 
 function uid(prefix) {

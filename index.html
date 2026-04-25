@@ -5,27 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Finance Tracker</title>
     <link rel="stylesheet" href="./styles.css" />
-    <meta name="apple-mobile-web-app-title" content="Finance Tracker">
-  <meta name="application-name" content="Finance Tracker">
-  <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-</head>
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+    <meta name="theme-color" content="#111111" />
+    <meta name="application-name" content="Finance Tracker" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Finance Tracker" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Box Budget Tracker</p>
-          <h1 id="pageTitle">Month</h1>
-          <p id="versionBadge" class="version-badge">v5.1.0</p>
+          <p class="eyebrow">Finance Tracker</p>
+          <h1 id="pageTitle">Overview</h1>
+          <p id="versionBadge" class="version-badge">v10.0-github-pages</p>
         </div>
         <div class="top-actions">
           <label class="month-field">
             <span>Month</span>
             <input id="monthInput" type="month" />
           </label>
-          <button id="globalEditButton" class="edit-toggle" type="button" aria-pressed="false">View Mode</button>
         </div>
       </header>
 
@@ -43,14 +44,12 @@
     </template>
 
     <script src="./app.js"></script>
-  
-<script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./sw.js").catch(() => {});
-    });
-  }
-</script>
-
-</body>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("./sw.js").catch(() => {});
+        });
+      }
+    </script>
+  </body>
 </html>

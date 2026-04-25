@@ -6,7 +6,7 @@ This is a static Finance Tracker PWA.
 
 - Existing app settings
 - Existing data model
-- Existing UI layout and visual design
+- Existing data-safe UX patterns unless the user requests a product iteration
 - Import/export behavior
 
 ## Allowed maintenance changes
@@ -15,6 +15,7 @@ This is a static Finance Tracker PWA.
 - PWA manifest and icon metadata
 - Service worker cache/version updates
 - README / CHANGELOG / deployment documentation
+- Navigation and dashboard simplification when explicitly requested
 
 ## Deployment assumptions
 

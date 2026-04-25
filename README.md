@@ -1,32 +1,80 @@
 # Finance Tracker
 
-GitHub-ready static PWA package.
+Personal monthly finance dashboard for GitHub Pages.
 
-## Files
+## What this app does
 
-- `index.html` — app entry
-- `app.js` — app logic
-- `styles.css` — app styling
-- `manifest.json` — PWA app name, icon, and install settings
-- `sw.js` — service worker for offline cache and GitHub Pages compatibility
-- `icon-192.png`, `icon-512.png`, `apple-touch-icon.png` — home screen icons
+Finance Tracker is a static, private-use budget dashboard. It tracks monthly spending, category pace, reserve coverage, income/fixed/debt plans, CSV/JSON backups, receivables, investments, and long-term reports using browser `localStorage`.
 
-## Deploy to GitHub Pages
+There is no backend, login system, database, serverless function, third-party deployment platform, or paid service dependency.
 
-1. Upload all files in this folder to the repository root.
-2. Go to **Settings → Pages**.
-3. Select **Deploy from a branch**.
-4. Choose `main` and `/root`.
-5. Wait for GitHub Pages to finish publishing.
+## Local development
 
-## iPhone home screen
+This repository is a plain static site. No build system is required.
 
-Open the GitHub Pages URL in Safari, then use **Share → Add to Home Screen**.  
-The installed app should display as **Finance Tracker** with the included custom icon.
+Open `index.html` directly, or serve the folder with any local static server:
 
-## Iteration rules
+```bash
+python3 -m http.server 5173
+```
 
-- Keep the files in the repository root.
-- Do not upload the ZIP itself.
-- Commit all changed files after each iteration.
-- For PWA cache issues, delete and re-add the iPhone home screen app after deployment.
+Then open `http://localhost:5173/`.
+
+## Build
+
+No build step is required. The repository root is the deployable site.
+
+If a future version adds a build tool, keep GitHub Pages output compatible with the project path:
+
+```text
+/finance-tracker/
+```
+
+## GitHub Pages deployment
+
+Repository name: `finance-tracker`
+
+Final URL:
+
+```text
+https://paay-waay.github.io/finance-tracker/
+```
+
+GitHub Pages source options:
+
+### A. Deploy from branch
+
+1. Commit these files to the repository root.
+2. Go to GitHub repository **Settings → Pages**.
+3. Choose **Deploy from a branch**.
+4. Select `main` and `/root`.
+5. Save and wait for Pages to publish.
+
+### B. GitHub Actions
+
+This static version does not require Actions. If a future build step is introduced, deploy the generated output directory with GitHub Pages official Actions.
+
+## iPhone usage
+
+1. Open `https://paay-waay.github.io/finance-tracker/` in Safari.
+2. Tap **Share**.
+3. Tap **Add to Home Screen**.
+4. Open the installed app from the iPhone home screen.
+
+The PWA manifest uses `/finance-tracker/` as both `start_url` and `scope`.
+
+## Data backup
+
+All tracker data is stored locally in the browser. Export backups regularly.
+
+- Use **Settings → Data → Export JSON** for full restore backups.
+- Use **Settings → Data → Export CSV** for spreadsheet analysis.
+- Restore after Safari data loss by importing JSON.
+
+## Troubleshooting
+
+- Blank page: check that all paths use the `/finance-tracker/` GitHub Pages project path.
+- Old version showing: service worker cache is still active. Refresh, clear Safari website data, or remove/re-add the home-screen app.
+- Missing icon: check `manifest.json`, `icon-192.png`, `icon-512.png`, and `apple-touch-icon.png` paths.
+- Data missing: Safari website data may have been cleared. Restore with **Import JSON**.
+- Repository renamed: update `manifest.json` `start_url`/`scope`, `sw.js` `BASE_PATH`, icon paths, and this README.
