@@ -1,3226 +1,3227 @@
-const APP_VERSION = "v10.0-github-pages";
-const GITHUB_PAGES_BASE = "/finance-tracker/";
-const STORAGE_KEY = "finance-box-budget-v3";
-const APP_MONTH = "2026-04";
+const APP_VERSION = "v13.1 Planning Edit Mode";
+const SCHEMA_VERSION = 11;
+const STORAGE_KEY = "financeCashflowOS_v11";
+const LEGACY_KEYS = ["financePlanner_v2", "finance-box-budget-v3"];
+const BASE_PATH = "/finance-tracker/";
 
-const wallets = {
-  vewu: { label: "VEWU", reserveLabel: "Cash Reserve", hasAssets: true },
-  pw: { label: "PW", reserveLabel: "Saved Money Reserve", hasAssets: false }
-};
-
-const tabs = [
-  { id: "overview", label: "Overview" },
-  { id: "review", label: "Review" },
-  { id: "reports", label: "Reports" },
-  { id: "settings", label: "Settings" }
+const DEFAULT_MONITOR_CATEGORIES = [
+  {
+    id: "groceries",
+    label: "Groceries",
+    icon: "🧺",
+    group: "essentials",
+    monthlyBudget: 750,
+    monitor: true,
+    allowTransactions: true,
+    includeInVariableTotal: true,
+    includeInWeeklyDiscipline: true,
+    ruleType: "softCap",
+    softCapMultiplier: 1.1,
+    penaltyMultiplier: null,
+    minPenaltyUnit: null,
+    priority: "primary",
+    displayOrder: 1,
+    active: true,
+    archived: false
+  },
+  {
+    id: "charging",
+    label: "Charging/407",
+    icon: "⚡",
+    group: "essentials",
+    monthlyBudget: 150,
+    monitor: true,
+    allowTransactions: true,
+    includeInVariableTotal: true,
+    includeInWeeklyDiscipline: true,
+    ruleType: "softCap",
+    softCapMultiplier: 1.1,
+    penaltyMultiplier: null,
+    minPenaltyUnit: null,
+    priority: "primary",
+    displayOrder: 2,
+    active: true,
+    archived: false
+  },
+  {
+    id: "entertainment",
+    label: "Entertainment",
+    icon: "🎟",
+    group: "discretionary",
+    monthlyBudget: 300,
+    monitor: true,
+    allowTransactions: true,
+    includeInVariableTotal: true,
+    includeInWeeklyDiscipline: true,
+    ruleType: "penalty",
+    softCapMultiplier: null,
+    penaltyMultiplier: 1.5,
+    minPenaltyUnit: 5,
+    priority: "primary",
+    displayOrder: 3,
+    active: true,
+    archived: false
+  },
+  {
+    id: "misc",
+    label: "Misc",
+    icon: "◼",
+    group: "discretionary",
+    monthlyBudget: 150,
+    monitor: true,
+    allowTransactions: true,
+    includeInVariableTotal: true,
+    includeInWeeklyDiscipline: true,
+    ruleType: "penalty",
+    softCapMultiplier: null,
+    penaltyMultiplier: 1.5,
+    minPenaltyUnit: 5,
+    priority: "primary",
+    displayOrder: 4,
+    active: true,
+    archived: false
+  }
 ];
 
-const boxMeta = {
-  groceries: { wallet: "vewu", name: "Food & Groceries" },
-  car407: { wallet: "vewu", name: "Car Energy & Tolls" },
-  misc: { wallet: "vewu", name: "Household Misc" },
-  eatOut: { wallet: "pw", name: "Food & RTO" },
-  personal: { wallet: "pw", name: "Personal Spending" }
+const DEFAULT_BACKGROUND_SECTIONS = [
+  {
+    id: "core-income",
+    label: "Core Income",
+    type: "income",
+    displayOrder: 1,
+    active: true,
+    archived: false,
+    items: [
+      { id: "pw-salary", label: "PW Salary", amount: 5897, frequency: "monthly", includeInGap: false, includeInProjection: false, includeInSummary: true, active: true, archived: false }
+    ]
+  },
+  {
+    id: "reserve-income",
+    label: "Reserve Income",
+    type: "income",
+    displayOrder: 2,
+    active: true,
+    archived: false,
+    items: [
+      { id: "mv-contrib", label: "MV Contrib", amount: 1500, frequency: "monthly", includeInGap: false, includeInProjection: true, includeInSummary: true, active: true, archived: false },
+      { id: "leo-debt", label: "Leo Debt", amount: 700, frequency: "monthly", includeInGap: false, includeInProjection: true, includeInSummary: true, active: true, archived: false }
+    ]
+  },
+  {
+    id: "investment",
+    label: "Investment",
+    type: "investment",
+    displayOrder: 3,
+    active: true,
+    archived: false,
+    items: [
+      { id: "investment", label: "Investment", amount: 217, frequency: "monthly", includeInGap: false, includeInProjection: false, includeInSummary: true, active: true, archived: false }
+    ]
+  },
+  {
+    id: "fixed",
+    label: "Fixed",
+    type: "fixed",
+    displayOrder: 4,
+    active: true,
+    archived: false,
+    items: [
+      { id: "insurance", label: "Insurance", amount: 558, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false },
+      { id: "condo-admin", label: "Condo Admin", amount: 564, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false },
+      { id: "property-tax", label: "Property Tax", amount: 267, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false },
+      { id: "internet", label: "Internet", amount: 49, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false },
+      { id: "pw-trust", label: "PW Trust", amount: 600, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false, systemNote: "Background only. Never appears in Quick Add or Monitor." }
+    ]
+  },
+  {
+    id: "debt",
+    label: "Debt",
+    type: "debt",
+    displayOrder: 5,
+    active: true,
+    archived: false,
+    items: [
+      { id: "mortgage", label: "Mortgage", amount: 2167, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false },
+      { id: "car-payment", label: "Car Payment", amount: 682, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false },
+      { id: "ikea-payment", label: "IKEA Payment", amount: 113, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false }
+    ]
+  }
+];
+
+const LEGACY_CATEGORY_ALIASES = {
+  groceries: ["groceries", "grocery", "food & groceries"],
+  charging: ["charging", "charging/407", "car407", "407", "car / charging / 407"],
+  entertainment: ["entertainment", "eat out", "dining", "food & rto", "eatout"],
+  misc: ["misc", "household misc", "personal spending"]
 };
 
-const debtFixedAliases = {
-  mortgage: ["mortgage"],
-  "car-loan": ["carPayment"],
-  ikea: ["ikea"]
-};
+const TABS = [
+  { id: "monitor", label: "Monitor" },
+  { id: "planning", label: "Planning" }
+];
 
-const demoState = {
+const DEFAULT_STATE = {
+  schemaVersion: SCHEMA_VERSION,
   appVersion: APP_VERSION,
-  currentMonth: APP_MONTH,
-  activeWallet: "vewu",
-  activeTab: "overview",
-  manageSettings: false,
-  manageReports: false,
-  settingsSection: "plan",
-  activeReport: "dashboard",
-  selectedBox: "",
-  highlightBox: "",
-  debtPlans: [
-    { debtId: "mortgage", wallet: "vewu", name: "Mortgage", startingBalance: 0, currentBalance: 0, monthlyPayment: 2000, interestRate: 0, status: "active", notes: "Tracked as debt payment with payoff tracking." },
-    { debtId: "car-loan", wallet: "vewu", name: "Car Loan", startingBalance: 0, currentBalance: 0, monthlyPayment: 682, interestRate: 0, status: "active", notes: "Tracked as debt payment with payoff tracking." },
-    { debtId: "ikea", wallet: "vewu", name: "Ikea Payment", startingBalance: 0, currentBalance: 0, monthlyPayment: 113, interestRate: 0, status: "active", notes: "Can be archived when paid off." }
-  ],
-  yearPlanVersions: [
-    {
-      versionId: "v1",
-      effectiveFrom: "2026-01",
-      createdAt: "2026-01-01",
-      plan: {
-        vewu: {
-          incomeDefaults: [
-            { id: "pwSalary", name: "PW Salary", amount: 5443 },
-            { id: "mvContribution", name: "MV Contribution", amount: 100 },
-            { id: "leoDebt", name: "Leo's Debt Payment", amount: 700 }
-          ],
-          autoFixedItems: [
-            { id: "mortgage", name: "Mortgage", amount: 2000 },
-            { id: "carPayment", name: "Car Payment", amount: 682 },
-            { id: "ikea", name: "Ikea Payment", amount: 113 },
-            { id: "condo", name: "Condo Admin", amount: 564 },
-            { id: "propertyTax", name: "Property Tax", amount: 267 },
-            { id: "insurance", name: "Insurance", amount: 558 },
-            { id: "internet", name: "Internet / Phone / Utilities", amount: 49 },
-            { id: "subscriptions", name: "Subscriptions", amount: 25 },
-            { id: "pwAllowance", name: "PW Allowance", amount: 600 }
-          ],
-          baselineSavingItems: [
-            { id: "investment", name: "Baseline Investment / Saving", amount: 200 }
-          ],
-          boxes: {
-            groceries: { name: "Food & Groceries", budget: 800 },
-            car407: { name: "Car Energy & Tolls", budget: 150 },
-            misc: { name: "Household Misc", budget: 200 }
-          },
-          pool: {
-            name: "Cash Reserve",
-            startingBalance: 3805
-          },
-          extraIncomeRule: "Extra income defaults to Cash Reserve."
-        },
-        pw: {
-          incomeDefaults: [
-            { id: "allowance", name: "PW Allowance income", amount: 600 }
-          ],
-          autoFixedItems: [
-            { id: "phone", name: "Phone", amount: 45 },
-            { id: "gpt", name: "GPT", amount: 20 },
-            { id: "youtube", name: "YouTube", amount: 16 },
-            { id: "apple", name: "Apple One", amount: 24 },
-            { id: "amex", name: "AMEX monthly fee", amount: 35 }
-          ],
-          baselineSavingItems: [],
-          boxes: {
-            eatOut: { name: "Food & RTO", budget: 200 },
-            personal: { name: "Personal Spending", budget: 100 }
-          },
-          pool: {
-            name: "Saved Money Reserve",
-            startingBalance: 0
-          },
-          extraIncomeRule: "Personal refunds default to Saved Money Reserve."
-        }
+  ui: {
+    activeTab: "monitor",
+    selectedMonth: currentMonthKey(),
+    txFilter: "month",
+    editingTransactionId: null,
+    monitorScope: "week",
+    planningOpenSections: {
+      summary: true,
+      budget: false,
+      reserve: false,
+      ledger: false,
+      background: false,
+      data: false
+    },
+    lastTransactionTemplate: null
+  },
+  settings: {
+    systemCore: {
+      reserveBalanceNow: 4231,
+      stableBaseGapMonthly: 669
+    },
+    budgetsMonthly: {
+      groceries: 750,
+      charging: 150,
+      entertainment: 300,
+      misc: 150
+    },
+    weeklyRules: {
+      weekStart: "MON",
+      penaltyMultiplier: 1.5,
+      minPenaltyUnit: 5,
+      defaultSoftCapMultiplier: 1.1,
+      grocerySoftCapMultiplier: 1.1,
+      chargingSoftCapMultiplier: 1.1
+    },
+    monitorCategories: structuredClone(DEFAULT_MONITOR_CATEGORIES),
+    reserveSchedule: {
+      preMay: 2700,
+      may: 1531,
+      june: null,
+      july: null,
+      august: null,
+      september: null,
+      october: null,
+      november: null,
+      december: null,
+      mayToAugMonthlyNet: 1531,
+      sepToDecMonthlyNet: 31,
+      janPlusMonthlyNet: -669
+    },
+    background: {
+      coreIncome: {
+        pwSalary: 5897
+      },
+      reserveIncome: {
+        mvContrib: 1500,
+        leoDebt: 700
+      },
+      investment: {
+        investment: 217
+      },
+      fixed: {
+        insurance: 558,
+        condoAdmin: 564,
+        propertyTax: 267,
+        internet: 49,
+        pwTrust: 600
+      },
+      debt: {
+        mortgage: 2167,
+        carPayment: 682,
+        ikeaPayment: 113
       }
-    }
-  ],
-  monthlyOverrides: {},
-  transactions: [
-    t("2026-04-01", "vewu", 22, "groceries", "Oceans"),
-    t("2026-04-05", "vewu", 145, "groceries", "Costco"),
-    t("2026-04-05", "vewu", 30, "groceries", "Shoppers"),
-    t("2026-04-06", "vewu", 84, "groceries", "Oceans"),
-    t("2026-04-12", "vewu", 48, "groceries", "Arepa"),
-    t("2026-04-14", "vewu", 83, "groceries", "Costco"),
-    t("2026-04-14", "vewu", 43, "groceries", "Asia mart"),
-    t("2026-04-15", "vewu", 10, "groceries", "Walmart"),
-    t("2026-04-19", "vewu", 31, "groceries", "Oceans"),
-    t("2026-04-19", "vewu", 11, "groceries", "Walmart"),
-    t("2026-04-02", "vewu", 100, "car407", "Charging #1"),
-    t("2026-04-04", "vewu", 10, "car407", "Charging #2"),
-    t("2026-04-05", "vewu", 52, "car407", "Hwy 407"),
-    t("2026-04-04", "vewu", 108, "misc", "Gusto + parking"),
-    t("2026-04-10", "vewu", 23, "misc", "Marisela food"),
-    t("2026-04-11", "vewu", 37, "misc", "Phone mount"),
-    t("2026-04-11", "vewu", 52, "misc", "The Fry"),
-    t("2026-04-12", "vewu", 300, "misc", "Half PC sell", "refund", { refundTarget: "box" }),
-    t("2026-04-12", "vewu", 17, "misc", "Chicha"),
-    t("2026-04-14", "vewu", 79, "misc", "Wok costco"),
-    t("2026-04-17", "vewu", 8, "misc", "Dairy Cream"),
-    t("2026-04-18", "vewu", 52, "misc", "Autospa"),
-    t("2026-04-19", "vewu", 11, "misc", "Ordinary"),
-    t("2026-04-21", "vewu", 7, "misc", "Shoppers"),
-    t("2026-04-09", "pw", 35, "eatOut", "RTO Tue"),
-    t("2026-04-10", "pw", 42, "eatOut", "RTO Wed"),
-    t("2026-04-11", "pw", 38, "eatOut", "RTO Thurs"),
-    t("2026-04-14", "pw", 64, "eatOut", "Dinner"),
-    t("2026-04-16", "pw", 55, "personal", "Haircut"),
-    t("2026-04-18", "pw", 45, "personal", "Small shopping")
-  ],
-  poolEntries: [
-    p("2026-01-01", "vewu", "inflow", 2045, "Extra Paycheque", "PW Jan Extra"),
-    p("2026-01-15", "vewu", "spend", 1743, "Big Spend", "Extra mortgage"),
-    p("2026-02-10", "vewu", "spend", 3665, "Big Spend", "Costco membership / annual"),
-    p("2026-03-11", "vewu", "inflow", 7355, "Bonus / Retro Pay", "PW Bonus + retro"),
-    p("2026-03-31", "vewu", "inflow", 3598, "Tax Return", "PW Tax return"),
-    p("2026-04-12", "vewu", "spend", 1220, "Big Spend", "Mateo screen"),
-    p("2026-04-12", "pw", "inflow", 300, "Refund / resale", "Half PC sell"),
-    p("2026-04-30", "pw", "inflow", 91, "Monthly leftover", "April saved allowance")
-  ],
-  historicalMonths: [
-    hm("2026-01", "vewu", { incomeActual: 6243, autoLockedActual: 4858, savedAmount: 200, boxes: { groceries: 845, car407: 118, misc: 265 }, poolInflows: 2045, poolOutflows: 1743, poolEnding: 4107 }),
-    hm("2026-02", "vewu", { incomeActual: 6243, autoLockedActual: 4858, savedAmount: 200, boxes: { groceries: 825, car407: 132, misc: 218 }, poolInflows: 0, poolOutflows: 3665, poolEnding: 442 }),
-    hm("2026-03", "vewu", { incomeActual: 6243, autoLockedActual: 4858, savedAmount: 200, boxes: { groceries: 872, car407: 140, misc: 248 }, poolInflows: 10953, poolOutflows: 0, poolEnding: 11195 }),
-    hm("2026-04", "vewu", { incomeActual: 6243, autoLockedActual: 4858, savedAmount: 200, boxes: { groceries: 612, car407: 162, misc: 213 }, poolInflows: 0, poolOutflows: 1220, poolEnding: 2560 }),
-    hm("2026-01", "pw", { incomeActual: 600, autoLockedActual: 140, savedAmount: 0, boxes: { eatOut: 197, personal: 198 }, poolInflows: 0, poolOutflows: 0, poolEnding: 0 }),
-    hm("2026-02", "pw", { incomeActual: 600, autoLockedActual: 140, savedAmount: 20, boxes: { eatOut: 155, personal: 92 }, poolInflows: 20, poolOutflows: 0, poolEnding: 20 }),
-    hm("2026-03", "pw", { incomeActual: 600, autoLockedActual: 140, savedAmount: 0, boxes: { eatOut: 195, personal: 202 }, poolInflows: 0, poolOutflows: 0, poolEnding: 20 }),
-    hm("2026-04", "pw", { incomeActual: 600, autoLockedActual: 140, savedAmount: 391, boxes: { eatOut: 179, personal: 100 }, poolInflows: 391, poolOutflows: 0, poolEnding: 411 })
-  ],
-  receivables: [
-    { receivableId: "cecilia", debtor: "Cecilia", startingBalance: 7700, currentBalance: 7756, expectedPayment: 19, interestRate: 0, expectedPayoffMonth: "2030-12", status: "active", notes: "Monthly snapshot balance." },
-    { receivableId: "noe", debtor: "Noe", startingBalance: 10896, currentBalance: 6728, expectedPayment: 1401, interestRate: 0, expectedPayoffMonth: "2026-08", status: "active", notes: "Default allocation: Cash Reserve when received." },
-    { receivableId: "leonardo", debtor: "Leonardo", startingBalance: 60000, currentBalance: 60000, expectedPayment: 0, interestRate: 0, expectedPayoffMonth: "TBD", status: "active", notes: "Longer-term receivable." }
-  ],
-  receivablePayments: [],
-  investmentSnapshots: [
-    inv("2026-01-31", "Liquid Emergency", "Emergency", 10042, 0, 0),
-    inv("2026-02-28", "Liquid Emergency", "Emergency", 8555, 0, 0),
-    inv("2026-03-31", "Liquid Emergency", "Emergency", 10000, 0, 0),
-    inv("2026-01-31", "Low Risk", "Low Risk", 45035, 0, 0),
-    inv("2026-02-28", "Low Risk", "Low Risk", 45191, 0, 0),
-    inv("2026-03-31", "Low Risk", "Low Risk", 45017, 0, 0),
-    inv("2026-01-31", "VFV", "Equity", 562, 0, 0),
-    inv("2026-02-28", "VFV", "Equity", 643, 0, 0),
-    inv("2026-03-31", "VFV", "Equity", 712, 0, 0),
-    inv("2026-01-31", "QQC", "Equity", 453, 0, 0),
-    inv("2026-02-28", "QQC", "Equity", 539, 0, 0),
-    inv("2026-03-31", "QQC", "Equity", 654, 0, 0)
-  ],
-  netWorthSnapshots: [
-    { snapshotDate: "2026-03-31", cashPool: 11195, receivables: 75866, investments: 56383, homeEquity: 0, otherAssets: 0, mortgageBalance: 0, carLoanBalance: 0, otherLiabilities: 0, netWorth: 143444 }
-  ],
-  closedMonths: {}
+    },
+    backgroundSections: structuredClone(DEFAULT_BACKGROUND_SECTIONS)
+  },
+  transactions: [],
+  weeklyBudgetAdjustments: {},
+  weeklyClosures: {}
 };
 
 let state = loadState();
+
 const app = document.querySelector("#app");
 const monthInput = document.querySelector("#monthInput");
 const bottomNav = document.querySelector("#bottomNav");
-const walletToggle = document.querySelector("#walletToggle");
 const pageTitle = document.querySelector("#pageTitle");
+const headerStatus = document.querySelector("#headerStatus");
 const modalRoot = document.querySelector("#modalRoot");
-let toastTimer;
+let toastTimer = null;
 
 init();
 
-function t(date, wallet, amount, box, note, type = "spending", extra = {}) {
-  return {
-    transactionId: uid("txn"),
-    wallet,
-    date,
-    month: date.slice(0, 7),
-    amount,
-    box,
-    note,
-    type,
-    excludedFromBudget: false,
-    ...extra
-  };
-}
-
-function p(date, wallet, type, amount, sourceOrUse, note, extra = {}) {
-  return {
-    poolEntryId: uid("pool"),
-    pool: wallet === "pw" ? "PW Saved Money Reserve" : "VEWU Cash Reserve",
-    wallet,
-    date,
-    month: date.slice(0, 7),
-    type,
-    amount,
-    sourceOrUse,
-    note,
-    linkedBox: "",
-    linkedTransactionId: "",
-    ...extra
-  };
-}
-
-function hm(month, wallet, data) {
-  return { month, wallet, closed: month !== APP_MONTH, ...data };
-}
-
-function inv(date, accountName, bucketType, marketValue, contribution, withdrawal, notes = "") {
-  return { snapshotId: uid("snap"), date, accountName, bucketType, marketValue, contribution, withdrawal, notes };
-}
-
 function init() {
-  bindGlobalEvents();
-  renderChrome();
+  monthInput.value = state.ui.selectedMonth;
+  bindShellEvents();
   render();
 }
 
-function bindGlobalEvents() {
+function bindShellEvents() {
   monthInput.addEventListener("change", () => {
-    state.currentMonth = monthInput.value;
-    save();
-    renderChrome();
-    render();
-  });
-
-  walletToggle.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-wallet]");
-    if (!button) return;
-    state.activeWallet = button.dataset.wallet;
-    save();
-    renderChrome();
+    state.ui.selectedMonth = monthInput.value || currentMonthKey();
+    saveState();
     render();
   });
 
   bottomNav.addEventListener("click", (event) => {
+    const quickAdd = event.target.closest("[data-quick-add]");
+    if (quickAdd) {
+      openQuickAdd();
+      return;
+    }
     const button = event.target.closest("[data-tab]");
     if (!button) return;
-    state.activeTab = button.dataset.tab;
-    save();
-    renderChrome();
+    state.ui.activeTab = button.dataset.tab;
+    saveState();
     render();
   });
 }
 
-function renderChrome() {
-  monthInput.value = state.currentMonth;
-  walletToggle.classList.remove("single-wallet");
-  walletToggle.innerHTML = Object.entries(wallets).map(([id, wallet]) => `
-      <button class="wallet-button ${state.activeWallet === id ? "is-active" : ""}" type="button" data-wallet="${id}">
-        ${escapeHtml(wallet.label)}
-      </button>
-    `).join("");
+function loadState() {
+  const primary = parseStored(STORAGE_KEY);
+  if (primary) return normalizeState(primary);
 
-  const visibleTabs = tabs;
-  bottomNav.style.gridTemplateColumns = `repeat(${visibleTabs.length}, 1fr)`;
-  bottomNav.innerHTML = visibleTabs.map((tab) => `
-    <button class="nav-item ${state.activeTab === tab.id ? "is-active" : ""}" type="button" data-tab="${tab.id}">
-      ${escapeHtml(tab.label)}
-    </button>
-  `).join("");
+  for (const key of LEGACY_KEYS) {
+    const legacy = parseStored(key);
+    if (legacy) {
+      const migrated = normalizeState(migrateLegacyState(legacy, key));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+      return migrated;
+    }
+  }
+
+  return structuredClone(DEFAULT_STATE);
 }
 
-function loadState() {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (!saved) return structuredClone(demoState);
+function parseStored(key) {
   try {
-    const loaded = normalizeState(JSON.parse(saved));
-    if (loaded.activeTab === "today" || loaded.activeTab === "month") loaded.activeTab = "overview";
-    if (loaded.activeTab === "boxes" || loaded.activeTab === "pool") loaded.activeTab = "overview";
-    if (loaded.activeTab === "assets" || loaded.activeTab === "year" || loaded.activeTab === "analysis") loaded.activeTab = "reports";
-    if (loaded.activeTab === "plan" || loaded.activeTab === "close" || loaded.activeTab === "more") loaded.activeTab = "settings";
-    if (!tabs.some((tab) => tab.id === loaded.activeTab)) loaded.activeTab = "overview";
-    loaded.manageSettings = Boolean(loaded.manageSettings);
-    loaded.manageReports = Boolean(loaded.manageReports);
-    loaded.settingsSection ||= "plan";
-    loaded.activeReport ||= "dashboard";
-    loaded.appVersion = APP_VERSION;
-    return loaded;
+    const text = localStorage.getItem(key);
+    if (!text) return null;
+    return JSON.parse(text);
   } catch {
-    return structuredClone(demoState);
+    return null;
   }
 }
 
-function normalizeState(next) {
-  const merged = {
-    ...structuredClone(demoState),
-    ...next,
-    yearPlanVersions: Array.isArray(next.yearPlanVersions) ? next.yearPlanVersions : demoState.yearPlanVersions,
-    monthlyOverrides: next.monthlyOverrides || {},
-    transactions: Array.isArray(next.transactions) ? next.transactions : demoState.transactions,
-    poolEntries: Array.isArray(next.poolEntries) ? next.poolEntries : demoState.poolEntries,
-    historicalMonths: Array.isArray(next.historicalMonths) ? next.historicalMonths : demoState.historicalMonths,
-    debtPlans: Array.isArray(next.debtPlans) ? next.debtPlans : demoState.debtPlans
-  };
-  migrateState(merged);
+function normalizeState(raw) {
+  const merged = deepMerge(structuredClone(DEFAULT_STATE), raw || {});
+  merged.schemaVersion = SCHEMA_VERSION;
+  merged.appVersion = APP_VERSION;
+  merged.ui ||= {};
+  if (["home", "transactions"].includes(merged.ui.activeTab)) merged.ui.activeTab = "monitor";
+  if (merged.ui.activeTab === "settings") merged.ui.activeTab = "planning";
+  merged.ui.activeTab = TABS.some((tab) => tab.id === merged.ui.activeTab) ? merged.ui.activeTab : "monitor";
+  merged.ui.selectedMonth ||= currentMonthKey();
+  merged.ui.txFilter ||= "month";
+  merged.ui.editingTransactionId ||= null;
+  merged.ui.monitorScope = merged.ui.monitorScope === "month" ? "month" : "week";
+  merged.ui.planningOpenSections = deepMerge(
+    structuredClone(DEFAULT_STATE.ui.planningOpenSections),
+    merged.ui.planningOpenSections || {}
+  );
+  merged.ui.lastTransactionTemplate = normalizeTemplate(merged.ui.lastTransactionTemplate);
+  merged.settings ||= structuredClone(DEFAULT_STATE.settings);
+  merged.settings.weeklyRules ||= structuredClone(DEFAULT_STATE.settings.weeklyRules);
+  merged.settings.weeklyRules.defaultSoftCapMultiplier ||= 1.1;
+  merged.settings.monitorCategories = normalizeMonitorCategories(
+    Array.isArray(raw?.settings?.monitorCategories) && raw.settings.monitorCategories.length
+      ? raw.settings.monitorCategories
+      : buildMonitorCategoriesFromLegacy(merged.settings)
+  );
+  merged.settings.backgroundSections = normalizeBackgroundSections(
+    Array.isArray(raw?.settings?.backgroundSections) && raw.settings.backgroundSections.length
+      ? raw.settings.backgroundSections
+      : buildBackgroundSectionsFromLegacy(merged.settings.background)
+  );
+  merged.settings.budgetsMonthly = buildLegacyBudgetsMonthly(merged.settings.monitorCategories);
+  merged.settings.background = buildLegacyBackgroundFromSections(merged.settings.backgroundSections, merged.settings.background);
+  merged.transactions = Array.isArray(merged.transactions) ? merged.transactions.map(normalizeTransaction).filter(Boolean) : [];
+  merged.weeklyBudgetAdjustments = normalizeAdjustments(merged.weeklyBudgetAdjustments);
+  merged.weeklyClosures = normalizeClosures(merged.weeklyClosures);
   return merged;
 }
 
-function migrateState(next) {
-  next.appVersion = APP_VERSION;
-  next.manageSettings = Boolean(next.manageSettings);
-  next.manageReports = Boolean(next.manageReports);
-  next.settingsSection ||= "plan";
-  next.activeReport ||= "dashboard";
-  next.yearPlanVersions.forEach((version) => {
-    const vewu = version.plan?.vewu;
-    const pw = version.plan?.pw;
-    if (vewu) {
-      vewu.pool.name = "Cash Reserve";
-      if (vewu.incomeDefaults?.length === 1 && vewu.incomeDefaults[0]?.id === "income" && Number(vewu.incomeDefaults[0].amount) === 6243) {
-        vewu.incomeDefaults = [
-          { id: "pwSalary", name: "PW Salary", amount: 5443 },
-          { id: "mvContribution", name: "MV Contribution", amount: 100 },
-          { id: "leoDebt", name: "Leo's Debt Payment", amount: 700 }
-        ];
-      }
-      if (vewu.boxes?.groceries) vewu.boxes.groceries.name = "Food & Groceries";
-      if (vewu.boxes?.car407) vewu.boxes.car407.name = "Car Energy & Tolls";
-      if (vewu.boxes?.misc) vewu.boxes.misc.name = "Household Misc";
-    }
-    if (pw) {
-      pw.pool.name = "Saved Money Reserve";
-      if (pw.boxes?.eatOut) pw.boxes.eatOut.name = "Food & RTO";
-      if (pw.boxes?.personal) pw.boxes.personal.name = "Personal Spending";
-    }
-    Object.entries(version.plan || {}).forEach(([walletId, plan]) => {
-      Object.entries(plan.boxes || {}).forEach(([boxId, box]) => {
-        boxMeta[boxId] = { wallet: walletId, name: box.name };
-      });
-    });
+function normalizeTemplate(raw) {
+  if (!isObject(raw)) return null;
+  const category = normalizeCategory(raw.category);
+  return {
+    amount: Number(raw.amount) || 0,
+    category: category || getActiveTransactionCategoriesFromState(DEFAULT_STATE).at(0)?.id || "groceries",
+    note: String(raw.note || "").trim()
+  };
+}
+
+function normalizeMonitorCategories(items) {
+  const source = Array.isArray(items) && items.length ? items : DEFAULT_MONITOR_CATEGORIES;
+  return source
+    .map((item, index) => ({
+      id: String(item?.id || slugify(item?.label || `category-${index + 1}`)),
+      label: String(item?.label || startCase(item?.id || `Category ${index + 1}`)),
+      icon: String(item?.icon || "•"),
+      group: item?.group === "essentials" ? "essentials" : item?.group === "custom" ? "custom" : "discretionary",
+      monthlyBudget: Number(item?.monthlyBudget) || 0,
+      monitor: item?.monitor !== false,
+      allowTransactions: item?.allowTransactions !== false,
+      includeInVariableTotal: item?.includeInVariableTotal !== false,
+      includeInWeeklyDiscipline: item?.includeInWeeklyDiscipline !== false,
+      ruleType: item?.ruleType === "trackOnly" ? "trackOnly" : item?.ruleType === "softCap" ? "softCap" : "penalty",
+      softCapMultiplier: item?.softCapMultiplier == null ? null : Number(item.softCapMultiplier) || null,
+      penaltyMultiplier: item?.penaltyMultiplier == null ? null : Number(item.penaltyMultiplier) || null,
+      minPenaltyUnit: item?.minPenaltyUnit == null ? null : Number(item.minPenaltyUnit) || null,
+      priority: item?.priority === "secondary" ? "secondary" : item?.priority === "hidden" ? "hidden" : "primary",
+      displayOrder: Number(item?.displayOrder ?? index + 1) || index + 1,
+      active: item?.active !== false,
+      archived: Boolean(item?.archived)
+    }))
+    .sort((a, b) => a.displayOrder - b.displayOrder);
+}
+
+function normalizeBackgroundSections(sections) {
+  const source = Array.isArray(sections) && sections.length ? sections : DEFAULT_BACKGROUND_SECTIONS;
+  return source
+    .map((section, sectionIndex) => ({
+      id: String(section?.id || slugify(section?.label || `section-${sectionIndex + 1}`)),
+      label: String(section?.label || startCase(section?.id || `Section ${sectionIndex + 1}`)),
+      type: String(section?.type || "other"),
+      displayOrder: Number(section?.displayOrder ?? sectionIndex + 1) || sectionIndex + 1,
+      active: section?.active !== false,
+      archived: Boolean(section?.archived),
+      items: Array.isArray(section?.items)
+        ? section.items.map((item, itemIndex) => ({
+            id: String(item?.id || slugify(item?.label || `item-${itemIndex + 1}`)),
+            label: String(item?.label || startCase(item?.id || `Item ${itemIndex + 1}`)),
+            amount: Number(item?.amount) || 0,
+            frequency: item?.frequency === "annual" ? "annual" : item?.frequency === "oneTime" ? "oneTime" : "monthly",
+            type: String(item?.type || section?.type || "other"),
+            includeInGap: Boolean(item?.includeInGap),
+            includeInProjection: Boolean(item?.includeInProjection),
+            includeInSummary: item?.includeInSummary !== false,
+            active: item?.active !== false,
+            archived: Boolean(item?.archived),
+            systemNote: item?.systemNote || ""
+          }))
+        : []
+    }))
+    .sort((a, b) => a.displayOrder - b.displayOrder);
+}
+
+function normalizeAdjustments(raw) {
+  const result = {};
+  if (!isObject(raw)) return result;
+  Object.entries(raw).forEach(([weekStartISO, item]) => {
+    result[weekStartISO] = {
+      weekStartISO,
+      sourceWeekStartISO: item?.sourceWeekStartISO || item?.sourceWeekKey || weekStartISO,
+      entertainmentPenalty: Number(item?.entertainmentPenalty ?? item?.entertainment ?? 0) || 0,
+      miscPenalty: Number(item?.miscPenalty ?? item?.misc ?? 0) || 0,
+      totalPenalty: Number(item?.totalPenalty ?? item?.total ?? 0) || 0
+    };
   });
-  next.debtPlans.forEach((item) => {
-    item.interestRate = Number(item.interestRate) || 0;
+  return result;
+}
+
+function normalizeClosures(raw) {
+  const result = {};
+  if (!isObject(raw)) return result;
+  Object.entries(raw).forEach(([weekStartISO, item]) => {
+    result[weekStartISO] = {
+      weekStartISO,
+      closedAtISO: item?.closedAtISO || item?.closedAt || new Date().toISOString(),
+      entertainmentPenalty: Number(item?.entertainmentPenalty ?? 0) || 0,
+      miscPenalty: Number(item?.miscPenalty ?? 0) || 0,
+      totalPenalty: Number(item?.totalPenalty ?? 0) || 0
+    };
   });
-  next.receivables.forEach((item) => {
-    item.interestRate = Number(item.interestRate) || 0;
+  return result;
+}
+
+function buildMonitorCategoriesFromLegacy(settings = {}) {
+  const budgets = settings?.budgetsMonthly || {};
+  const weeklyRules = settings?.weeklyRules || {};
+  return DEFAULT_MONITOR_CATEGORIES.map((item) => {
+    const next = structuredClone(item);
+    if (budgets[item.id] != null) next.monthlyBudget = Number(budgets[item.id]) || 0;
+    if (item.id === "groceries") next.softCapMultiplier = Number(weeklyRules.grocerySoftCapMultiplier ?? weeklyRules.defaultSoftCapMultiplier ?? item.softCapMultiplier) || 1.1;
+    if (item.id === "charging") next.softCapMultiplier = Number(weeklyRules.chargingSoftCapMultiplier ?? weeklyRules.defaultSoftCapMultiplier ?? item.softCapMultiplier) || 1.1;
+    if (item.ruleType === "penalty") {
+      next.penaltyMultiplier = Number(weeklyRules.penaltyMultiplier ?? item.penaltyMultiplier) || 1.5;
+      next.minPenaltyUnit = Number(weeklyRules.minPenaltyUnit ?? item.minPenaltyUnit) || 5;
+    }
+    return next;
   });
 }
 
-function save() {
+function buildBackgroundSectionsFromLegacy(background = {}) {
+  const sections = structuredClone(DEFAULT_BACKGROUND_SECTIONS);
+  const legacyMap = {
+    "core-income": background?.coreIncome || {},
+    "reserve-income": background?.reserveIncome || {},
+    investment: background?.investment || {},
+    fixed: background?.fixed || {},
+    debt: background?.debt || {}
+  };
+  return sections.map((section) => ({
+    ...section,
+    items: section.items.map((item) => {
+      const legacySection = legacyMap[section.id] || {};
+      const legacyKey = item.id
+        .replaceAll("-", "")
+        .replace("pwsalary", "pwSalary")
+        .replace("mvcontrib", "mvContrib")
+        .replace("leodebt", "leoDebt")
+        .replace("condoadmin", "condoAdmin")
+        .replace("propertytax", "propertyTax")
+        .replace("pwtrust", "pwTrust")
+        .replace("carpayment", "carPayment")
+        .replace("ikeapayment", "ikeaPayment");
+      const legacyAmount = legacySection[legacyKey];
+      return {
+        ...item,
+        amount: legacyAmount == null ? item.amount : Number(legacyAmount) || 0
+      };
+    })
+  }));
+}
+
+function buildLegacyBudgetsMonthly(categories) {
+  const result = { groceries: 0, charging: 0, entertainment: 0, misc: 0 };
+  normalizeMonitorCategories(categories).forEach((item) => {
+    if (Object.hasOwn(result, item.id)) result[item.id] = Number(item.monthlyBudget) || 0;
+  });
+  return result;
+}
+
+function buildLegacyBackgroundFromSections(sections, fallback = {}) {
+  const result = {
+    coreIncome: { ...(fallback?.coreIncome || {}) },
+    reserveIncome: { ...(fallback?.reserveIncome || {}) },
+    investment: { ...(fallback?.investment || {}) },
+    fixed: { ...(fallback?.fixed || {}) },
+    debt: { ...(fallback?.debt || {}) }
+  };
+  normalizeBackgroundSections(sections).forEach((section) => {
+    const bucket = section.id === "core-income"
+      ? result.coreIncome
+      : section.id === "reserve-income"
+        ? result.reserveIncome
+        : section.id === "investment"
+          ? result.investment
+          : section.id === "fixed"
+            ? result.fixed
+            : section.id === "debt"
+              ? result.debt
+              : null;
+    if (!bucket) return;
+    section.items.forEach((item) => {
+      bucket[toLegacyBackgroundKey(item.id)] = Number(item.amount) || 0;
+    });
+  });
+  return result;
+}
+
+function toLegacyBackgroundKey(id) {
+  const slug = String(id || "");
+  if (slug === "pw-salary") return "pwSalary";
+  if (slug === "mv-contrib") return "mvContrib";
+  if (slug === "leo-debt") return "leoDebt";
+  if (slug === "condo-admin") return "condoAdmin";
+  if (slug === "property-tax") return "propertyTax";
+  if (slug === "pw-trust") return "pwTrust";
+  if (slug === "car-payment") return "carPayment";
+  if (slug === "ikea-payment") return "ikeaPayment";
+  return camelCaseFromSlug(slug);
+}
+
+function migrateLegacyState(raw, sourceKey) {
+  if (sourceKey === "financePlanner_v2") return migrateFromPlannerV2(raw);
+  if (sourceKey === "finance-box-budget-v3") return migrateFromBoxBudgetV3(raw);
+  return raw;
+}
+
+function migrateFromPlannerV2(raw) {
+  const settings = raw?.settings || {};
+  const month = raw?.ui?.selectedMonth || currentMonthKey();
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    appVersion: APP_VERSION,
+    ui: {
+      activeTab: "monitor",
+      selectedMonth: month,
+      txFilter: "month",
+      editingTransactionId: null
+    },
+    settings: {
+      systemCore: {
+        reserveBalanceNow: Number(settings.reserveBalanceNow ?? settings.systemCore?.reserveBalanceNow ?? calculateReserveFromLedger(settings.reserveLedger || DEFAULT_STATE.settings.reserveSchedule)) || 4231,
+        stableBaseGapMonthly: Number(settings.stableBaseGapMonthly ?? settings.systemCore?.stableBaseGapMonthly) || 669
+      },
+      budgetsMonthly: {
+        groceries: Number(settings.budgetsMonthly?.groceries ?? 750) || 0,
+        charging: Number(settings.budgetsMonthly?.charging ?? 150) || 0,
+        entertainment: Number(settings.budgetsMonthly?.entertainment ?? 300) || 0,
+        misc: Number(settings.budgetsMonthly?.misc ?? 150) || 0
+      },
+      weeklyRules: {
+        weekStart: "MON",
+        penaltyMultiplier: Number(settings.penaltyMultiplier ?? settings.weeklyRules?.penaltyMultiplier) || 1.5,
+        minPenaltyUnit: Number(settings.minPenaltyUnit ?? settings.weeklyRules?.minPenaltyUnit) || 5,
+        defaultSoftCapMultiplier: Number(settings.weeklyRules?.defaultSoftCapMultiplier ?? settings.grocerySoftCapMultiplier ?? settings.chargingSoftCapMultiplier) || 1.1,
+        grocerySoftCapMultiplier: Number(settings.grocerySoftCapMultiplier ?? settings.weeklyRules?.grocerySoftCapMultiplier) || 1.1,
+        chargingSoftCapMultiplier: Number(settings.chargingSoftCapMultiplier ?? settings.weeklyRules?.chargingSoftCapMultiplier) || 1.1
+      },
+      reserveSchedule: {
+        ...structuredClone(DEFAULT_STATE.settings.reserveSchedule),
+        ...pickReserveSchedule(settings.reserveLedger)
+      },
+      background: {
+        coreIncome: {
+          pwSalary: Number(settings.coreIncome?.pwSalary ?? settings.income?.pwMonthlyEq) || 5897
+        },
+        reserveIncome: {
+          mvContrib: Number(settings.reserveIncome?.mvContrib ?? settings.income?.mvContribMonthly) || 1500,
+          leoDebt: Number(settings.reserveIncome?.leoDebt ?? settings.income?.leoInterestMonthly) || 700
+        },
+        investment: {
+          investment: Number(settings.investment?.investment ?? settings.investment?.monthlyEq) || 217
+        },
+        fixed: {
+          insurance: Number(settings.fixed?.insurance) || 558,
+          condoAdmin: Number(settings.fixed?.condoAdmin) || 564,
+          propertyTax: Number(settings.fixed?.propertyTax) || 267,
+          internet: Number(settings.fixed?.internet) || 49,
+          pwTrust: Number(settings.fixed?.pwTrust) || 600
+        },
+        debt: {
+          mortgage: Number(settings.debt?.mortgage ?? settings.debt?.mortgageMonthlyEq) || 2167,
+          carPayment: Number(settings.debt?.carPayment) || 682,
+          ikeaPayment: Number(settings.debt?.ikeaPayment) || 113
+        }
+      }
+    },
+    transactions: migrateTransactions(raw?.transactions),
+    weeklyBudgetAdjustments: normalizeAdjustments(raw?.weeklyBudgetAdjustments),
+    weeklyClosures: normalizeClosures(raw?.weeklyClosures)
+  };
+}
+
+function migrateFromBoxBudgetV3(raw) {
+  const currentMonth = raw?.currentMonth || currentMonthKey();
+  const latestPlan = Array.isArray(raw?.yearPlanVersions) ? raw.yearPlanVersions[raw.yearPlanVersions.length - 1] : null;
+  const vewuPlan = latestPlan?.plan?.vewu || {};
+  const pwPlan = latestPlan?.plan?.pw || {};
+  const incomeDefaults = vewuPlan.incomeDefaults || [];
+  const fixedItems = vewuPlan.autoFixedItems || [];
+  const baselineSavingItems = vewuPlan.baselineSavingItems || [];
+  const background = {
+    coreIncome: {
+      pwSalary: findAmount(incomeDefaults, ["pwSalary", "PW Salary"], 5897)
+    },
+    reserveIncome: {
+      mvContrib: findAmount(incomeDefaults, ["mvContribution", "MV Contribution"], 1500),
+      leoDebt: findAmount(incomeDefaults, ["leoDebt", "Leo"], 700)
+    },
+    investment: {
+      investment: findAmount(baselineSavingItems, ["investment", "Baseline Investment / Saving"], 217)
+    },
+    fixed: {
+      insurance: findAmount(fixedItems, ["insurance", "Insurance"], 558),
+      condoAdmin: findAmount(fixedItems, ["condo", "Condo"], 564),
+      propertyTax: findAmount(fixedItems, ["propertyTax", "Property Tax"], 267),
+      internet: findAmount(fixedItems, ["internet", "Internet"], 49),
+      pwTrust: findAmount(fixedItems, ["pwAllowance", "PW Allowance"], 600)
+    },
+    debt: {
+      mortgage: findAmount(raw?.debtPlans, ["mortgage", "Mortgage"], 2167),
+      carPayment: findAmount(raw?.debtPlans, ["car-loan", "Car"], 682),
+      ikeaPayment: findAmount(raw?.debtPlans, ["ikea", "Ikea"], 113)
+    }
+  };
+
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    appVersion: APP_VERSION,
+    ui: {
+      activeTab: "monitor",
+      selectedMonth: currentMonth,
+      txFilter: "month",
+      editingTransactionId: null
+    },
+    settings: {
+      systemCore: {
+        reserveBalanceNow: deriveReserveFromBoxBudget(raw),
+        stableBaseGapMonthly: 669
+      },
+      budgetsMonthly: {
+        groceries: Number(vewuPlan.boxes?.groceries?.budget) || 750,
+        charging: Number(vewuPlan.boxes?.car407?.budget) || 150,
+        entertainment: Number(pwPlan.boxes?.eatOut?.budget) || 300,
+        misc: Number(vewuPlan.boxes?.misc?.budget) || 150
+      },
+      weeklyRules: structuredClone(DEFAULT_STATE.settings.weeklyRules),
+      reserveSchedule: structuredClone(DEFAULT_STATE.settings.reserveSchedule),
+      background
+    },
+    transactions: migrateTransactions(raw?.transactions),
+    weeklyBudgetAdjustments: {},
+    weeklyClosures: {}
+  };
+}
+
+function migrateTransactions(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => {
+      const category = normalizeCategory(item?.category ?? item?.box);
+      if (!category) return null;
+      return {
+        id: item.id || item.transactionId || uid("txn"),
+        dateISO: item.dateISO || item.date,
+        amount: Number(item.amount) || 0,
+        category,
+        note: item.note || ""
+      };
+    })
+    .filter((item) => item && item.dateISO && item.amount >= 0);
+}
+
+function normalizeTransaction(item) {
+  const category = normalizeCategory(item?.category);
+  const dateISO = item?.dateISO || item?.date;
+  if (!category || !dateISO) return null;
+  return {
+    id: item.id || uid("txn"),
+    dateISO,
+    amount: Number(item.amount) || 0,
+    category,
+    note: item.note || ""
+  };
+}
+
+function normalizeCategory(value, categoriesSource = null) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const normalized = slugify(text).replace(/-/g, "");
+  const categories = normalizeMonitorCategories(categoriesSource || getCurrentMonitorCategoriesSource());
+  const exact = categories.find((item) => item.id === text || item.id === text.toLowerCase());
+  if (exact) return exact.id;
+  const bySlug = categories.find((item) => slugify(item.id).replace(/-/g, "") === normalized);
+  if (bySlug) return bySlug.id;
+  for (const [id, aliases] of Object.entries(LEGACY_CATEGORY_ALIASES)) {
+    if (aliases.map((alias) => slugify(alias).replace(/-/g, "")).includes(normalized)) return id;
+  }
+  return text.toLowerCase().replace(/\s+/g, "-");
+}
+
+function getCategories() {
+  return normalizeMonitorCategories(getCurrentMonitorCategoriesSource());
+}
+
+function getCategoriesFromStateLike(stateLike) {
+  return normalizeMonitorCategories(stateLike?.settings?.monitorCategories || DEFAULT_MONITOR_CATEGORIES);
+}
+
+function getCurrentMonitorCategoriesSource() {
+  try {
+    return state?.settings?.monitorCategories || DEFAULT_MONITOR_CATEGORIES;
+  } catch {
+    return DEFAULT_MONITOR_CATEGORIES;
+  }
+}
+
+function getCategoryById(categoryId) {
+  const id = String(categoryId || "");
+  const found = getCategories().find((item) => item.id === id);
+  if (found) return found;
+  return {
+    id,
+    label: startCase(id || "Unknown"),
+    icon: "•",
+    group: "custom",
+    monthlyBudget: 0,
+    monitor: false,
+    allowTransactions: false,
+    includeInVariableTotal: false,
+    includeInWeeklyDiscipline: false,
+    ruleType: "trackOnly",
+    softCapMultiplier: null,
+    penaltyMultiplier: null,
+    minPenaltyUnit: null,
+    priority: "hidden",
+    displayOrder: 999,
+    active: false,
+    archived: true,
+    unknown: true
+  };
+}
+
+function getActiveTransactionCategories() {
+  return getActiveTransactionCategoriesFromState(state);
+}
+
+function getActiveTransactionCategoriesFromState(stateLike) {
+  return getCategoriesFromStateLike(stateLike)
+    .filter((item) => item.active && !item.archived && item.allowTransactions)
+    .sort(compareCategoryOrder);
+}
+
+function getMonitorCategories() {
+  return getCategories()
+    .filter((item) => item.active && !item.archived && item.monitor)
+    .sort(compareCategoryOrder);
+}
+
+function getPrimaryMonitorCategories() {
+  const primary = getMonitorCategories().filter((item) => item.priority === "primary");
+  if (primary.length) return primary.slice(0, 6);
+  return getMonitorCategories().slice(0, 4);
+}
+
+function getCategoryLabel(categoryId) {
+  return getCategoryById(categoryId).label;
+}
+
+function getCategoryIcon(categoryId) {
+  return getCategoryById(categoryId).icon || "•";
+}
+
+function getCategoryGroup(categoryId) {
+  return getCategoryById(categoryId).group;
+}
+
+function isCategoryAllowedForTransaction(categoryId) {
+  const item = getCategoryById(categoryId);
+  return item.active && !item.archived && item.allowTransactions;
+}
+
+function isCategoryArchived(categoryId) {
+  return Boolean(getCategoryById(categoryId).archived);
+}
+
+function compareCategoryOrder(a, b) {
+  const priorityRank = { primary: 0, secondary: 1, hidden: 2 };
+  return (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9)
+    || (a.displayOrder ?? 999) - (b.displayOrder ?? 999)
+    || a.label.localeCompare(b.label);
+}
+
+function getMonitorBehaviorType(category) {
+  return category?.ruleType === "penalty" ? "discretionary" : "essentials";
+}
+
+function getBackgroundSections() {
+  return normalizeBackgroundSections(state?.settings?.backgroundSections || DEFAULT_BACKGROUND_SECTIONS);
+}
+
+function getBackgroundSectionById(sectionId) {
+  return getBackgroundSections().find((section) => section.id === sectionId) || null;
+}
+
+function getBackgroundItems(sectionId) {
+  return getBackgroundSectionById(sectionId)?.items || [];
+}
+
+function calculateSectionTotal(sectionId) {
+  return sum(getBackgroundItems(sectionId).filter(isActiveBackgroundItem).map(monthlyEquivalentAmount));
+}
+
+function calculateBackgroundTotals() {
+  const sections = getBackgroundSections().filter((section) => section.active && !section.archived);
+  const totals = {};
+  sections.forEach((section) => {
+    totals[section.id] = sum(section.items.filter(isActiveBackgroundItem).map(monthlyEquivalentAmount));
+  });
+  return totals;
+}
+
+function calculateTotalByType(type) {
+  return sum(
+    getBackgroundSections()
+      .filter((section) => section.active && !section.archived)
+      .flatMap((section) => section.items.map((item) => ({ ...item, __sectionType: section.type })))
+      .filter((item) => (item.type || item.__sectionType) === type)
+      .filter(isActiveBackgroundItem)
+      .map(monthlyEquivalentAmount)
+  );
+}
+
+function calculateFixedDebtTotal() {
+  return calculateTotalByType("fixed") + calculateTotalByType("debt");
+}
+
+function calculateIncomeTotal() {
+  return calculateTotalByType("income");
+}
+
+function calculateInvestmentTotal() {
+  return calculateTotalByType("investment");
+}
+
+function isActiveBackgroundItem(item) {
+  return item?.active !== false && !item?.archived;
+}
+
+function monthlyEquivalentAmount(item) {
+  const amount = Number(item?.amount) || 0;
+  if (item?.frequency === "annual") return amount / 12;
+  if (item?.frequency === "oneTime") return 0;
+  return amount;
+}
+
+function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 function render() {
-  pageTitle.textContent = tabs.find((tab) => tab.id === state.activeTab)?.label || "Overview";
-  const routes = {
-    overview: renderOverview,
-    month: renderOverview,
-    today: renderOverview,
-    review: renderReview,
-    reports: renderReports,
-    settings: renderSettings
-  };
-  app.innerHTML = (routes[state.activeTab] || renderOverview)();
-  bindPage();
+  monthInput.value = state.ui.selectedMonth;
+  pageTitle.textContent = TABS.find((tab) => tab.id === state.ui.activeTab)?.label || "Monitor";
+  renderHeaderControls();
+  renderHeaderStatus();
+  renderNav();
+  const activeTab = state.ui.activeTab || "monitor";
+  if (activeTab === "monitor") app.innerHTML = renderMonitorPage();
+  if (activeTab === "planning") app.innerHTML = renderPlanningPage();
+  bindPageEvents();
 }
 
-function bindPage() {
-  document.querySelector("#addForm")?.addEventListener("submit", addTransaction);
-  document.querySelector("#quickAddButton")?.addEventListener("click", openAddEntryModal);
-  document.querySelector("#boxSelect")?.addEventListener("change", updateRefundControls);
-  document.querySelector("#typeSelect")?.addEventListener("change", updateRefundControls);
-  document.querySelector("#refundTarget")?.addEventListener("change", updateRefundControls);
-  document.querySelector("#advancedTypeSelect")?.addEventListener("change", (event) => {
-    const value = event.target.value;
-    const select = document.querySelector("#boxSelect");
-    if (select) select.value = value;
-    document.querySelectorAll(".category-chip").forEach((chip) => chip.classList.toggle("is-active", chip.dataset.categoryValue === value));
-    updateRefundControls();
+function renderHeaderControls() {
+  document.querySelectorAll("[data-scope]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.scope === state.ui.monitorScope);
   });
-  document.querySelectorAll(".category-chip").forEach((button) => {
-    button.addEventListener("click", () => {
-      const select = document.querySelector("#boxSelect");
-      const advanced = document.querySelector("#advancedTypeSelect");
-      if (select) select.value = button.dataset.categoryValue;
-      if (advanced) advanced.value = button.dataset.categoryValue;
-      document.querySelectorAll(".category-chip").forEach((chip) => chip.classList.toggle("is-active", chip === button));
-      updateRefundControls();
-    });
-  });
-
-  document.querySelectorAll("[data-settings-section]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.settingsSection = button.dataset.settingsSection;
-      save();
-      render();
-    });
-  });
-
-  document.querySelectorAll("[data-report]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.activeReport = button.dataset.report;
-      save();
-      render();
-    });
-  });
-
-  document.querySelector("#manageSettingsButton")?.addEventListener("click", () => {
-    state.manageSettings = !state.manageSettings;
-    save();
-    render();
-  });
-
-  document.querySelector("#manageReportsButton")?.addEventListener("click", () => {
-    state.manageReports = !state.manageReports;
-    save();
-    render();
-  });
-
-  document.querySelectorAll("[data-view-box]").forEach((button) => {
-    button.addEventListener("click", () => openCategoryDetail(button.dataset.viewBox));
-  });
-
-  document.querySelectorAll("[data-set-box]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.selectedBox = button.dataset.setBox;
-      save();
-      render();
-    });
-  });
-
-  document.querySelectorAll("[data-delete-txn]").forEach((button) => {
-    button.addEventListener("click", () => deleteTransaction(button.dataset.deleteTxn));
-  });
-
-  document.querySelectorAll("[data-edit-txn]").forEach((button) => {
-    button.addEventListener("click", () => editTransaction(button.dataset.editTxn));
-  });
-
-  document.querySelectorAll("[data-current-override]").forEach((input) => {
-    input.addEventListener("change", () => setCurrentOverride(input.dataset.currentOverride, Number(input.value)));
-  });
-
-  document.querySelectorAll("[data-year-plan]").forEach((input) => {
-    input.addEventListener("change", () => setFutureYearPlan(input.dataset.yearPlan, Number(input.value)));
-  });
-
-  document.querySelector("#investmentForm")?.addEventListener("submit", addInvestmentSnapshot);
-  document.querySelectorAll("[data-edit-investment]").forEach((button) => {
-    button.addEventListener("click", () => editInvestmentSnapshot(button.dataset.editInvestment));
-  });
-  document.querySelector("#receivableForm")?.addEventListener("submit", addReceivable);
-  document.querySelectorAll("[data-edit-receivable]").forEach((button) => {
-    button.addEventListener("click", () => editReceivable(button.dataset.editReceivable));
-  });
-  document.querySelectorAll("[data-edit-debt]").forEach((button) => {
-    button.addEventListener("click", () => editDebtPlan(button.dataset.editDebt));
-  });
-  document.querySelectorAll("[data-delete-debt]").forEach((button) => {
-    button.addEventListener("click", () => deleteDebtPlan(button.dataset.deleteDebt));
-  });
-  document.querySelector("#debtForm")?.addEventListener("submit", addDebtPlan);
-  document.querySelector("#planItemForm")?.addEventListener("submit", addPlanItem);
-  document.querySelector("#openPlanItemButton")?.addEventListener("click", openPlanItemModal);
-  document.querySelectorAll("[data-edit-plan]").forEach((button) => {
-    button.addEventListener("click", () => editPlanItem(button.dataset.editPlan));
-  });
-  document.querySelectorAll("[data-delete-plan]").forEach((button) => {
-    button.addEventListener("click", () => deletePlanItem(button.dataset.deletePlan));
-  });
-
-  document.querySelector("#exportButton")?.addEventListener("click", exportCsv);
-  document.querySelector("#importCsvInput")?.addEventListener("change", importCsv);
-  document.querySelector("#exportJsonButton")?.addEventListener("click", exportJson);
-  document.querySelector("#importJsonInput")?.addEventListener("change", importJson);
-  document.querySelector("#resetButton")?.addEventListener("click", resetDemo);
-  document.querySelector("#closeWalletButton")?.addEventListener("click", () => closeWalletMonth(state.activeWallet));
-  document.querySelector("#reopenWalletButton")?.addEventListener("click", () => reopenWalletMonth(state.activeWallet));
+  document.querySelector(".topbar-controls")?.classList.toggle("is-hidden", state.ui.activeTab !== "monitor");
 }
 
-function renderOverview() {
-  const wallet = state.activeWallet;
-  const dashboard = getDashboard(wallet);
-  const warnings = getWarnings(wallet).slice(0, 3);
-  const boxes = getBoxes(wallet);
-  const status = getMonthStatus(dashboard);
-
-  return `
-    <section class="hero overview-hero">
-      <div class="hero-main">
-        <p class="eyebrow">${formatMonthLabel(state.currentMonth)} · ${escapeHtml(wallets[wallet].label)}</p>
-        <div class="hero-number">${money(dashboard.monthRemaining)}</div>
-        <p class="hero-sub">${money(dashboard.dailySafeSpend)} / day available</p>
-        <div class="hero-pills">
-          <span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span>
-          <span>Projected ${money(dashboard.projectedMonthEnd)}</span>
-        </div>
-      </div>
-      <div class="hero-strip">
-        <div class="strip-item"><span>Reserve</span><strong>${money(dashboard.pool.available)}</strong></div>
-        <div class="strip-item"><span>Uncovered</span><strong class="${dashboard.pool.unfundedOverspend ? "risk-text" : ""}">${money(dashboard.pool.unfundedOverspend)}</strong></div>
-        <div class="strip-item"><span>Categories</span><strong>${boxes.length}</strong></div>
-      </div>
-    </section>
-
-    <section class="card compact-card">
-      <div class="section-head">
-        <div><h2>Watch These</h2></div>
-      </div>
-      <div class="warning-list compact-list">
-        ${warnings.length ? warnings.map(renderWarning).join("") : `<div class="warning-item good"><span><strong>On track</strong></span><strong>Good</strong></div>`}
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="section-head">
-        <div><h2>Category Progress</h2></div>
-      </div>
-      <div class="box-grid overview-categories">
-        ${boxes.length ? boxes.map(renderOverviewCategoryCard).join("") : renderEmptyState("No spending categories yet.", "Add categories in Settings.")}
-      </div>
-    </section>
-
-    <button id="quickAddButton" class="fab-button" type="button" aria-label="Add entry">+</button>
-  `;
-}
-
-function renderReview() {
-  const wallet = state.activeWallet;
-  const dashboard = getDashboard(wallet);
-  const weekly = getWeeklyStats(wallet);
-  const boxes = getBoxes(wallet).slice().sort((a, b) => b.paceRatio - a.paceRatio);
-  const recommendations = getRecommendations(wallet);
-
-  return `
-    <section class="hero review-hero">
-      <div class="hero-main">
-        <p class="eyebrow">This Week · ${escapeHtml(wallets[wallet].label)}</p>
-        <div class="hero-number">${money(weekly.thisWeekSpend)}</div>
-        <p class="hero-sub">${money(weekly.last7Average)} / day recently · ${weekly.last7Average > dashboard.dailySafeSpend ? "above" : "under"} safe pace</p>
-      </div>
-      <div class="hero-strip">
-        <div class="strip-item"><span>Safe Daily</span><strong>${money(dashboard.dailySafeSpend)}</strong></div>
-        <div class="strip-item"><span>Last 7 Days</span><strong>${money(weekly.last7Spend)}</strong></div>
-        <div class="strip-item"><span>Status</span><strong>${weekly.last7Average > dashboard.dailySafeSpend ? "Review" : "OK"}</strong></div>
-      </div>
-    </section>
-
-    <section class="desktop-grid">
-      <div class="card">
-        <div class="section-head"><div><h2>Fastest Categories</h2></div></div>
-        <div class="warning-list compact-list">
-          ${boxes.slice(0, 3).map((box) => `<div class="warning-item ${box.status}"><span><strong>${escapeHtml(box.name)}</strong><br><span class="muted">${paceText(box)} · ${money(box.visibleRemaining)} left</span></span><strong>${escapeHtml(getBoxStatusLabel(box).label)}</strong></div>`).join("")}
-        </div>
-      </div>
-      <div class="card">
-        <div class="section-head"><div><h2>Last 7 Days</h2></div></div>
-        ${renderDailySpendChart(weekly.dailyRows)}
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="section-head"><div><h2>Budget Suggestions</h2></div></div>
-      <div class="recommendation-list">
-        ${recommendations.length ? recommendations.map((item) => `<div class="recommendation-item">${escapeHtml(item)}</div>`).join("") : renderEmptyState("No budget changes suggested.", "Current category budgets look reasonable.")}
-      </div>
-    </section>
-  `;
-}
-
-function renderReports() {
-  const wallet = state.activeWallet;
-  const reportTabs = wallet === "vewu"
-    ? [["dashboard", "Dashboard"], ["year", "Year"], ["networth", "Net Worth"], ["receivables", "Receivables"], ["investments", "Investments"]]
-    : [["dashboard", "Dashboard"], ["year", "Year"], ["saved", "Saved Reserve"]];
-  const active = reportTabs.some(([id]) => id === state.activeReport) ? state.activeReport : "dashboard";
-  state.activeReport = active;
-
-  return `
-    <section class="card">
-      <div class="section-head">
-        <div><h2>Reports</h2></div>
-        ${wallet === "vewu" ? `<button id="manageReportsButton" class="ghost-button section-action" type="button">${state.manageReports ? "Done" : "Manage"}</button>` : ""}
-      </div>
-      <div class="segmented report-switch">
-        ${reportTabs.map(([id, label]) => `<button class="segmented-button ${active === id ? "is-active" : ""}" type="button" data-report="${id}">${escapeHtml(label)}</button>`).join("")}
-      </div>
-    </section>
-    ${renderReportPanel(active, wallet)}
-  `;
-}
-
-function renderSettings() {
-  const sections = [["plan", "Budget"], ["reserve", "Reserve"], ["close", "Month End"], ["data", "Data"], ["danger", "Danger"]];
-  const active = sections.some(([id]) => id === state.settingsSection) ? state.settingsSection : "plan";
-  state.settingsSection = active;
-  return `
-    <section class="card">
-      <div class="section-head">
-        <div><h2>Settings</h2></div>
-        <button id="manageSettingsButton" class="ghost-button section-action" type="button">${state.manageSettings ? "Done" : "Manage"}</button>
-      </div>
-      <div class="segmented settings-switch">
-        ${sections.map(([id, label]) => `<button class="segmented-button ${active === id ? "is-active" : ""}" type="button" data-settings-section="${id}">${escapeHtml(label)}</button>`).join("")}
-      </div>
-    </section>
-    ${renderSettingsPanel(active)}
-  `;
-}
-
-function renderReportPanel(active, wallet) {
-  if (active === "year") return renderYear();
-  if (wallet === "pw") return renderSavedReserveReport(wallet);
-  if (active === "receivables") return renderReceivableReport();
-  if (active === "investments") return renderInvestmentReport();
-  if (active === "networth") return renderNetWorthReport();
-  return renderAssetDashboard();
-}
-
-function renderSettingsPanel(active) {
-  if (active === "reserve") return renderReserveSettings();
-  if (active === "close") return renderMonthClose();
-  if (active === "data") return renderDataSettings();
-  if (active === "danger") return renderDangerSettings();
-  return renderPlan();
-}
-
-function renderAssetDashboard() {
-  if (state.activeWallet === "pw") return renderSavedReserveReport("pw");
-  const receivables = state.receivables.reduce((acc, item) => acc + Number(item.currentBalance || 0), 0);
-  const latestInvestments = getLatestInvestments();
-  const investments = latestInvestments.reduce((acc, item) => acc + item.marketValue, 0);
-  const pool = getDashboard("vewu").pool.available;
-  const latestNetWorth = state.netWorthSnapshots[state.netWorthSnapshots.length - 1];
-  const computedNetWorth = pool + receivables + investments + (latestNetWorth?.homeEquity || 0) + (latestNetWorth?.otherAssets || 0) - (latestNetWorth?.mortgageBalance || 0) - (latestNetWorth?.carLoanBalance || 0) - (latestNetWorth?.otherLiabilities || 0);
-  return `
-    <section class="card">
-      <div class="section-head"><div><h2>Financial Position</h2></div></div>
-      <div class="asset-grid">
-        <article class="metric-card olive"><span>Cash Reserve</span><strong>${money(pool)}</strong></article>
-        <article class="metric-card blue"><span>Receivables</span><strong>${money(receivables)}</strong></article>
-        <article class="metric-card sage"><span>Investments</span><strong>${money(investments)}</strong></article>
-        <article class="metric-card grey"><span>Net Worth Estimate</span><strong>${money(computedNetWorth)}</strong></article>
-      </div>
-    </section>
-    ${renderYear()}
-  `;
-}
-
-function renderReceivableReport() {
-  return `<section class="card">${renderReceivableTracker()}</section>`;
-}
-
-function renderInvestmentReport() {
-  return `<section class="card">${renderInvestmentTracker()}</section>`;
-}
-
-function renderNetWorthReport() {
-  return renderAssetDashboard();
-}
-
-function renderSavedReserveReport(wallet) {
-  const rows = getPoolMonthSummaries(wallet);
-  return `
-    <section class="card">
-      <div class="section-head"><div><h2>Saved Reserve Trend</h2></div></div>
-      ${renderBarChart(`${wallets[wallet].reserveLabel}`, "Ending balance", rows.map((item) => item.month.slice(5)), rows.map((item) => item.ending), "olive")}
-    </section>
-  `;
-}
-
-function renderReceivableTracker() {
-  const receivables = state.receivables.reduce((acc, item) => acc + Number(item.currentBalance || 0), 0);
-  const manage = Boolean(state.manageReports);
-  return `
-    <div class="section-head">
-      <div><h2>Receivables</h2><p>Total ${money(receivables)}</p></div>
-    </div>
-    <div class="asset-list">
-      ${state.receivables.map((item) => `
-        <div class="asset-row">
-          <span><strong>${escapeHtml(item.debtor)}</strong><br><span class="muted">${escapeHtml(item.status)} · expected ${money(item.expectedPayment)} · ${escapeHtml(getPayoffLabel(item.currentBalance, item.expectedPayment, item.interestRate, item.expectedPayoffMonth))}</span></span>
-          <span><strong>${money(item.currentBalance)}</strong>${manage ? `<br><button class="mini-button" type="button" data-edit-receivable="${item.receivableId}">Edit</button>` : ""}</span>
-        </div>
-      `).join("")}
-    </div>
-    ${manage ? `<form id="receivableForm" class="tracker-form">
-      <h3>Add / Track Receivable</h3>
-      <div class="asset-edit-grid">
-        <label class="field"><span>Debtor</span><input id="receivableDebtor" required /></label>
-        <label class="field"><span>Current Balance</span><input id="receivableBalance" type="number" step="0.01" required /></label>
-        <label class="field"><span>Expected Payment</span><input id="receivableExpected" type="number" step="0.01" value="0" /></label>
-        <label class="field"><span>Interest Rate %</span><input id="receivableInterest" type="number" step="0.01" value="0" /></label>
-        <label class="field"><span>Status</span><select id="receivableStatus"><option value="active">Active</option><option value="paused">Paused</option><option value="archived">Archived</option><option value="paid-off">Paid Off</option></select></label>
-        <label class="field"><span>Notes</span><input id="receivableNotes" /></label>
-      </div>
-      <button class="primary-button" type="submit">Save Receivable</button>
-    </form>` : ""}
-  `;
-}
-
-function renderInvestmentTracker() {
-  const latestInvestments = getLatestInvestments();
-  const investments = latestInvestments.reduce((acc, item) => acc + item.marketValue, 0);
-  const manage = Boolean(state.manageReports);
-  return `
-    <div class="section-head">
-      <div><h2>Investments</h2><p>Total ${money(investments)}</p></div>
-    </div>
-    ${renderInvestmentVisualizer(latestInvestments)}
-    <div class="asset-list" style="margin-top: 12px;">
-      ${latestInvestments.map((item) => `
-        <div class="asset-row">
-          <span><strong>${escapeHtml(item.accountName)}</strong><br><span class="muted">${escapeHtml(item.bucketType)} · ${escapeHtml(item.date)}</span></span>
-          <span><strong>${money(item.marketValue)}</strong>${manage ? `<br><button class="mini-button" type="button" data-edit-investment="${item.snapshotId}">Edit</button>` : ""}</span>
-        </div>
-      `).join("")}
-    </div>
-    ${manage ? `<form id="investmentForm" class="tracker-form">
-      <h3>Add Investment Snapshot</h3>
-      <div class="asset-edit-grid">
-        <label class="field"><span>Date</span><input id="investmentDate" type="date" value="${state.currentMonth}-28" required /></label>
-        <label class="field"><span>Account / Bucket</span><input id="investmentAccount" placeholder="VFV, QQC..." required /></label>
-        <label class="field"><span>Bucket Type</span><select id="investmentType"><option>Emergency</option><option>Low Risk</option><option>Equity</option><option>Other</option></select></label>
-        <label class="field"><span>Market Value</span><input id="investmentValue" type="number" step="0.01" required /></label>
-        <label class="field"><span>Contribution</span><input id="investmentContribution" type="number" step="0.01" value="0" /></label>
-        <label class="field"><span>Withdrawal</span><input id="investmentWithdrawal" type="number" step="0.01" value="0" /></label>
-        <label class="field"><span>Notes</span><input id="investmentNotes" /></label>
-      </div>
-      <button class="primary-button" type="submit">Save Snapshot</button>
-    </form>` : ""}
-  `;
-}
-
-function renderReserveSettings() {
-  return `
-    ${renderPool()}
-  `;
-}
-
-function renderDataSettings() {
-  return `
-    <section class="card">
-      <div class="section-head"><div><h2>Data Backup</h2><p>Export regularly. Safari website data can be cleared by iOS.</p></div></div>
-      <div class="action-row">
-        <button id="exportJsonButton" class="primary-button" type="button">Export JSON</button>
-        <label class="ghost-button">Import JSON<input id="importJsonInput" class="hidden" type="file" accept=".json,application/json" /></label>
-      </div>
-      <div class="action-row" style="margin-top: 10px;">
-        <button id="exportButton" class="ghost-button" type="button">Export CSV</button>
-        <label class="ghost-button">Import CSV<input id="importCsvInput" class="hidden" type="file" accept=".csv,text/csv" /></label>
-      </div>
-    </section>
-  `;
-}
-
-function renderDangerSettings() {
-  return `
-    <section class="card danger-zone">
-      <div class="section-head"><div><h2>Danger Zone</h2><p>These actions change saved local data.</p></div></div>
-      <div class="action-row">
-        <button id="reopenWalletButton" class="ghost-button" type="button">Reopen Current Month</button>
-        <button id="resetButton" class="danger-button" type="button">Reset Demo Data</button>
-      </div>
-    </section>
-  `;
-}
-
-function renderAdd() {
-  return `
-    <section class="form-card">
-      <div class="section-head">
-        <div><h2>Add ${escapeHtml(wallets[state.activeWallet].label)} Entry</h2><p>No payment method. No card repayment. Choose the real spending box.</p></div>
-      </div>
-      ${renderAddEntryForm(state.activeWallet)}
-    </section>
-  `;
-}
-
-function renderAddEntryForm(wallet) {
-  const plan = getPlan(state.currentMonth, wallet);
-  const closed = isClosed(state.currentMonth, wallet);
-  const dailyOptions = Object.entries(plan.boxes).map(([id, box]) => [`spending:${id}`, box.name]);
-  const firstOption = dailyOptions[0]?.[0] || "refund:refund";
-  const optionGroups = wallet === "vewu"
-    ? [
-        { label: "Daily Spend", options: dailyOptions },
-        { label: "Cash Reserve Entries", options: [["pool_spend:pool", "Paid From Reserve"], ["pool_inflow:pool", "Reserve Inflow"], ["refund:refund", "Refund"]] }
-      ]
-    : [
-        { label: "Daily Spend", options: dailyOptions },
-        { label: "Saved Reserve Entries", options: [["pool_inflow:pool", "Saved Reserve Inflow"], ["pool_spend:pool", "Paid From Saved Reserve"], ["refund:refund", "Refund"]] }
-      ];
-
-  return `
-      ${closed ? `<div class="warning-item risk"><span><strong>This month is closed.</strong></span><strong>Locked</strong></div>` : ""}
-      <form id="addForm" class="form-card">
-        <label class="field">
-          <span>Amount</span>
-          <input class="amount-input" id="amountInput" type="number" inputmode="decimal" min="0" step="0.01" required ${closed ? "disabled" : ""} />
-        </label>
-        <label class="field">
-          <span>Category</span>
-          <div class="chip-grid category-chip-grid">
-            ${dailyOptions.map(([value, label], index) => `<button class="chip category-chip ${index === 0 ? "is-active" : ""}" type="button" data-category-value="${escapeHtml(value)}">${escapeHtml(label)}</button>`).join("")}
-          </div>
-          <select id="boxSelect" class="hidden" ${closed ? "disabled" : ""}>
-            ${dailyOptions.map(([value, label]) => `<option value="${value}" ${value === firstOption ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}
-            ${optionGroups.slice(1).flatMap((group) => group.options).map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("")}
-          </select>
-        </label>
-        <label class="field">
-          <span>Note</span>
-          <textarea id="noteInput" rows="2" placeholder="Costco, RTO lunch, refund..." ${closed ? "disabled" : ""}></textarea>
-        </label>
-        <label class="field">
-          <span>Date</span>
-          <input id="dateInput" type="date" value="${defaultDate()}" required ${closed ? "disabled" : ""} />
-        </label>
-        <details class="advanced-entry">
-          <summary>Advanced</summary>
-          <label class="field">
-            <span>Entry type</span>
-            <select id="advancedTypeSelect" ${closed ? "disabled" : ""}>
-              <option value="${escapeHtml(firstOption)}">Regular spending</option>
-              ${optionGroups.map((group) => `
-                <optgroup label="${escapeHtml(group.label)}">
-                  ${group.options.map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("")}
-                </optgroup>
-              `).join("")}
-            </select>
-          </label>
-        </details>
-        <div id="refundControls" class="split-grid hidden">
-          <label class="field">
-            <span>Refund applies to</span>
-            <select id="refundTarget">
-              <option value="pool">Reserve</option>
-              <option value="box">Offset a box</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Offset box</span>
-            <select id="refundBox">
-              ${Object.entries(plan.boxes).map(([id, box]) => `<option value="${id}">${escapeHtml(box.name)}</option>`).join("")}
-            </select>
-          </label>
-        </div>
-        <button class="primary-button" type="submit" ${closed ? "disabled" : ""}>Add Entry</button>
-      </form>
-  `;
-}
-
-function renderBoxes() {
-  const wallet = state.activeWallet;
-  const boxes = getBoxes(wallet);
-  const selected = state.selectedBox || boxes[0]?.boxId || "";
-  const transactions = getBoxTransactions(wallet, selected);
-  const box = boxes.find((item) => item.boxId === selected);
-
-  return `
-    <section class="card">
-      <div class="section-head">
-        <div><h2>Daily Spending Boxes</h2><p>Only boxes you manually record. Fixed bills, debt, and assets stay out of this view.</p></div>
-      </div>
-      <div class="box-grid">
-        ${boxes.map((item) => `<button class="box-card ${selected === item.boxId ? "sage is-selected" : ""}" type="button" data-set-box="${item.boxId}">${renderBoxCardInner(item)}</button>`).join("")}
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="section-head">
-        <div><h2>${escapeHtml(box?.name || "Box")} Details</h2><p>Review, edit, or delete manual entries.</p></div>
-      </div>
-      ${box ? renderBoxDetail(box) : ""}
-      <div class="transaction-list" style="margin-top: 12px;">
-        ${transactions.length ? transactions.map(renderTransaction).join("") : `<div class="transaction-item"><span>No entries yet.</span><strong>$0</strong></div>`}
-      </div>
-    </section>
-  `;
-}
-
-function renderPool() {
-  const wallet = state.activeWallet;
-  const dashboard = getDashboard(wallet);
-  const entries = getPoolEntries(wallet);
-  const monthly = getPoolMonthSummaries(wallet);
-
-  return `
-    <section class="hero">
-      <div class="hero-main">
-        <p class="eyebrow">${escapeHtml(wallets[wallet].reserveLabel)}</p>
-        <div class="hero-number">${money(dashboard.pool.available)}</div>
-        <p class="hero-sub">Available after ${money(dashboard.pool.committed)} already used or committed this month</p>
-      </div>
-      <div class="hero-strip">
-        <div class="strip-item"><span>Starting</span><strong>${money(dashboard.pool.startingBalance)}</strong></div>
-        <div class="strip-item"><span>Inflows</span><strong>${money(dashboard.pool.inflows)}</strong></div>
-        <div class="strip-item"><span>Already Used</span><strong>${money(dashboard.pool.committed)}</strong></div>
-      </div>
-    </section>
-
-    <section class="metric-grid">
-      <article class="metric-card olive"><span>Reserve Available</span><strong>${money(dashboard.pool.available)}</strong><p>Flexibility left after spending and overage coverage.</p></article>
-      <article class="metric-card blue"><span>Paid From Reserve</span><strong>${money(dashboard.pool.outflows)}</strong><p>Big spend and one-off reserve use.</p></article>
-      <article class="metric-card amber"><span>Covered Overages</span><strong>${money(dashboard.pool.overageCoverage)}</strong><p>Box overages absorbed by reserve.</p></article>
-      <article class="metric-card ${dashboard.pool.unfundedOverspend ? "terra" : "sage"}"><span>Overspend Not Covered</span><strong>${money(dashboard.pool.unfundedOverspend)}</strong><p>Only appears when reserve cannot cover overages.</p></article>
-    </section>
-
-    <section class="desktop-grid">
-      <div class="card">
-        <div class="section-head"><div><h2>This Month Reserve Entries</h2><p>Reserve spending, inflows, and direct adjustments.</p></div></div>
-        <div class="pool-list">${entries.map(renderPoolEntry).join("") || `<div class="pool-item"><span>No reserve entries this month.</span><strong>$0</strong></div>`}</div>
-      </div>
-      <div class="card">
-        <div class="section-head"><div><h2>Month Summaries</h2><p>Reserve resilience by month.</p></div></div>
-        <div class="pool-list">${monthly.map((item) => `<div class="pool-item"><span>${escapeHtml(item.month)}<br><span class="muted">In ${money(item.inflow)} · Out ${money(item.outflow)} · Coverage ${money(item.coverage)}</span></span><strong>${money(item.ending)}</strong></div>`).join("")}</div>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="section-head"><div><h2>Reserve Health</h2><p>How much flexibility remains after direct spending and covered overages.</p></div></div>
-      ${renderReserveAnalysis(wallet)}
-    </section>
-  `;
-}
-
-function renderYear() {
-  const wallet = state.activeWallet;
-  const months = getRecentActualMonths(wallet, 12);
-  return `
-    <section class="hero">
-      <div class="hero-main">
-        <p class="eyebrow">${escapeHtml(wallets[wallet].label)} Year Review</p>
-        <div class="hero-number">${money(months.at(-1)?.poolEnding || 0)}</div>
-        <p class="hero-sub">Latest ${escapeHtml(wallets[wallet].reserveLabel)} ending balance · month-over-month review</p>
-      </div>
-      <div class="hero-strip">
-        <div class="strip-item"><span>Months</span><strong>${months.length}</strong></div>
-        <div class="strip-item"><span>Avg Box Spend</span><strong>${money(average(months.map((item) => Object.values(item.boxes || {}).reduce((acc, value) => acc + value, 0))))}</strong></div>
-        <div class="strip-item"><span>Avg Saved</span><strong>${money(average(months.map((item) => item.savedAmount || 0)))}</strong></div>
-      </div>
-    </section>
-    <section class="card">
-      <div class="section-head"><div><h2>Month-Over-Month Review</h2><p>Longer-term patterns stay here, separate from current-month decisions.</p></div></div>
-      ${renderYearBreakdown(wallet)}
-    </section>
-  `;
-}
-
-function renderAnalysis() {
-  return `
-    ${renderYear()}
-    ${renderAssets()}
-  `;
-}
-
-function renderAssets() {
-  if (state.activeWallet === "pw") {
-    return `<section class="card"><h2>PW Asset Tracking Is Off</h2><p class="muted" style="margin-top: 8px;">PW is a personal allowance tracker only. The analysis above focuses on saved reserve and spending trends.</p></section>`;
+function renderHeaderStatus() {
+  if (!headerStatus) return;
+  if (state.ui.activeTab !== "monitor") {
+    headerStatus.className = "header-status-pill neutral";
+    headerStatus.textContent = "Plan";
+    return;
   }
-
-  const receivables = state.receivables.reduce((acc, item) => acc + Number(item.currentBalance || 0), 0);
-  const latestInvestments = getLatestInvestments();
-  const investments = latestInvestments.reduce((acc, item) => acc + item.marketValue, 0);
-  const pool = getDashboard("vewu").pool.available;
-  const latestNetWorth = state.netWorthSnapshots[state.netWorthSnapshots.length - 1];
-  const computedNetWorth = pool + receivables + investments + (latestNetWorth?.homeEquity || 0) + (latestNetWorth?.otherAssets || 0) - (latestNetWorth?.mortgageBalance || 0) - (latestNetWorth?.carLoanBalance || 0) - (latestNetWorth?.otherLiabilities || 0);
-  const editMode = Boolean(state.manageReports);
-
-  return `
-    <section class="card">
-      <div class="section-head"><div><h2>Asset Dashboard</h2><p>Assets are analysis-only. They do not increase monthly spending capacity.</p></div></div>
-      <div class="asset-grid">
-        <article class="metric-card olive"><span>Cash Reserve</span><strong>${money(pool)}</strong><p>Only this affects budget flexibility.</p></article>
-        <article class="metric-card blue"><span>Receivables</span><strong>${money(receivables)}</strong><p>Tracked separately until received.</p></article>
-        <article class="metric-card sage"><span>Investments</span><strong>${money(investments)}</strong><p>Latest saved snapshots.</p></article>
-        <article class="metric-card grey"><span>Net Worth Estimate</span><strong>${money(computedNetWorth)}</strong><p>Independent from monthly spendable money.</p></article>
-      </div>
-    </section>
-
-    <section class="desktop-grid">
-      <div class="card">
-        <div class="section-head">
-          <div><h2>Receivable Tracker</h2><p>Total ${money(receivables)} · independent from budget plan.</p></div>
-        </div>
-        <div class="asset-list">
-          ${state.receivables.map((item) => `
-            <div class="asset-row">
-              <span><strong>${escapeHtml(item.debtor)}</strong><br><span class="muted">${escapeHtml(item.status)} · expected ${money(item.expectedPayment)} · ${escapeHtml(getPayoffLabel(item.currentBalance, item.expectedPayment, item.interestRate, item.expectedPayoffMonth))}</span></span>
-              <span><strong>${money(item.currentBalance)}</strong>${editMode ? `<br><button class="mini-button" type="button" data-edit-receivable="${item.receivableId}">Edit</button>` : ""}</span>
-            </div>
-          `).join("")}
-        </div>
-        ${editMode ? `<form id="receivableForm" class="tracker-form">
-          <h3>Add / Track Receivable</h3>
-          <div class="asset-edit-grid">
-            <label class="field"><span>Debtor</span><input id="receivableDebtor" required /></label>
-            <label class="field"><span>Current Balance</span><input id="receivableBalance" type="number" step="0.01" required /></label>
-            <label class="field"><span>Expected Payment</span><input id="receivableExpected" type="number" step="0.01" value="0" /></label>
-            <label class="field"><span>Interest Rate %</span><input id="receivableInterest" type="number" step="0.01" value="0" /></label>
-            <label class="field"><span>Status</span><select id="receivableStatus"><option value="active">Active</option><option value="paused">Paused</option><option value="archived">Archived</option><option value="paid-off">Paid Off</option></select></label>
-            <label class="field"><span>Notes</span><input id="receivableNotes" /></label>
-          </div>
-          <button class="primary-button" type="submit">Save Receivable</button>
-        </form>` : ""}
-      </div>
-      <div class="card">
-        <div class="section-head">
-          <div><h2>Investment Tracker</h2><p>Total ${money(investments)} · snapshots, not portfolio trading.</p></div>
-        </div>
-        ${renderInvestmentVisualizer(latestInvestments)}
-        <div class="asset-list" style="margin-top: 12px;">
-          ${latestInvestments.map((item) => `
-            <div class="asset-row">
-              <span><strong>${escapeHtml(item.accountName)}</strong><br><span class="muted">${escapeHtml(item.bucketType)} · ${escapeHtml(item.date)} · contribution ${money(item.contribution)} · withdrawal ${money(item.withdrawal)}</span></span>
-              <span><strong>${money(item.marketValue)}</strong>${editMode ? `<br><button class="mini-button" type="button" data-edit-investment="${item.snapshotId}">Edit</button>` : ""}</span>
-            </div>
-          `).join("")}
-        </div>
-        ${editMode ? `<form id="investmentForm" class="tracker-form">
-          <h3>Add Investment Snapshot</h3>
-          <div class="asset-edit-grid">
-            <label class="field"><span>Date</span><input id="investmentDate" type="date" value="${state.currentMonth}-28" required /></label>
-            <label class="field"><span>Account / Bucket</span><input id="investmentAccount" placeholder="VFV, QQC..." required /></label>
-            <label class="field"><span>Bucket Type</span><select id="investmentType"><option>Emergency</option><option>Low Risk</option><option>Equity</option><option>Other</option></select></label>
-            <label class="field"><span>Market Value</span><input id="investmentValue" type="number" step="0.01" required /></label>
-            <label class="field"><span>Contribution</span><input id="investmentContribution" type="number" step="0.01" value="0" /></label>
-            <label class="field"><span>Withdrawal</span><input id="investmentWithdrawal" type="number" step="0.01" value="0" /></label>
-            <label class="field"><span>Notes</span><input id="investmentNotes" /></label>
-          </div>
-          <button class="primary-button" type="submit">Save Snapshot</button>
-        </form>` : ""}
-      </div>
-    </section>
-  `;
+  const status = getDashboard().overallStatus;
+  headerStatus.className = `header-status-pill ${status.key}`;
+  headerStatus.textContent = status.label;
 }
 
-function renderPlan() {
-  const wallet = state.activeWallet;
-  const plan = getPlan(state.currentMonth, wallet);
-  const base = getEditableYearPlan(wallet);
-  const closed = isClosed(state.currentMonth, wallet);
-  const manage = Boolean(state.manageSettings);
-
+function renderScopeSwitch() {
   return `
-    <section class="card">
-      <div class="section-head">
-        <div><h2>Monthly Plan</h2><p>${manage ? "Changes apply from next month forward. Closed months are never overwritten." : "Turn on Manage to change names, categories, or amounts."}</p></div>
-      </div>
-      <div class="plan-section">
-        ${renderPlanInputs(base, "year")}
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="section-head">
-        <div><h2>This Month Changes</h2><p>${closed ? "This month is closed. Reopen before editing." : manage ? "Only changes this month; next month returns to the monthly plan." : "Current month view."}</p></div>
-      </div>
-      <div class="plan-section">
-        ${renderPlanInputs(plan, "current", closed)}
-      </div>
-    </section>
-
-    ${manage ? `<section class="card">
-      <div class="section-head">
-        <div><h2>Add or Change Plan Items</h2><p>Add income, fixed bills, debt payments, spending boxes, or planned saving.</p></div>
-      </div>
-      <div class="action-row">
-        <button id="openPlanItemButton" class="primary-button" type="button" ${closed ? "disabled" : ""}>Add Plan Item</button>
-      </div>
-    </section>` : ""}
-
-    <section class="card">
-      <div class="section-head"><div><h2>Debt Payments</h2><p>Debt payments are locked plan items with payoff tracking. Edit, pause, or archive when done.</p></div></div>
-      <div class="asset-list">
-        ${state.debtPlans.filter((item) => item.wallet === wallet).map((item) => `
-          <div class="asset-row">
-            <span><strong>${escapeHtml(item.name)}</strong><br><span class="muted">${escapeHtml(item.status)} · balance ${money(item.currentBalance)} · monthly ${money(item.monthlyPayment)} · ${escapeHtml(getPayoffLabel(item.currentBalance, item.monthlyPayment, item.interestRate))}</span></span>
-            <span>${manage ? `<button class="mini-button" type="button" data-edit-debt="${item.debtId}">Edit</button> <button class="mini-button" type="button" data-delete-debt="${item.debtId}">Delete</button>` : `<strong>${money(item.monthlyPayment)}</strong>`}</span>
-          </div>
-        `).join("") || `<div class="asset-row"><span>No debt payment items.</span><strong>$0</strong></div>`}
-      </div>
-      ${manage ? `<form id="debtForm" class="tracker-form">
-        <h3>Add Debt Payment</h3>
-        <div class="asset-edit-grid">
-          <label class="field"><span>Name</span><input id="debtName" required /></label>
-          <label class="field"><span>Current Balance</span><input id="debtBalance" type="number" step="0.01" value="0" /></label>
-          <label class="field"><span>Monthly Payment</span><input id="debtPayment" type="number" step="0.01" value="0" /></label>
-          <label class="field"><span>Interest Rate %</span><input id="debtInterest" type="number" step="0.01" value="0" /></label>
-          <label class="field"><span>Status</span><select id="debtStatus"><option value="active">Active</option><option value="paused">Paused</option><option value="archived">Archived</option><option value="paid-off">Paid Off</option></select></label>
-          <label class="field"><span>Notes</span><input id="debtNotes" /></label>
-        </div>
-        <button class="primary-button" type="submit">Save Debt Payment</button>
-      </form>` : ""}
-    </section>
-  `;
-}
-
-function renderMonthClose() {
-  const wallet = state.activeWallet;
-  const dashboard = getDashboard(wallet);
-  const closed = isClosed(state.currentMonth, wallet);
-  const unclosed = getUnclosedMonths();
-  const reminder = getCloseReminder();
-  const closeSummary = getCloseSummary(wallet);
-  const manage = Boolean(state.manageSettings);
-
-  return `
-    ${reminder ? `<section class="warning-item watch"><span><strong>Close reminder</strong><br><span class="muted">${escapeHtml(reminder)}</span></span><strong>Close</strong></section>` : ""}
-    <section class="card">
-      <div class="section-head">
-        <div><h2>Close This Month</h2><p>Freeze ${escapeHtml(wallets[wallet].label)} budget so future plan changes cannot overwrite it.</p></div>
-      </div>
-      <div class="checklist">
-        <div class="check-item">Review unusual transactions</div>
-        <div class="check-item">Confirm over-budget categories</div>
-        <div class="check-item">Confirm reserve coverage</div>
-        <div class="check-item">Export backup from Data</div>
-      </div>
-      <div class="metric-grid">
-        <article class="metric-card sage"><span>Income / Allowance</span><strong>${money(dashboard.income)}</strong><p>Plan-default monthly inflow.</p></article>
-        <article class="metric-card blue"><span>Fixed Bills</span><strong>${money(dashboard.fixedBills)}</strong><p>Fixed operating costs.</p></article>
-        <article class="metric-card grey"><span>Debt Payments</span><strong>${money(dashboard.debtPayments)}</strong><p>Debt-like fixed costs with payoff tracking.</p></article>
-        <article class="metric-card olive"><span>Reserve Ending</span><strong>${money(dashboard.pool.available)}</strong><p>After inflows, outflows, and overage coverage.</p></article>
-        <article class="metric-card ${dashboard.pool.unfundedOverspend ? "terra" : "sage"}"><span>Overspend Not Covered</span><strong>${money(dashboard.pool.unfundedOverspend)}</strong><p>Only appears when reserve cannot cover overages.</p></article>
-      </div>
-      <div class="action-row" style="margin-top: 14px;">
-        <button id="closeWalletButton" class="primary-button" type="button">${closed ? "Closed" : `Close ${wallets[wallet].label}`}</button>
-        ${manage ? `<button id="reopenWalletButton" class="ghost-button" type="button">Reopen</button>` : ""}
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="section-head"><div><h2>Month-End Summary</h2><p>${escapeHtml(closeSummary.text)}</p></div></div>
-      ${renderCloseVisualization(wallet)}
-    </section>
-
-    <section class="card">
-      <div class="section-head"><div><h2>Months Not Closed</h2><p>Tracked months that still need closing.</p></div></div>
-      <div class="unclosed-grid">
-        ${unclosed.length ? unclosed.map((item) => `<div class="asset-row"><span>${escapeHtml(item.month)} · ${escapeHtml(wallets[item.wallet].label)}</span><strong>Open</strong></div>`).join("") : `<div class="asset-row"><span>All tracked months are closed.</span><strong>Done</strong></div>`}
-      </div>
-    </section>
-  `;
-}
-
-function renderPlanInputs(plan, mode, disabled = false) {
-  const attr = mode === "year" ? "data-year-plan" : "data-current-override";
-  const fixedItems = getFixedItems(plan, state.activeWallet);
-  return `
-    ${planGroup("Income Sources", plan.incomeDefaults.map((item) => planRow(item.name, "Income Source", `${mode}:income:${item.id}`, item.amount, attr, disabled)))}
-    ${planGroup("Fixed Bills", fixedItems.map((item) => planRow(item.name, "Fixed Bill", `${mode}:fixed:${item.id}`, item.amount, attr, disabled)))}
-    ${planGroup("Spending Boxes", Object.entries(plan.boxes).map(([id, box]) => planRow(box.name, "Spending Box", `${mode}:box:${id}`, box.budget, attr, disabled)))}
-    ${planGroup("Planned Saving", plan.baselineSavingItems.map((item) => planRow(item.name, "Planned Saving", `${mode}:saving:${item.id}`, item.amount, attr, disabled)))}
-    ${planGroup("Reserve", [planRow(`${plan.pool.name} Starting Balance`, "Reserve", `${mode}:pool:startingBalance`, plan.pool.startingBalance, attr, disabled, false)])}
-  `;
-}
-
-function planGroup(title, rows) {
-  return `
-    <div class="plan-group">
-      <h3>${escapeHtml(title)}</h3>
-      ${rows.length ? rows.join("") : `<div class="asset-row"><span>No items.</span><strong>$0</strong></div>`}
+    <div class="scope-switch" role="tablist" aria-label="Monitor scope">
+      <button class="scope-button ${state.ui.monitorScope === "week" ? "is-active" : ""}" type="button" data-scope="week">Week</button>
+      <button class="scope-button ${state.ui.monitorScope === "month" ? "is-active" : ""}" type="button" data-scope="month">Month</button>
     </div>
   `;
 }
 
-function planRow(label, typeLabel, key, value, attr, disabled, canDelete = true) {
-  const editable = state.manageSettings && !disabled;
-  return `
-    <div class="plan-row ${editable ? "is-editable" : "is-readonly"}">
-      <span><strong>${escapeHtml(label)}</strong><br><span class="muted">${escapeHtml(typeLabel)}</span></span>
-      ${editable ? `<input class="small-input" ${attr}="${escapeHtml(key)}" type="number" step="0.01" value="${Number(value) || 0}" />` : `<strong class="plan-amount">${money(value)}</strong>`}
-      ${editable && canDelete ? `<button class="mini-button" type="button" data-edit-plan="${escapeHtml(key)}">Edit</button>` : ""}
-      ${editable && canDelete ? `<button class="mini-button" type="button" data-delete-plan="${escapeHtml(key)}">Delete</button>` : ""}
-    </div>
-  `;
-}
-
-function addTransaction(event) {
-  event.preventDefault();
-  const wallet = state.activeWallet;
-  if (isClosed(state.currentMonth, wallet)) return showToast("Month is closed");
-  const amount = Number(document.querySelector("#amountInput").value) || 0;
-  const date = document.querySelector("#dateInput").value;
-  const note = document.querySelector("#noteInput").value.trim();
-  const [type, box] = document.querySelector("#boxSelect").value.split(":");
-  if (!amount || !date) return;
-
-  if (type === "spending") {
-    state.transactions.push(t(date, wallet, amount, box, note || boxMeta[box]?.name || "Spending"));
-    state.highlightBox = box;
-  }
-
-  if (type === "pool_inflow") {
-    state.poolEntries.push(p(date, wallet, "inflow", amount, "Manual Reserve Inflow", note || "Reserve inflow"));
-  }
-
-  if (type === "pool_spend") {
-    state.poolEntries.push(p(date, wallet, "spend", amount, "Paid From Reserve", note || "Reserve spend"));
-  }
-
-  if (type === "refund") {
-    const target = document.querySelector("#refundTarget").value;
-    if (target === "pool") {
-      state.poolEntries.push(p(date, wallet, "inflow", amount, "Refund / Reimbursement", note || "Refund"));
-    } else {
-      const refundBox = document.querySelector("#refundBox").value;
-      state.transactions.push(t(date, wallet, amount, refundBox, note || "Refund", "refund", { refundTarget: "box" }));
-    }
-  }
-
-  save();
-  const updatedBox = type === "spending" ? getBoxes(wallet).find((item) => item.boxId === box) : null;
-  showToast(updatedBox ? `Added to ${updatedBox.name} · ${money(updatedBox.visibleRemaining)} left` : "Entry added");
-  closeEditModal();
+function setMonitorScope(scope) {
+  const nextScope = scope === "month" ? "month" : "week";
+  if (state.ui.monitorScope === nextScope) return;
+  state.ui.monitorScope = nextScope;
+  state.ui.txFilter = nextScope === "month" ? "month" : "week";
+  saveState();
   render();
-  if (state.highlightBox) {
-    window.setTimeout(() => {
-      state.highlightBox = "";
-      save();
+}
+
+function renderNav() {
+  bottomNav.innerHTML = `
+    <button class="tab-button ${state.ui.activeTab === "monitor" ? "is-active" : ""}" type="button" data-tab="monitor">Monitor</button>
+    <button class="quick-add-button" type="button" data-quick-add aria-label="Quick Add">+</button>
+    <button class="tab-button ${state.ui.activeTab === "planning" ? "is-active" : ""}" type="button" data-tab="planning">Planning</button>
+  `;
+}
+
+function bindPageEvents() {
+  document.querySelectorAll("[data-scope]").forEach((button) => {
+    button.addEventListener("click", () => setMonitorScope(button.dataset.scope));
+  });
+  document.querySelector("#transactionForm")?.addEventListener("submit", saveTransaction);
+  document.querySelectorAll("[data-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.ui.txFilter = button.dataset.filter;
+      saveState();
       render();
-    }, 900);
+    });
+  });
+  document.querySelectorAll("[data-edit-transaction]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.ui.activeTab = "monitor";
+      state.ui.editingTransactionId = button.dataset.editTransaction;
+      saveState();
+      openQuickAdd();
+    });
+  });
+  document.querySelectorAll("[data-delete-transaction]").forEach((button) => {
+    button.addEventListener("click", () => deleteTransaction(button.dataset.deleteTransaction));
+  });
+  document.querySelectorAll("[data-manage-transactions]").forEach((button) => {
+    button.addEventListener("click", openTransactionsManager);
+  });
+  document.querySelector("#cancelEditButton")?.addEventListener("click", cancelEditingTransaction);
+  document.querySelectorAll("[data-close-sheet]").forEach((button) => {
+    button.addEventListener("click", closeQuickAdd);
+  });
+  document.querySelector(".sheet-backdrop")?.addEventListener("click", (event) => {
+    if (event.target.classList.contains("sheet-backdrop")) closeQuickAdd();
+  });
+  document.querySelector("#closeWeekButton")?.addEventListener("click", closeWeek);
+  document.querySelector("#reopenWeekButton")?.addEventListener("click", reopenWeek);
+  document.querySelector("#settingsForm")?.addEventListener("submit", saveSettings);
+  document.querySelector("#recalcReserveButton")?.addEventListener("click", recalcReserveFromLedger);
+  document.querySelector("#exportJsonButton")?.addEventListener("click", exportJSON);
+  document.querySelector("#importJsonInput")?.addEventListener("change", importJSON);
+  document.querySelector("#resetButton")?.addEventListener("click", resetData);
+  document.querySelectorAll("[data-planning-section]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      if (event.target.closest("input, button, label, summary, textarea, select")) return;
+      togglePlanningSection(button.dataset.planningSection);
+    });
+  });
+  document.querySelectorAll("[data-toggle-planning]").forEach((button) => {
+    button.addEventListener("click", () => togglePlanningSection(button.dataset.togglePlanning));
+  });
+  document.querySelectorAll("[data-manage-budget-categories]").forEach((button) => {
+    button.addEventListener("click", openManageBudgetCategories);
+  });
+  document.querySelectorAll("[data-edit-category]").forEach((button) => {
+    button.addEventListener("click", () => openManageCategory(button.dataset.editCategory));
+  });
+  document.querySelectorAll("[data-manage-background]").forEach((button) => {
+    button.addEventListener("click", openManageBackgroundSections);
+  });
+  document.querySelectorAll("[data-edit-background-item]").forEach((button) => {
+    button.addEventListener("click", () => openManageBackgroundItem(button.dataset.sectionId, button.dataset.editBackgroundItem));
+  });
+}
+
+function renderMonitorPage() {
+  const dashboard = getDashboard();
+  const cards = dashboard.monitorCards;
+  return `
+    <section class="page monitor-page">
+      ${renderCompactReserveHero(dashboard.reserve, dashboard.projections)}
+      ${renderOverallMonitorStatus(dashboard.overallStatus)}
+      <section class="monitor-grid" aria-label="Variable monitors">
+        ${cards.length ? cards.map(renderMonitorBox).join("") : `<article class="monitor-box empty"><div class="empty-state">No monitor categories configured. Add one in Planning.</div></article>`}
+      </section>
+      ${renderWeeklyDiscipline(dashboard.discipline)}
+      ${renderRecentTransactionsPreview(dashboard.scope)}
+    </section>
+  `;
+}
+
+function renderMonitorBox(card) {
+  return `
+    <article class="monitor-box ${card.status.key}">
+      <div class="monitor-box-head">
+        <h2><span class="category-icon" aria-hidden="true">${escapeHtml(card.icon)}</span>${escapeHtml(card.label)}</h2>
+        <span class="monitor-status">${escapeHtml(card.status.label)}</span>
+      </div>
+      <div class="monitor-spend">${money(card.primarySpent)} / ${money(card.primaryBudget)}</div>
+      ${renderProgressBar(card)}
+      <p class="monitor-warning">${escapeHtml(card.secondaryLine)}</p>
+    </article>
+  `;
+}
+
+function renderCompactReserveHero(reserve, projections) {
+  const filled = Math.max(0, Math.min(12, reserve.runwayMonths));
+  const pill = reserve.status.tone === "green"
+    ? "Healthy"
+    : reserve.status.tone === "yellow"
+      ? "Below target"
+      : "Critical";
+  return `
+    <section class="compact-reserve-hero">
+      <div class="compact-reserve-top">
+        <span>Reserve Vault</span>
+        <em class="reserve-pill ${reserve.status.tone}">${pill}</em>
+      </div>
+      <strong class="reserve-balance">${money(reserve.balance)}</strong>
+      <div class="compact-runway-row">
+        <span>Runway ${reserve.runwayMonths}/12</span>
+        <div class="mini-runway gold" aria-hidden="true">
+          ${Array.from({ length: 12 }, (_, index) => `<i class="${index < filled ? "is-filled" : ""}"></i>`).join("")}
+        </div>
+      </div>
+      <div class="compact-projection-line">
+        <span>Gap -${money(reserve.gap)}/mo</span>
+        <span>Sep ${money(projections.sep.value)} · Jan ${money(projections.jan.value)}</span>
+      </div>
+    </section>
+  `;
+}
+
+function renderOverallMonitorStatus(status) {
+  return `
+    <section class="overall-status-strip ${status.key}">
+      <div>
+        <strong>${escapeHtml(status.label)}</strong>
+        <span>${escapeHtml(status.action)}</span>
+      </div>
+      <b>${money(status.projectedSpend)} / ${money(status.budget)}</b>
+    </section>
+  `;
+}
+
+function renderReserveMiniStrip(reserve, projections) {
+  const filled = Math.max(0, Math.min(12, reserve.runwayMonths));
+  return `
+    <section class="reserve-mini-strip">
+      <span>Runway ${reserve.runwayMonths}/12</span>
+      <div class="mini-runway gold" aria-hidden="true">
+        ${Array.from({ length: 12 }, (_, index) => `<i class="${index < filled ? "is-filled" : ""}"></i>`).join("")}
+      </div>
+      <span>Sep ${money(projections.sep.value)} · Jan ${money(projections.jan.value)}</span>
+    </section>
+  `;
+}
+
+function renderRunwayMeter(reserve) {
+  const filled = Math.max(0, Math.min(12, reserve.runwayMonths));
+  const blocks = Array.from({ length: 12 }, (_, index) => `
+    <i class="runway-block ${index < filled ? "is-filled" : ""}"></i>
+  `).join("");
+  return `
+    <section class="runway-meter tone-${reserve.status.tone}" aria-label="Reserve runway">
+      <div class="visual-head">
+        <h2>Reserve Runway</h2>
+        <span>${reserve.runwayMonths} / 12 months</span>
+      </div>
+      <div class="runway-blocks" aria-hidden="true">${blocks}</div>
+      <div class="runway-lines">
+        <strong>${money(reserve.balance)}</strong>
+        <span>-${money(reserve.gap)} / month gap</span>
+      </div>
+      <p class="visual-note">${escapeHtml(reserve.conclusion)} ${escapeHtml(reserve.nextAction)}</p>
+    </section>
+  `;
+}
+
+function renderProjectionTimeline(reserve, projections) {
+  const nodes = [
+    { label: "Now", value: reserve.balance },
+    { label: "Sep 1", value: projections.sep.value },
+    { label: "Jan 1", value: projections.jan.value }
+  ];
+  return `
+    <section class="projection-timeline" aria-label="Reserve projection timeline">
+      <div class="timeline-line" aria-hidden="true"></div>
+      ${nodes.map((node) => `
+        <div class="timeline-node ${projectionTone(node.value)}">
+          <i></i>
+          <strong>${money(node.value)}</strong>
+          <span>${escapeHtml(node.label)}</span>
+        </div>
+      `).join("")}
+    </section>
+  `;
+}
+
+function renderVariablePaceBoard(dashboard) {
+  return `
+    <section class="stack">
+      <div class="visual-section-title">Variable Control Grid</div>
+      <section class="pace-board">
+        <div class="pace-group">
+          <h3>Essentials Variable</h3>
+          ${renderCategoryCard(dashboard.categories.groceries)}
+          ${renderCategoryCard(dashboard.categories.charging)}
+        </div>
+        <div class="pace-group">
+          <h3>Discretionary Variable</h3>
+          ${renderCategoryCard(dashboard.categories.entertainment)}
+          ${renderCategoryCard(dashboard.categories.misc)}
+        </div>
+      </section>
+    </section>
+  `;
+}
+
+function renderCategoryCard(card) {
+  return `
+    <article class="pace-card visual-category ${card.status.tone}">
+      <div class="pace-card-head">
+        <h3>${escapeHtml(card.label)}</h3>
+        <span class="status-dot ${card.status.tone}"><i></i></span>
+      </div>
+      <div class="pace-money">${money(card.thisWeekSpent)} / ${money(card.thisWeekBudget)}</div>
+      ${renderProgressBar(card)}
+      <div class="remaining-line">Remaining: ${money(card.remainingThisMonth)}</div>
+      <p class="visual-note">${escapeHtml(card.conclusion)}</p>
+    </article>
+  `;
+}
+
+function renderProgressBar(card) {
+  const maxValue = card.type === "essentials"
+    ? Math.max(card.zoneSoftCap, card.markerBudget, card.projectedAmount, card.actualAmount, 1)
+    : Math.max(card.markerBudget * 1.35, card.projectedAmount, card.actualAmount, 1);
+  const actualFill = card.actualAmount / maxValue * 100;
+  const projectedFill = Math.max(0, card.projectedAmount - card.actualAmount) / maxValue * 100;
+  const budgetMarker = card.markerBudget / maxValue * 100;
+  const softMarker = card.type === "essentials" ? card.zoneSoftCap / maxValue * 100 : budgetMarker;
+  const zoneEnd = card.type === "essentials" ? softMarker : 100;
+  const penaltyWidth = card.type === "discretionary" && card.projectedOvershoot > 0
+    ? Math.min(100 - budgetMarker, card.projectedOvershoot / maxValue * 100)
+    : 0;
+
+  return `
+    <div class="budget-bar ${card.type} ${card.status.tone} ${card.scope}">
+      <div class="budget-zone" style="left:${clampPercent(budgetMarker)}%; width:${clampPercent(zoneEnd - budgetMarker)}%"></div>
+      ${card.type === "discretionary" ? `<div class="penalty-zone" style="left:${clampPercent(budgetMarker)}%; width:${clampPercent(penaltyWidth)}%"></div>` : ""}
+      <div class="budget-fill" style="width:${clampPercent(actualFill)}%"></div>
+      <div class="projected-fill" style="left:${clampPercent(actualFill)}%; width:${clampPercent(projectedFill)}%"></div>
+      <i class="budget-marker" style="left:${clampPercent(budgetMarker)}%"></i>
+      ${card.type === "essentials" && card.scope === "week" ? `<i class="soft-marker" style="left:${clampPercent(softMarker)}%"></i>` : ""}
+    </div>
+  `;
+}
+
+function renderWeeklyDiscipline(discipline) {
+  return `
+    <article class="discipline-card impact-card tone-${discipline.status.tone}">
+      <div class="visual-head">
+        <h2>This Week Impact</h2>
+        <span>${discipline.isClosed ? "Closed" : discipline.status.label}</span>
+      </div>
+      <div class="impact-main">${discipline.nextWeekReduction > 0 ? "-" : ""}${money(discipline.nextWeekReduction)} if closed now</div>
+      <div class="impact-flow">
+        <span>${money(discipline.discretionaryOvershoot)} overshoot</span>
+        <i></i>
+        <span>${money(discipline.nextWeekReduction)} penalty</span>
+        <i></i>
+        <span>next week reduced</span>
+      </div>
+      <p class="visual-note">Projected discretionary overshoot by Sunday: ${money(discipline.projectedDiscretionaryOvershoot)}</p>
+      <div class="button-row">
+        <button id="closeWeekButton" class="action-button" type="button" ${discipline.isClosed ? "disabled" : ""}>Close Week</button>
+        <button id="reopenWeekButton" class="ghost-button" type="button">Clear Close</button>
+      </div>
+      <p class="visual-note">${discipline.isClosed ? "This week has already been closed." : escapeHtml(discipline.conclusion)}</p>
+    </article>
+  `;
+}
+
+function openQuickAdd() {
+  modalRoot.innerHTML = renderQuickAddSheet();
+  bindQuickAddEvents();
+  requestAnimationFrame(() => modalRoot.querySelector("input[name='amount']")?.focus());
+}
+
+function bindQuickAddEvents() {
+  modalRoot.querySelector("#transactionForm")?.addEventListener("submit", saveTransaction);
+  modalRoot.querySelectorAll("[data-quick-amount]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const input = modalRoot.querySelector("input[name='amount']");
+      if (input) input.value = button.dataset.quickAmount;
+    });
+  });
+  modalRoot.querySelectorAll("[data-pick-category]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const input = modalRoot.querySelector("#quickCategoryInput");
+      if (!input) return;
+      input.value = button.dataset.pickCategory;
+      modalRoot.querySelectorAll("[data-pick-category]").forEach((chip) => chip.classList.remove("is-active"));
+      button.classList.add("is-active");
+    });
+  });
+  modalRoot.querySelector("[data-repeat-last]")?.addEventListener("click", () => {
+    const template = state.ui.lastTransactionTemplate;
+    if (!template) return;
+    const amountInput = modalRoot.querySelector("input[name='amount']");
+    const noteInput = modalRoot.querySelector("input[name='note']");
+    const categoryInput = modalRoot.querySelector("#quickCategoryInput");
+    if (amountInput) amountInput.value = template.amount || "";
+    if (noteInput) noteInput.value = template.note || "";
+    if (categoryInput) categoryInput.value = template.category || "groceries";
+    modalRoot.querySelectorAll("[data-pick-category]").forEach((chip) => {
+      chip.classList.toggle("is-active", chip.dataset.pickCategory === (template.category || "groceries"));
+    });
+  });
+  modalRoot.querySelectorAll("[data-close-sheet]").forEach((button) => {
+    button.addEventListener("click", closeQuickAdd);
+  });
+  modalRoot.querySelector(".sheet-backdrop")?.addEventListener("click", (event) => {
+    if (event.target.classList.contains("sheet-backdrop")) closeQuickAdd();
+  });
+}
+
+function closeQuickAdd() {
+  modalRoot.innerHTML = "";
+  if (state.ui.editingTransactionId) {
+    state.ui.editingTransactionId = null;
+    saveState();
   }
 }
 
-function updateRefundControls() {
-  const selected = document.querySelector("#boxSelect")?.value || "";
-  const show = selected.startsWith("refund:");
-  document.querySelector("#refundControls")?.classList.toggle("hidden", !show);
+function openTransactionsManager() {
+  state.ui.txFilter = state.ui.monitorScope === "month" ? "month" : "week";
+  saveState();
+  modalRoot.innerHTML = renderTransactionsManagerSheet();
+  bindTransactionManagerEvents();
 }
 
-function openAddEntryModal() {
-  const wallet = state.activeWallet;
-  modalRoot.innerHTML = `
-    <div class="modal-backdrop" role="presentation">
-      <section class="edit-modal" role="dialog" aria-modal="true" aria-labelledby="addEntryModalTitle">
-        <div class="modal-head">
-          <div>
-            <h2 id="addEntryModalTitle">Add ${escapeHtml(wallets[wallet].label)} Entry</h2>
-            <p>Fast manual entry. Choose the real box, not a payment method.</p>
-          </div>
-          <button class="icon-button" type="button" data-close-modal aria-label="Close">×</button>
+function openManageCategory(categoryId) {
+  const category = getCategoryById(categoryId);
+  modalRoot.innerHTML = renderCategoryEditorSheet(category);
+  bindManageCategoryEvents(categoryId);
+}
+
+function bindManageCategoryEvents(categoryId) {
+  modalRoot.querySelector("#categoryEditorForm")?.addEventListener("submit", (event) => saveCategoryEdits(event, categoryId));
+  modalRoot.querySelector("[data-archive-category]")?.addEventListener("click", () => archiveCategory(categoryId));
+  modalRoot.querySelector("[data-delete-category]")?.addEventListener("click", () => deleteCategory(categoryId));
+  bindSheetCloseOnly();
+}
+
+function openManageBudgetCategories() {
+  modalRoot.innerHTML = renderBudgetCategoriesManagerSheet();
+  bindManageBudgetCategoriesEvents();
+}
+
+function bindManageBudgetCategoriesEvents() {
+  modalRoot.querySelector("#budgetCategoriesManagerForm")?.addEventListener("submit", saveBudgetCategoriesManager);
+  modalRoot.querySelector("#addCategoryForm")?.addEventListener("submit", addMonitorCategory);
+  modalRoot.querySelectorAll("[data-restore-category]").forEach((button) => {
+    button.addEventListener("click", () => restoreCategory(button.dataset.restoreCategory));
+  });
+  modalRoot.querySelectorAll("[data-edit-category]").forEach((button) => {
+    button.addEventListener("click", () => openManageCategory(button.dataset.editCategory));
+  });
+  bindSheetCloseOnly();
+}
+
+function openManageBackgroundItem(sectionId, itemId) {
+  const section = getBackgroundSectionById(sectionId);
+  const item = section?.items?.find((entry) => entry.id === itemId);
+  if (!section || !item) return;
+  modalRoot.innerHTML = renderBackgroundItemEditorSheet(section, item);
+  bindManageBackgroundItemEvents(sectionId, itemId);
+}
+
+function bindManageBackgroundItemEvents(sectionId, itemId) {
+  modalRoot.querySelector("#backgroundItemEditorForm")?.addEventListener("submit", (event) => saveBackgroundItemEdits(event, sectionId, itemId));
+  modalRoot.querySelector("[data-archive-background-item]")?.addEventListener("click", () => archiveBackgroundItem(sectionId, itemId));
+  bindSheetCloseOnly();
+}
+
+function openManageBackgroundSections() {
+  modalRoot.innerHTML = renderBackgroundSectionsManagerSheet();
+  bindManageBackgroundSectionsEvents();
+}
+
+function bindManageBackgroundSectionsEvents() {
+  modalRoot.querySelector("#backgroundSectionsManagerForm")?.addEventListener("submit", saveBackgroundSectionsManager);
+  modalRoot.querySelector("#addBackgroundSectionForm")?.addEventListener("submit", addBackgroundSection);
+  modalRoot.querySelector("#addBackgroundItemForm")?.addEventListener("submit", addBackgroundItem);
+  modalRoot.querySelectorAll("[data-restore-section]").forEach((button) => {
+    button.addEventListener("click", () => restoreBackgroundSection(button.dataset.restoreSection));
+  });
+  modalRoot.querySelectorAll("[data-archive-section]").forEach((button) => {
+    button.addEventListener("click", () => archiveBackgroundSection(button.dataset.archiveSection));
+  });
+  modalRoot.querySelectorAll("[data-edit-background-item]").forEach((button) => {
+    button.addEventListener("click", () => openManageBackgroundItem(button.dataset.sectionId, button.dataset.editBackgroundItem));
+  });
+  bindSheetCloseOnly();
+}
+
+function bindSheetCloseOnly() {
+  modalRoot.querySelectorAll("[data-close-sheet]").forEach((button) => {
+    button.addEventListener("click", closeQuickAdd);
+  });
+  modalRoot.querySelector(".sheet-backdrop")?.addEventListener("click", (event) => {
+    if (event.target.classList.contains("sheet-backdrop")) closeQuickAdd();
+  });
+}
+
+function bindTransactionManagerEvents() {
+  modalRoot.querySelectorAll("[data-sheet-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.ui.txFilter = button.dataset.sheetFilter;
+      saveState();
+      openTransactionsManager();
+    });
+  });
+  modalRoot.querySelectorAll("[data-edit-transaction]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.ui.editingTransactionId = button.dataset.editTransaction;
+      saveState();
+      openQuickAdd();
+    });
+  });
+  modalRoot.querySelectorAll("[data-delete-transaction]").forEach((button) => {
+    button.addEventListener("click", () => {
+      deleteTransaction(button.dataset.deleteTransaction);
+      openTransactionsManager();
+    });
+  });
+  modalRoot.querySelectorAll("[data-close-sheet]").forEach((button) => {
+    button.addEventListener("click", closeQuickAdd);
+  });
+  modalRoot.querySelector(".sheet-backdrop")?.addEventListener("click", (event) => {
+    if (event.target.classList.contains("sheet-backdrop")) closeQuickAdd();
+  });
+}
+
+function renderRecentTransactionsPreview(scope = state.ui.monitorScope || "week") {
+  const monthKey = state.ui.selectedMonth;
+  const weekKey = getWeekKey(getReferenceDateISO(monthKey));
+  const weekEnd = getWeekEnd(weekKey);
+  const recent = state.transactions
+    .filter((item) => {
+      if (scope === "month") return item.dateISO.slice(0, 7) === monthKey;
+      return item.dateISO.slice(0, 7) === monthKey && item.dateISO >= weekKey && item.dateISO <= weekEnd;
+    })
+    .sort((a, b) => `${b.dateISO}-${b.id}`.localeCompare(`${a.dateISO}-${a.id}`))
+    .slice(0, 5);
+  return `
+    <section class="recent-preview">
+      <div class="recent-head">
+        <h2>Recent</h2>
+        <button class="mini-button" type="button" data-manage-transactions>View all</button>
+      </div>
+      <div class="recent-feed">
+        ${recent.length ? recent.map(renderRecentTransaction).join("") : `<div class="empty-state">No transactions recorded yet.</div>`}
+      </div>
+    </section>
+  `;
+}
+
+function renderRecentTransaction(transaction) {
+  return `
+    <div class="recent-item ${transaction.category}">
+      <span>${escapeHtml(getCategoryLabel(transaction.category))}</span>
+      <strong>${money(transaction.amount)}</strong>
+      <em>${formatDate(transaction.dateISO)}</em>
+    </div>
+  `;
+}
+
+function renderTransactionsManagerSheet() {
+  const transactions = getFilteredTransactions();
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Manage transactions">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Transactions</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
         </div>
-        ${renderAddEntryForm(wallet)}
+        <div class="tx-filter">
+          ${renderSheetFilter("week", "This Week")}
+          ${renderSheetFilter("month", "This Month")}
+          ${renderSheetFilter("essentials", "Essentials")}
+          ${renderSheetFilter("discretionary", "Discretionary")}
+          ${renderSheetFilter("all", "All")}
+        </div>
+        <div class="tx-list">
+          ${transactions.length ? transactions.map(renderManagedTransaction).join("") : `<div class="empty-state">No transactions recorded yet.</div>`}
+        </div>
       </section>
     </div>
   `;
-  const backdrop = modalRoot.querySelector(".modal-backdrop");
-  const form = modalRoot.querySelector("#addForm");
-  backdrop.addEventListener("click", (event) => {
-    if (event.target === backdrop) closeEditModal();
-  });
-  modalRoot.querySelectorAll("[data-close-modal]").forEach((button) => {
-    button.addEventListener("click", closeEditModal);
-  });
-  form?.addEventListener("submit", addTransaction);
-  modalRoot.querySelector("#boxSelect")?.addEventListener("change", updateRefundControls);
-  modalRoot.querySelector("#refundTarget")?.addEventListener("change", updateRefundControls);
-  modalRoot.querySelector("#advancedTypeSelect")?.addEventListener("change", (event) => {
-    const value = event.target.value;
-    const select = modalRoot.querySelector("#boxSelect");
-    if (select) select.value = value;
-    modalRoot.querySelectorAll(".category-chip").forEach((chip) => chip.classList.toggle("is-active", chip.dataset.categoryValue === value));
-    updateRefundControls();
-  });
-  modalRoot.querySelectorAll(".category-chip").forEach((button) => {
-    button.addEventListener("click", () => {
-      const select = modalRoot.querySelector("#boxSelect");
-      const advanced = modalRoot.querySelector("#advancedTypeSelect");
-      if (select) select.value = button.dataset.categoryValue;
-      if (advanced) advanced.value = button.dataset.categoryValue;
-      modalRoot.querySelectorAll(".category-chip").forEach((chip) => chip.classList.toggle("is-active", chip === button));
-      updateRefundControls();
-    });
-  });
-  requestAnimationFrame(() => modalRoot.querySelector("#amountInput")?.focus());
 }
 
-function deleteTransaction(id) {
-  if (!confirm("Delete this entry?")) return;
-  state.transactions = state.transactions.filter((item) => item.transactionId !== id);
-  save();
-  showToast("Entry deleted");
-  render();
-}
-
-function editTransaction(id) {
-  const entry = state.transactions.find((item) => item.transactionId === id);
-  if (!entry) return;
-  openEditModal({
-    title: "Edit Entry",
-    description: `${wallets[entry.wallet]?.label || entry.wallet} · ${formatDate(entry.date)}`,
-    submitLabel: "Save Entry",
-    fields: [
-      { name: "amount", label: "Amount", type: "number", value: entry.amount, step: "0.01", required: true },
-      { name: "date", label: "Date", type: "date", value: entry.date, required: true },
-      { name: "box", label: "Box", type: "select", value: entry.box, options: getBoxOptions(entry.wallet, entry.month, entry.box) },
-      { name: "type", label: "Type", type: "select", value: entry.type, options: [["spending", "Spending"], ["refund", "Refund"]] },
-      { name: "note", label: "Note", type: "textarea", value: entry.note || "" }
-    ],
-    onSubmit(values) {
-      const amount = Number(values.amount);
-      if (!Number.isFinite(amount) || amount < 0) {
-        showToast("Invalid amount");
-        return false;
-      }
-      entry.amount = amount;
-      entry.date = values.date;
-      entry.month = values.date.slice(0, 7);
-      entry.box = values.box;
-      entry.type = values.type;
-      entry.note = values.note.trim();
-      save();
-      showToast("Entry updated");
-      render();
-    }
-  });
-}
-
-function addInvestmentSnapshot(event) {
-  event.preventDefault();
-  state.investmentSnapshots.push(inv(
-    document.querySelector("#investmentDate").value,
-    document.querySelector("#investmentAccount").value.trim(),
-    document.querySelector("#investmentType").value,
-    Number(document.querySelector("#investmentValue").value) || 0,
-    Number(document.querySelector("#investmentContribution").value) || 0,
-    Number(document.querySelector("#investmentWithdrawal").value) || 0,
-    document.querySelector("#investmentNotes").value.trim()
-  ));
-  save();
-  showToast("Investment snapshot saved");
-  render();
-}
-
-function editInvestmentSnapshot(id) {
-  const item = state.investmentSnapshots.find((entry) => entry.snapshotId === id);
-  if (!item) return;
-  openEditModal({
-    title: "Edit Investment Snapshot",
-    description: "Update this snapshot without touching budget plans.",
-    submitLabel: "Save Snapshot",
-    fields: [
-      { name: "date", label: "Date", type: "date", value: item.date, required: true },
-      { name: "accountName", label: "Account / Bucket", value: item.accountName, required: true },
-      { name: "bucketType", label: "Bucket Type", type: "select", value: item.bucketType, options: [["Emergency", "Emergency"], ["Low Risk", "Low Risk"], ["Equity", "Equity"], ["Other", "Other"]] },
-      { name: "marketValue", label: "Market Value", type: "number", value: item.marketValue, step: "0.01", required: true },
-      { name: "contribution", label: "Contribution", type: "number", value: item.contribution, step: "0.01" },
-      { name: "withdrawal", label: "Withdrawal", type: "number", value: item.withdrawal, step: "0.01" },
-      { name: "notes", label: "Notes", type: "textarea", value: item.notes || "" }
-    ],
-    onSubmit(values) {
-      const marketValue = Number(values.marketValue);
-      const contribution = Number(values.contribution) || 0;
-      const withdrawal = Number(values.withdrawal) || 0;
-      if (!Number.isFinite(marketValue)) {
-        showToast("Invalid market value");
-        return false;
-      }
-      item.date = values.date;
-      item.accountName = values.accountName.trim();
-      item.bucketType = values.bucketType;
-      item.marketValue = marketValue;
-      item.contribution = contribution;
-      item.withdrawal = withdrawal;
-      item.notes = values.notes.trim();
-      save();
-      showToast("Investment snapshot updated");
-      render();
-    }
-  });
-}
-
-function addReceivable(event) {
-  event.preventDefault();
-  state.receivables.push({
-    receivableId: uid("recv"),
-    debtor: document.querySelector("#receivableDebtor").value.trim(),
-    startingBalance: Number(document.querySelector("#receivableBalance").value) || 0,
-    currentBalance: Number(document.querySelector("#receivableBalance").value) || 0,
-    expectedPayment: Number(document.querySelector("#receivableExpected").value) || 0,
-    interestRate: Number(document.querySelector("#receivableInterest").value) || 0,
-    expectedPayoffMonth: "TBD",
-    status: document.querySelector("#receivableStatus").value,
-    notes: document.querySelector("#receivableNotes").value.trim()
-  });
-  save();
-  showToast("Receivable saved");
-  render();
-}
-
-function editReceivable(id) {
-  const item = state.receivables.find((entry) => entry.receivableId === id);
-  if (!item) return;
-  openEditModal({
-    title: "Edit Receivable",
-    description: "Independent tracker. Does not change monthly plan.",
-    submitLabel: "Save Receivable",
-    fields: [
-      { name: "debtor", label: "Debtor", value: item.debtor, required: true },
-      { name: "startingBalance", label: "Starting Balance", type: "number", value: item.startingBalance, step: "0.01" },
-      { name: "currentBalance", label: "Current Balance", type: "number", value: item.currentBalance, step: "0.01", required: true },
-      { name: "expectedPayment", label: "Expected Payment", type: "number", value: item.expectedPayment, step: "0.01" },
-      { name: "interestRate", label: "Interest Rate %", type: "number", value: item.interestRate || 0, step: "0.01" },
-      { name: "expectedPayoffMonth", label: "Expected Payoff Month", value: item.expectedPayoffMonth || "TBD" },
-      { name: "status", label: "Status", type: "select", value: item.status, options: [["active", "Active"], ["paused", "Paused"], ["archived", "Archived"], ["paid-off", "Paid Off"]] },
-      { name: "notes", label: "Notes", type: "textarea", value: item.notes || "" }
-    ],
-    onSubmit(values) {
-      const startingBalance = Number(values.startingBalance) || 0;
-      const currentBalance = Number(values.currentBalance);
-      const expectedPayment = Number(values.expectedPayment) || 0;
-      const interestRate = Number(values.interestRate) || 0;
-      if (!Number.isFinite(currentBalance)) {
-        showToast("Invalid current balance");
-        return false;
-      }
-      item.debtor = values.debtor.trim();
-      item.startingBalance = startingBalance;
-      item.currentBalance = currentBalance;
-      item.expectedPayment = expectedPayment;
-      item.interestRate = interestRate;
-      item.expectedPayoffMonth = values.expectedPayoffMonth.trim() || "TBD";
-      item.status = values.status;
-      item.notes = values.notes.trim();
-      save();
-      showToast("Receivable updated");
-      render();
-    }
-  });
-}
-
-function addDebtPlan(event) {
-  event.preventDefault();
-  const debt = {
-    debtId: uid("debt"),
-    wallet: state.activeWallet,
-    name: document.querySelector("#debtName").value.trim(),
-    startingBalance: Number(document.querySelector("#debtBalance").value) || 0,
-    currentBalance: Number(document.querySelector("#debtBalance").value) || 0,
-    monthlyPayment: Number(document.querySelector("#debtPayment").value) || 0,
-    interestRate: Number(document.querySelector("#debtInterest").value) || 0,
-    status: document.querySelector("#debtStatus").value,
-    notes: document.querySelector("#debtNotes").value.trim()
-  };
-  state.debtPlans.push(debt);
-  addDebtToYearPlan(debt);
-  save();
-  showToast("Debt plan saved");
-  render();
-}
-
-function editDebtPlan(id) {
-  const debt = state.debtPlans.find((item) => item.debtId === id);
-  if (!debt) return;
-  openEditModal({
-    title: "Edit Debt Payment",
-    description: "Debt payment is locked money with payoff tracking, not daily spend.",
-    submitLabel: "Save Debt Payment",
-    fields: [
-      { name: "name", label: "Name", value: debt.name, required: true },
-      { name: "startingBalance", label: "Starting Balance", type: "number", value: debt.startingBalance, step: "0.01" },
-      { name: "currentBalance", label: "Current Balance", type: "number", value: debt.currentBalance, step: "0.01" },
-      { name: "monthlyPayment", label: "Monthly Payment", type: "number", value: debt.monthlyPayment, step: "0.01" },
-      { name: "interestRate", label: "Interest Rate %", type: "number", value: debt.interestRate || 0, step: "0.01" },
-      { name: "status", label: "Status", type: "select", value: debt.status, options: [["active", "Active"], ["paused", "Paused"], ["archived", "Archived"], ["paid-off", "Paid Off"]] },
-      { name: "notes", label: "Notes", type: "textarea", value: debt.notes || "" }
-    ],
-    onSubmit(values) {
-      const startingBalance = Number(values.startingBalance) || 0;
-      const currentBalance = Number(values.currentBalance) || 0;
-      const monthlyPayment = Number(values.monthlyPayment) || 0;
-      const interestRate = Number(values.interestRate) || 0;
-      debt.name = values.name.trim();
-      debt.startingBalance = startingBalance;
-      debt.currentBalance = currentBalance;
-      debt.monthlyPayment = monthlyPayment;
-      debt.interestRate = interestRate;
-      debt.status = values.status;
-      debt.notes = values.notes.trim();
-      syncDebtPaymentToPlan(debt);
-      save();
-      showToast("Debt plan updated");
-      render();
-    }
-  });
-}
-
-function deleteDebtPlan(id) {
-  const debt = state.debtPlans.find((item) => item.debtId === id);
-  if (!debt || !confirm(`Delete debt plan "${debt.name}"?`)) return;
-  const aliases = {
-    mortgage: ["mortgage"],
-    "car-loan": ["carPayment"],
-    ikea: ["ikea"]
-  };
-  const ids = [debt.debtId, ...(aliases[debt.debtId] || [])];
-  state.debtPlans = state.debtPlans.filter((item) => item.debtId !== id);
-  removeFixedItemsFromPlans(debt.wallet, ids);
-  save();
-  showToast("Debt plan deleted");
-  render();
-}
-
-function openEditModal({ title, description, fields, submitLabel, onSubmit }) {
-  modalRoot.innerHTML = `
-    <div class="modal-backdrop" role="presentation">
-      <section class="edit-modal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
-        <div class="modal-head">
-          <div>
-            <h2 id="editModalTitle">${escapeHtml(title)}</h2>
-            ${description ? `<p>${escapeHtml(description)}</p>` : ""}
-          </div>
-          <button class="icon-button" type="button" data-close-modal aria-label="Close">×</button>
+function renderCategoryEditorSheet(category) {
+  const used = categoryHasTransactions(category.id);
+  const canDelete = !used;
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Edit Monitor Category">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Edit Monitor Category</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
         </div>
-        <form id="editModalForm" class="modal-form">
-          <div class="asset-edit-grid">
-            ${fields.map(renderModalField).join("")}
+        <form id="categoryEditorForm" class="quick-form">
+          <label class="field"><span>Name</span><input name="label" type="text" value="${escapeHtml(category.label)}" required /></label>
+          <label class="field"><span>Icon</span><input name="icon" type="text" value="${escapeHtml(category.icon || "")}" /></label>
+          <label class="field"><span>Group</span><select name="group"><option value="essentials" ${category.group === "essentials" ? "selected" : ""}>Essentials</option><option value="discretionary" ${category.group === "discretionary" ? "selected" : ""}>Discretionary</option><option value="custom" ${category.group === "custom" ? "selected" : ""}>Custom</option></select></label>
+          <label class="field"><span>Monthly Budget</span><input name="monthlyBudget" type="number" step="0.01" value="${category.monthlyBudget}" /></label>
+          <label class="field"><span>Rule Type</span><select name="ruleType"><option value="softCap" ${category.ruleType === "softCap" ? "selected" : ""}>Soft Cap</option><option value="penalty" ${category.ruleType === "penalty" ? "selected" : ""}>Penalty</option><option value="trackOnly" ${category.ruleType === "trackOnly" ? "selected" : ""}>Track Only</option></select></label>
+          <label class="field"><span>Soft Cap Multiplier</span><input name="softCapMultiplier" type="number" step="0.01" value="${category.softCapMultiplier ?? ""}" /></label>
+          <label class="field"><span>Penalty Multiplier</span><input name="penaltyMultiplier" type="number" step="0.01" value="${category.penaltyMultiplier ?? ""}" /></label>
+          <label class="field"><span>Minimum Penalty Unit</span><input name="minPenaltyUnit" type="number" step="0.01" value="${category.minPenaltyUnit ?? ""}" /></label>
+          <label class="field"><span>Priority</span><select name="priority"><option value="primary" ${category.priority === "primary" ? "selected" : ""}>Primary</option><option value="secondary" ${category.priority === "secondary" ? "selected" : ""}>Secondary</option><option value="hidden" ${category.priority === "hidden" ? "selected" : ""}>Hidden</option></select></label>
+          <label class="field"><span>Display Order</span><input name="displayOrder" type="number" step="1" value="${category.displayOrder}" /></label>
+          <div class="boolean-grid">
+            ${renderCheckbox("monitor", "Monitor visibility", category.monitor)}
+            ${renderCheckbox("allowTransactions", "Allow transactions", category.allowTransactions)}
+            ${renderCheckbox("includeInVariableTotal", "Include in variable total", category.includeInVariableTotal)}
+            ${renderCheckbox("includeInWeeklyDiscipline", "Include in weekly discipline", category.includeInWeeklyDiscipline)}
+            ${renderCheckbox("active", "Active", category.active)}
           </div>
-          <div class="modal-actions">
-            <button class="ghost-button" type="button" data-close-modal>Cancel</button>
-            <button class="primary-button" type="submit">${escapeHtml(submitLabel || "Save")}</button>
+          <div class="button-row">
+            <button class="action-button" type="submit">Save Category</button>
+            <button class="ghost-button" type="button" data-archive-category>${used ? "Archive Category" : "Archive"}</button>
+            ${canDelete ? `<button class="danger-button" type="button" data-delete-category>Delete</button>` : ""}
           </div>
+          ${used ? `<p class="settings-note">This category already has transactions, so it can be archived but not hard-deleted.</p>` : ""}
         </form>
       </section>
     </div>
   `;
-
-  const backdrop = modalRoot.querySelector(".modal-backdrop");
-  const form = modalRoot.querySelector("#editModalForm");
-  backdrop.addEventListener("click", (event) => {
-    if (event.target === backdrop) closeEditModal();
-  });
-  modalRoot.querySelectorAll("[data-close-modal]").forEach((button) => {
-    button.addEventListener("click", closeEditModal);
-  });
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const values = {};
-    fields.forEach((field) => {
-      values[field.name] = form.elements[field.name]?.value ?? "";
-    });
-    const result = onSubmit(values);
-    if (result !== false) closeEditModal();
-  });
-  requestAnimationFrame(() => {
-    form.querySelector("input, select, textarea")?.focus();
-  });
 }
 
-function closeEditModal() {
-  modalRoot.innerHTML = "";
-}
-
-function renderModalField(field) {
-  const id = `modal-${field.name}`;
-  const required = field.required ? "required" : "";
-  if (field.type === "select") {
-    return `
-      <label class="field">
-        <span>${escapeHtml(field.label)}</span>
-        <select id="${escapeHtml(id)}" name="${escapeHtml(field.name)}" ${required}>
-          ${(field.options || []).map(([value, label]) => `<option value="${escapeHtml(value)}" ${String(value) === String(field.value) ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}
-        </select>
-      </label>
-    `;
-  }
-  if (field.type === "textarea") {
-    return `
-      <label class="field modal-wide">
-        <span>${escapeHtml(field.label)}</span>
-        <textarea id="${escapeHtml(id)}" name="${escapeHtml(field.name)}" rows="3" ${required}>${escapeHtml(field.value || "")}</textarea>
-      </label>
-    `;
-  }
-  const step = field.type === "number" ? `step="${escapeHtml(field.step || "1")}" inputmode="decimal"` : "";
+function renderBudgetCategoriesManagerSheet() {
+  const active = getCategories().filter((item) => !item.archived);
+  const archived = getCategories().filter((item) => item.archived);
   return `
-    <label class="field">
-      <span>${escapeHtml(field.label)}</span>
-      <input id="${escapeHtml(id)}" name="${escapeHtml(field.name)}" type="${escapeHtml(field.type || "text")}" ${step} value="${escapeHtml(field.value ?? "")}" ${required} />
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Manage Budget Categories">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Manage Budget Categories</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        <form id="budgetCategoriesManagerForm" class="quick-form">
+          <div class="manager-list">
+            ${active.map((category) => `
+              <div class="manager-row">
+                <div><strong>${escapeHtml(category.icon || "•")} ${escapeHtml(category.label)}</strong><div class="settings-note">${escapeHtml(category.priority)} · ${escapeHtml(category.group)}</div></div>
+                <div class="manager-actions">
+                  <input class="order-input" name="order:${category.id}" type="number" step="1" value="${category.displayOrder}" />
+                  <button class="mini-button" type="button" data-edit-category="${category.id}">Edit</button>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+          <button class="action-button" type="submit">Save Order</button>
+        </form>
+        <form id="addCategoryForm" class="quick-form add-form">
+          <h3>Add Category</h3>
+          <label class="field"><span>Name</span><input name="label" type="text" required /></label>
+          <label class="field"><span>Icon</span><input name="icon" type="text" value="•" /></label>
+          <label class="field"><span>Group</span><select name="group"><option value="discretionary">Discretionary</option><option value="essentials">Essentials</option><option value="custom">Custom</option></select></label>
+          <label class="field"><span>Monthly Budget</span><input name="monthlyBudget" type="number" step="0.01" value="0" /></label>
+          <label class="field"><span>Rule preset</span><select name="rulePreset"><option value="penalty">Penalty Discipline</option><option value="softCap">Soft Cap Only</option><option value="trackOnly">Track Only</option></select></label>
+          <label class="field"><span>Priority</span><select name="priority"><option value="secondary">Secondary</option><option value="primary">Primary</option><option value="hidden">Hidden</option></select></label>
+          <div class="boolean-grid">
+            ${renderCheckbox("monitor", "Monitor visibility", true)}
+            ${renderCheckbox("allowTransactions", "Allow transactions", true)}
+          </div>
+          <button class="action-button" type="submit">Add Category</button>
+        </form>
+        ${archived.length ? `
+          <section class="manager-archived">
+            <h3>Archived</h3>
+            ${archived.map((category) => `
+              <div class="manager-row">
+                <div><strong>${escapeHtml(category.icon || "•")} ${escapeHtml(category.label)}</strong></div>
+                <button class="mini-button" type="button" data-restore-category="${category.id}">Restore</button>
+              </div>
+            `).join("")}
+          </section>
+        ` : ""}
+      </section>
+    </div>
+  `;
+}
+
+function renderBackgroundItemEditorSheet(section, item) {
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Edit Background Item">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Edit Background Item</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        <form id="backgroundItemEditorForm" class="quick-form">
+          <label class="field"><span>Name</span><input name="label" type="text" value="${escapeHtml(item.label)}" required /></label>
+          <label class="field"><span>Amount</span><input name="amount" type="number" step="0.01" value="${item.amount}" /></label>
+          <label class="field"><span>Frequency</span><select name="frequency"><option value="monthly" ${item.frequency === "monthly" ? "selected" : ""}>Monthly</option><option value="annual" ${item.frequency === "annual" ? "selected" : ""}>Annual</option><option value="oneTime" ${item.frequency === "oneTime" ? "selected" : ""}>One Time</option></select></label>
+          <label class="field"><span>Type</span><select name="type"><option value="income" ${item.type === "income" ? "selected" : ""}>Income</option><option value="fixed" ${item.type === "fixed" ? "selected" : ""}>Fixed</option><option value="debt" ${item.type === "debt" ? "selected" : ""}>Debt</option><option value="investment" ${item.type === "investment" ? "selected" : ""}>Investment</option><option value="other" ${item.type === "other" ? "selected" : ""}>Other</option></select></label>
+          <div class="boolean-grid">
+            ${renderCheckbox("includeInGap", "Include in gap", item.includeInGap)}
+            ${renderCheckbox("includeInProjection", "Include in projection", item.includeInProjection)}
+            ${renderCheckbox("includeInSummary", "Include in summary", item.includeInSummary)}
+            ${renderCheckbox("active", "Active", item.active)}
+          </div>
+          <div class="button-row">
+            <button class="action-button" type="submit">Save Item</button>
+            <button class="ghost-button" type="button" data-archive-background-item>Archive</button>
+          </div>
+          <p class="settings-note">Annual values are monthly-equivalent in summaries.</p>
+        </form>
+      </section>
+    </div>
+  `;
+}
+
+function renderBackgroundSectionsManagerSheet() {
+  const activeSections = getBackgroundSections().filter((section) => !section.archived);
+  const archivedSections = getBackgroundSections().filter((section) => section.archived);
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Manage Background Sections">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Manage Background Sections</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        <form id="backgroundSectionsManagerForm" class="quick-form">
+          <div class="manager-list">
+            ${activeSections.map((section) => `
+              <div class="manager-row">
+                <div class="manager-stack">
+                  <label class="field">
+                    <span>Section name</span>
+                    <input name="section-label:${section.id}" type="text" value="${escapeHtml(section.label)}" />
+                  </label>
+                  <div class="manager-inline-fields">
+                    <label class="field">
+                      <span>Type</span>
+                      <select name="section-type:${section.id}">
+                        ${renderBackgroundTypeOptions(section.type)}
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Order</span>
+                      <input class="order-input" name="section-order:${section.id}" type="number" step="1" value="${section.displayOrder}" />
+                    </label>
+                  </div>
+                  <div class="settings-note">${money(calculateSectionTotal(section.id))} monthly-equivalent</div>
+                </div>
+                <div class="manager-actions">
+                  <button class="mini-button" type="button" data-archive-section="${section.id}">Archive</button>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+          <button class="action-button" type="submit">Save Sections</button>
+        </form>
+        <form id="addBackgroundSectionForm" class="quick-form add-form">
+          <h3>Add Section</h3>
+          <label class="field"><span>Section Name</span><input name="label" type="text" required /></label>
+          <label class="field"><span>Section Type</span><select name="type"><option value="income">Income</option><option value="fixed">Fixed</option><option value="debt">Debt</option><option value="investment">Investment</option><option value="other">Other</option></select></label>
+          <label class="field"><span>Display Order</span><input name="displayOrder" type="number" step="1" value="${activeSections.length + 1}" /></label>
+          <button class="action-button" type="submit">Add Section</button>
+        </form>
+        <form id="addBackgroundItemForm" class="quick-form add-form">
+          <h3>Add Item</h3>
+          <label class="field"><span>Section</span><select name="sectionId">${activeSections.map((section) => `<option value="${section.id}">${escapeHtml(section.label)}</option>`).join("")}</select></label>
+          <label class="field"><span>Name</span><input name="label" type="text" required /></label>
+          <label class="field"><span>Amount</span><input name="amount" type="number" step="0.01" value="0" /></label>
+          <label class="field"><span>Frequency</span><select name="frequency"><option value="monthly">Monthly</option><option value="annual">Annual</option><option value="oneTime">One Time</option></select></label>
+          <label class="field"><span>Type</span><select name="type"><option value="income">Income</option><option value="fixed">Fixed</option><option value="debt">Debt</option><option value="investment">Investment</option><option value="other">Other</option></select></label>
+          <div class="boolean-grid">
+            ${renderCheckbox("includeInGap", "Include in gap", false)}
+            ${renderCheckbox("includeInProjection", "Include in projection", false)}
+            ${renderCheckbox("includeInSummary", "Include in summary", true)}
+            ${renderCheckbox("active", "Active", true)}
+          </div>
+          <button class="action-button" type="submit">Add Item</button>
+        </form>
+        ${archivedSections.length ? `
+          <section class="manager-archived">
+            <h3>Archived Sections</h3>
+            ${archivedSections.map((section) => `
+              <div class="manager-row">
+                <div><strong>${escapeHtml(section.label)}</strong></div>
+                <button class="mini-button" type="button" data-restore-section="${section.id}">Restore</button>
+              </div>
+            `).join("")}
+          </section>
+        ` : ""}
+      </section>
+    </div>
+  `;
+}
+
+function renderSheetFilter(key, label) {
+  return `<button class="filter-chip ${state.ui.txFilter === key ? "is-active" : ""}" type="button" data-sheet-filter="${key}">${escapeHtml(label)}</button>`;
+}
+
+function renderManagedTransaction(transaction) {
+  return `
+    <div class="tx-item ${transaction.category}">
+      <div>
+        <strong>${escapeHtml(getCategoryLabel(transaction.category))}</strong>
+        <div class="settings-note">${formatDate(transaction.dateISO)} · ${escapeHtml(transaction.note || "No note")}</div>
+      </div>
+      <div>
+        <div class="pace-money">${money(transaction.amount)}</div>
+        <div class="tx-actions">
+          <button class="mini-button" type="button" data-edit-transaction="${transaction.id}">Edit</button>
+          <button class="mini-button" type="button" data-delete-transaction="${transaction.id}">Delete</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderQuickAddSheet() {
+  const editing = getEditingTransaction();
+  const template = state.ui.lastTransactionTemplate;
+  const availableCategories = getActiveTransactionCategories();
+  const fallbackCategory = availableCategories.at(0)?.id || "groceries";
+  const templateCategory = template?.category && isCategoryAllowedForTransaction(template.category) ? template.category : fallbackCategory;
+  const selectedCategory = editing?.category || templateCategory || fallbackCategory;
+  const selectedAmount = editing ? editing.amount : "";
+  const selectedNote = editing?.note || "";
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet" role="dialog" aria-label="Quick Add">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>${editing ? "Edit Entry" : "Quick Add"}</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        <form id="transactionForm" class="quick-form">
+          <input type="hidden" name="id" value="${editing?.id || ""}" />
+          <label class="field amount-field">
+            <span>Amount</span>
+            <input name="amount" type="number" step="0.01" min="0" value="${selectedAmount}" required />
+          </label>
+          ${!editing && template ? `<div class="repeat-last-row"><button class="ghost-button" type="button" data-repeat-last>Repeat Last</button></div>` : ""}
+          <div class="quick-amount-row">
+            ${[10, 20, 50, 100].map((amount) => `<button class="amount-chip" type="button" data-quick-amount="${amount}">${money(amount)}</button>`).join("")}
+          </div>
+          <input id="quickCategoryInput" type="hidden" name="category" value="${selectedCategory}" />
+          <div class="category-chip-row">
+            ${availableCategories.map((meta) => `
+              <button class="category-chip ${selectedCategory === meta.id ? "is-active" : ""}" type="button" data-pick-category="${meta.id}">
+                ${escapeHtml(meta.label === "Charging/407" ? "Charging" : meta.label)}
+              </button>
+            `).join("")}
+          </div>
+          <label class="field">
+            <span>Date</span>
+            <input name="dateISO" type="date" value="${escapeHtml(editing?.dateISO || defaultDateForMonth(state.ui.selectedMonth))}" required />
+          </label>
+          <label class="field">
+            <span>Note</span>
+            <input name="note" type="text" value="${escapeHtml(selectedNote)}" placeholder="Optional note" />
+          </label>
+          <button class="action-button sheet-save" type="submit">${editing ? "Save Entry" : "Add Entry"}</button>
+        </form>
+      </section>
+    </div>
+  `;
+}
+
+function renderPlanningPage() {
+  const core = state.settings.systemCore;
+  const runway = calculateReserveRunway(core.reserveBalanceNow, core.stableBaseGapMonthly);
+  const projections = buildProjectionData(getReferenceDateISO(state.ui.selectedMonth));
+  const totals = calculateTotals();
+  return `
+    <section class="page planning-page">
+      <form id="settingsForm" class="stack">
+        ${renderPlanningAccordionCard({
+          sectionKey: "summary",
+          title: "Planning Summary",
+          eyebrow: "Planning Summary",
+          summary: renderPlanningSectionSummary("summary", { core, totals }),
+          expanded: ``
+        })}
+
+        ${renderPlanningAccordionCard({
+          sectionKey: "budget",
+          title: "Budget Planning",
+          eyebrow: "Budget Planning",
+          summary: renderPlanningSectionSummary("budget", { totals }),
+          accentClass: "budget-planning-card",
+          manageAction: `<button class="mini-button" type="button" data-manage-budget-categories aria-label="Manage Budget Categories">Manage</button>`,
+          expanded: `
+            <div class="planning-metrics">
+              ${getCategories().filter((category) => category.active && !category.archived).map((category) => {
+                const actualIndex = state.settings.monitorCategories.findIndex((item) => item.id === category.id);
+                return renderBudgetField(category, actualIndex);
+              }).join("")}
+              <label class="field"><span>Penalty Multiplier</span><input name="settings.weeklyRules.penaltyMultiplier" type="number" step="0.01" value="${state.settings.weeklyRules.penaltyMultiplier}" /></label>
+              <label class="field"><span>Minimum Penalty Unit</span><input name="settings.weeklyRules.minPenaltyUnit" type="number" step="0.01" value="${state.settings.weeklyRules.minPenaltyUnit}" /></label>
+              <label class="field"><span>Default Soft Cap Multiplier</span><input name="settings.weeklyRules.defaultSoftCapMultiplier" type="number" step="0.01" value="${state.settings.weeklyRules.defaultSoftCapMultiplier}" /></label>
+            </div>
+            <p class="settings-note">Current week uses monthly budget divided by weeks overlapping this month; future weeks use remaining monthly budget after this week and apply closed-week penalties.</p>
+          `
+        })}
+
+        ${renderPlanningAccordionCard({
+          sectionKey: "reserve",
+          title: "Reserve Planning",
+          eyebrow: "Reserve Planning",
+          summary: renderPlanningSectionSummary("reserve", { core, runway, projections }),
+          accentClass: "reserve-planning-card",
+          expanded: `
+            <div class="planning-metrics">
+              <label class="field"><span>Reserve Balance Now</span><input name="settings.systemCore.reserveBalanceNow" type="number" step="0.01" value="${core.reserveBalanceNow}" /></label>
+              <label class="field"><span>Stable Base Gap Monthly</span><input name="settings.systemCore.stableBaseGapMonthly" type="number" step="0.01" value="${core.stableBaseGapMonthly}" /></label>
+              <div class="readonly-card"><span class="tiny-label">Runway Months</span><strong>${runway.months}</strong></div>
+              <div class="readonly-card"><span class="tiny-label">Sep 1 Projection</span><strong>${money(projections.sep.value)}</strong></div>
+              <div class="readonly-card"><span class="tiny-label">Jan 1 Projection</span><strong>${money(projections.jan.value)}</strong></div>
+            </div>
+          `
+        })}
+
+        ${renderPlanningAccordionCard({
+          sectionKey: "ledger",
+          title: "Reserve Ledger",
+          eyebrow: "Reserve Ledger",
+          summary: renderPlanningSectionSummary("ledger", { totals }),
+          expanded: `
+            <div class="settings-grid">
+              ${renderReserveField("preMay", "Pre May reserve")}
+              ${renderReserveField("may", "May reserved")}
+              ${renderReserveField("june", "Jun reserved")}
+              ${renderReserveField("july", "Jul reserved")}
+              ${renderReserveField("august", "Aug reserved")}
+              ${renderReserveField("september", "Sep reserved")}
+              ${renderReserveField("october", "Oct reserved")}
+              ${renderReserveField("november", "Nov reserved")}
+              ${renderReserveField("december", "Dec reserved")}
+              <label class="field"><span>May to Aug monthly net</span><input name="settings.reserveSchedule.mayToAugMonthlyNet" type="number" step="0.01" value="${state.settings.reserveSchedule.mayToAugMonthlyNet}" /></label>
+              <label class="field"><span>Sep to Dec monthly net</span><input name="settings.reserveSchedule.sepToDecMonthlyNet" type="number" step="0.01" value="${state.settings.reserveSchedule.sepToDecMonthlyNet}" /></label>
+              <label class="field"><span>Jan+ monthly net</span><input name="settings.reserveSchedule.janPlusMonthlyNet" type="number" step="0.01" value="${state.settings.reserveSchedule.janPlusMonthlyNet}" /></label>
+            </div>
+            <div class="button-row">
+              <button id="recalcReserveButton" class="ghost-button" type="button">Recalculate Reserve From Ledger</button>
+            </div>
+          `
+        })}
+
+        ${renderPlanningAccordionCard({
+          sectionKey: "background",
+          title: "Background Data",
+          eyebrow: "Background Data",
+          summary: renderPlanningSectionSummary("background", { totals }),
+          manageAction: `<button class="mini-button" type="button" data-manage-background aria-label="Manage Background Sections">Manage</button>`,
+          expanded: `
+            <div class="stack">
+              ${getBackgroundSections().filter((section) => section.active && !section.archived).map((section) => {
+                const actualIndex = state.settings.backgroundSections.findIndex((item) => item.id === section.id);
+                return renderBackgroundGroup(section, actualIndex, calculateSectionTotal(section.id));
+              }).join("")}
+            </div>
+            <div class="totals-grid">
+              ${renderTotalChip("Total Core Income", totals.coreIncome)}
+              ${renderTotalChip("Total Reserve Income", totals.reserveIncome)}
+              ${renderTotalChip("Total Fixed", totals.fixed)}
+              ${renderTotalChip("Total Debt", totals.debt)}
+              ${renderTotalChip("Total Investment", totals.investment)}
+              ${renderTotalChip("Total Variable Essentials", totals.variableEssentials)}
+              ${renderTotalChip("Total Discretionary", totals.discretionary)}
+              ${renderTotalChip("Total Reserve Ledger", totals.reserveLedger)}
+            </div>
+          `
+        })}
+
+        ${renderPlanningAccordionCard({
+          sectionKey: "data",
+          title: "Data Management",
+          eyebrow: "Data",
+          summary: renderPlanningSectionSummary("data"),
+          weak: true,
+          expanded: `
+            <div class="button-row">
+              <button id="exportJsonButton" class="action-button" type="button">Export JSON</button>
+              <label class="ghost-button">Import JSON<input id="importJsonInput" class="hidden" type="file" accept=".json,application/json" /></label>
+              <button id="resetButton" class="danger-button" type="button">Reset local data</button>
+            </div>
+          `
+        })}
+
+        <div class="button-row">
+          <button class="action-button" type="submit">Save Settings</button>
+        </div>
+      </form>
+    </section>
+  `;
+}
+
+function renderBudgetField(category, index) {
+  const weekly = getCurrentWeekBudget(category.id, getWeekKey(getReferenceDateISO(state.ui.selectedMonth)), state.ui.selectedMonth);
+  return `
+    <div class="budget-input-card">
+      <div class="budget-card-head">
+        <strong>${escapeHtml(category.label)}</strong>
+        <button class="mini-button" type="button" data-edit-category="${category.id}" aria-label="Manage ${escapeHtml(category.label)}">⚙</button>
+      </div>
+      <label class="field"><span>${escapeHtml(category.label)}</span><input name="settings.monitorCategories.${index}.monthlyBudget" type="number" step="0.01" value="${category.monthlyBudget}" /></label>
+      <small>Est. weekly ${money(weekly)}</small>
+    </div>
+  `;
+}
+
+function renderPlanningAccordionCard({ sectionKey, title, eyebrow, summary, expanded, accentClass = "", weak = false, manageAction = "" }) {
+  const isOpen = Boolean(state.ui.planningOpenSections?.[sectionKey]);
+  const expandedMarkup = String(expanded || "").trim();
+  return `
+    <article class="planning-card planning-accordion ${accentClass} ${isOpen ? "is-open" : ""} ${weak ? "is-weak" : ""}" data-planning-section="${sectionKey}">
+      <div class="planning-accordion-head">
+        <div>
+          <p class="eyebrow">${escapeHtml(eyebrow)}</p>
+          <h2>${escapeHtml(title)}</h2>
+        </div>
+        <div class="planning-card-actions">
+          ${manageAction}
+          <button class="mini-button" type="button" data-toggle-planning="${sectionKey}">${isOpen ? "Close" : "Edit"}</button>
+        </div>
+      </div>
+      <div class="planning-accordion-summary">
+        ${summary}
+      </div>
+      ${isOpen && expandedMarkup ? `<div class="planning-accordion-body">${expandedMarkup}</div>` : ""}
+    </article>
+  `;
+}
+
+function renderPlanningSectionSummary(sectionKey, context = {}) {
+  const totals = context.totals || calculateTotals();
+  const core = context.core || state.settings.systemCore;
+  const projections = context.projections || buildProjectionData(getReferenceDateISO(state.ui.selectedMonth));
+  const runway = context.runway || calculateReserveRunway(core.reserveBalanceNow, core.stableBaseGapMonthly);
+
+  if (sectionKey === "summary") {
+    return `
+      <div class="planning-summary-grid">
+        <div><span>Reserve Balance</span><strong>${money(core.reserveBalanceNow)}</strong></div>
+        <div><span>Stable Gap</span><strong>${money(core.stableBaseGapMonthly)}</strong></div>
+        <div><span>Monthly Variable Budget</span><strong>${money(totals.variableEssentials + totals.discretionary)}</strong></div>
+        <div><span>Fixed + Debt</span><strong>${money(totals.fixed + totals.debt)}</strong></div>
+      </div>
+    `;
+  }
+  if (sectionKey === "budget") {
+    return `
+      <div class="accordion-inline-summary">
+        <strong>Monthly Variable Budget: ${money(totals.variableEssentials + totals.discretionary)}</strong>
+        <span>Essentials ${money(totals.variableEssentials)} · Discretionary ${money(totals.discretionary)}</span>
+        <span>Rules: penalty ${state.settings.weeklyRules.penaltyMultiplier}x · soft cap ${state.settings.weeklyRules.defaultSoftCapMultiplier}x</span>
+      </div>
+    `;
+  }
+  if (sectionKey === "reserve") {
+    return `
+      <div class="accordion-inline-summary">
+        <strong>Reserve ${money(core.reserveBalanceNow)} · Gap ${money(core.stableBaseGapMonthly)}/mo</strong>
+        <span>Runway ${runway.months} months</span>
+        <span>Sep ${money(projections.sep.value)} · Jan ${money(projections.jan.value)}</span>
+      </div>
+    `;
+  }
+  if (sectionKey === "ledger") {
+    return `
+      <div class="accordion-inline-summary">
+        <strong>Ledger Total ${money(totals.reserveLedger)}</strong>
+        <span>Pre-May ${money(state.settings.reserveSchedule.preMay)} · May ${money(state.settings.reserveSchedule.may)}</span>
+      </div>
+    `;
+  }
+  if (sectionKey === "background") {
+    return `
+      <div class="accordion-inline-summary">
+        <strong>Income ${money(totals.coreIncome + totals.reserveIncome)} · Fixed+Debt ${money(totals.fixed + totals.debt)}</strong>
+        <span>Investment ${money(totals.investment)} · PW Trust background only</span>
+      </div>
+    `;
+  }
+  return `
+    <div class="accordion-inline-summary">
+      <strong>Export / Import / Reset</strong>
+    </div>
+  `;
+}
+
+function togglePlanningSection(sectionKey) {
+  const next = !Boolean(state.ui.planningOpenSections?.[sectionKey]);
+  state.ui.planningOpenSections[sectionKey] = next;
+  saveState();
+  render();
+}
+
+function renderReserveField(key, label) {
+  const value = state.settings.reserveSchedule[key];
+  return `<label class="field"><span>${escapeHtml(label)}</span><input name="settings.reserveSchedule.${key}" type="number" step="0.01" value="${value == null ? "" : value}" /></label>`;
+}
+
+function renderBackgroundGroup(section, sectionIndex, total) {
+  const items = section.items.filter((item) => item.active && !item.archived);
+  return `
+    <section class="readonly-card">
+      <div class="section-head">
+        <h3>${escapeHtml(section.label)}</h3>
+        <span class="tiny-label">Total ${money(total)}</span>
+      </div>
+      <div class="settings-grid" style="margin-top:10px;">
+        ${items.map((item) => {
+          const itemIndex = section.items.findIndex((candidate) => candidate.id === item.id);
+          return `
+          <div class="background-item-card">
+            <label class="field">
+              <span>${escapeHtml(item.label)}</span>
+              <input name="settings.backgroundSections.${sectionIndex}.items.${itemIndex}.amount" type="number" step="0.01" value="${item.amount}" />
+            </label>
+            <button class="mini-button" type="button" data-section-id="${section.id}" data-edit-background-item="${item.id}" aria-label="Manage ${escapeHtml(item.label)}">⚙</button>
+          </div>
+        `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderTotalChip(label, amount) {
+  return `<div class="total-chip"><span class="tiny-label">${escapeHtml(label)}</span><strong>${money(amount)}</strong></div>`;
+}
+
+function renderCheckbox(name, label, checked) {
+  return `
+    <label class="checkbox-row">
+      <input name="${name}" type="checkbox" ${checked ? "checked" : ""} />
+      <span>${escapeHtml(label)}</span>
     </label>
   `;
 }
 
-function getBoxOptions(wallet, month, currentBox) {
-  const plan = getPlan(month || state.currentMonth, wallet);
-  const options = Object.entries(plan.boxes || {}).map(([id, box]) => [id, box.name]);
-  if (currentBox && !options.some(([id]) => id === currentBox)) options.push([currentBox, boxMeta[currentBox]?.name || currentBox]);
-  return options;
-}
+function getDashboard() {
+  const monthKey = state.ui.selectedMonth;
+  const referenceDateISO = getReferenceDateISO(monthKey);
+  const currentWeekKey = getWeekKey(referenceDateISO);
+  const reserve = buildReserveHeroData();
+  const projections = buildProjectionData(referenceDateISO);
+  const categories = {};
+  const scope = state.ui.monitorScope || "week";
+  const monitorDefs = getPrimaryMonitorCategories();
 
-function addPlanItem(event) {
-  event.preventDefault();
-  addPlanItemFromValues({
-    name: document.querySelector("#planItemName").value.trim(),
-    amount: Number(document.querySelector("#planItemAmount").value) || 0,
-    type: document.querySelector("#planItemType").value,
-    scope: document.querySelector("#planItemScope").value,
-    notes: document.querySelector("#planItemNotes").value.trim()
+  monitorDefs.forEach((categoryDef) => {
+    categories[categoryDef.id] = calculateCategoryDisplay(categoryDef.id, scope, monthKey, currentWeekKey);
   });
-}
-
-function openPlanItemModal() {
-  const closed = isClosed(state.currentMonth, state.activeWallet);
-  if (closed) return showToast("Month is closed");
-  openEditModal({
-    title: "Add Plan Item",
-    description: "Choose where this item belongs. Debt payments get their own payoff tracking.",
-    submitLabel: "Add Plan Item",
-    fields: planItemModalFields({ name: "", amount: 0, type: "box", scope: "current", notes: "" }),
-    onSubmit(values) {
-      addPlanItemFromValues({
-        name: values.name.trim(),
-        amount: Number(values.amount) || 0,
-        type: values.type,
-        scope: values.scope,
-        notes: values.notes.trim()
-      });
-    }
-  });
-}
-
-function addPlanItemFromValues({ name, amount, type, scope, notes }) {
-  const wallet = state.activeWallet;
-  if (isClosed(state.currentMonth, wallet)) return showToast("Month is closed");
-  if (!name) return;
-
-  const basePlan = scope === "future" ? getOrCreateFuturePlanVersion().plan[wallet] : getPlan(state.currentMonth, wallet);
-  const id = uniquePlanItemId(basePlan, name);
-
-  if (scope === "future") {
-    const version = getOrCreateFuturePlanVersion();
-    addPlanItemToPlan(version.plan[wallet], id, name, amount, type);
-    if (type === "debt") upsertDebtPlan({ debtId: id, wallet, name, monthlyPayment: amount, notes });
-    save();
-    showToast(`Future plan item starts ${version.effectiveFrom}`);
-    render();
-    return;
-  }
-
-  state.monthlyOverrides[state.currentMonth] ||= {};
-  state.monthlyOverrides[state.currentMonth][wallet] ||= {};
-  const patch = state.monthlyOverrides[state.currentMonth][wallet];
-  addPlanItemToPatch(patch, id, name, amount, type);
-  if (type === "debt") upsertDebtPlan({ debtId: id, wallet, name, monthlyPayment: amount, notes });
-  save();
-  showToast("Current month plan item added");
-  render();
-}
-
-function editPlanItem(key) {
-  const wallet = state.activeWallet;
-  const item = getPlanItemForEdit(key, wallet);
-  if (!item) return showToast("Plan item not found");
-  if (item.mode === "current" && isClosed(state.currentMonth, wallet)) return showToast("Month is closed");
-  openEditModal({
-    title: "Edit Plan Item",
-    description: "Rename, change amount, or move it to another plan category.",
-    submitLabel: "Save Plan Item",
-    fields: planItemModalFields({
-      name: item.name,
-      amount: item.amount,
-      type: item.type,
-      scope: item.mode,
-      notes: ""
-    }, item.mode),
-    onSubmit(values) {
-      const name = values.name.trim();
-      const amount = Number(values.amount) || 0;
-      const nextType = values.type;
-      const scope = values.scope;
-      if (!name) {
-        showToast("Name is required");
-        return false;
-      }
-      applyEditedPlanItem(key, { name, amount, type: nextType, scope, notes: values.notes.trim() });
-    }
-  });
-}
-
-function planItemModalFields(values, forcedScope = "") {
-  return [
-    { name: "name", label: "Name", value: values.name, required: true },
-    { name: "amount", label: "Amount", type: "number", value: values.amount, step: "0.01", required: true },
-    { name: "type", label: "Category", type: "select", value: values.type, options: [["box", "Spending Box"], ["fixed", "Fixed Bill"], ["debt", "Debt Payment"], ["income", "Income Source"], ["saving", "Planned Saving"]] },
-    { name: "scope", label: "Apply To", type: "select", value: forcedScope || values.scope, options: [["current", "Current Month Only"], ["future", "Future Year Plan"]] },
-    { name: "notes", label: "Notes", type: "textarea", value: values.notes || "" }
-  ];
-}
-
-function getPlanItemForEdit(key, wallet) {
-  const [mode, section, id] = key.split(":");
-  const plan = mode === "year" ? getEditableYearPlan(wallet) : getPlan(state.currentMonth, wallet);
-  if (section === "box" && plan.boxes[id]) return { mode, section, id, type: "box", name: plan.boxes[id].name, amount: plan.boxes[id].budget };
-  if (section === "pool") return null;
-  const sectionName = sectionToPlanSection(section);
-  const row = plan[sectionName]?.find((item) => item.id === id);
-  if (!row) return null;
-  return { mode, section, id, type: section === "income" ? "income" : section === "fixed" ? "fixed" : "saving", name: row.name, amount: row.amount };
-}
-
-function applyEditedPlanItem(oldKey, item) {
-  const [oldMode, oldSection, oldId] = oldKey.split(":");
-  const wallet = state.activeWallet;
-  const oldSectionName = sectionToPlanSection(oldSection);
-  if (item.scope === "future") {
-    const version = getOrCreateFuturePlanVersion();
-    removePlanItemFromPlan(version.plan[wallet], oldSectionName, oldId);
-    addPlanItemToPlan(version.plan[wallet], oldId, item.name, item.amount, item.type);
-    if (item.type === "debt") upsertDebtPlan({ debtId: oldId, wallet, name: item.name, monthlyPayment: item.amount, notes: item.notes });
-    save();
-    showToast(`Future plan item updated from ${version.effectiveFrom}`);
-    render();
-    return;
-  }
-
-  state.monthlyOverrides[state.currentMonth] ||= {};
-  state.monthlyOverrides[state.currentMonth][wallet] ||= {};
-  const patch = state.monthlyOverrides[state.currentMonth][wallet];
-  removePlanItemFromPatch(patch, oldSectionName, oldId);
-  patch.deleted ||= {};
-  patch.deleted[oldSectionName] ||= [];
-  if (!patch.deleted[oldSectionName].includes(oldId)) patch.deleted[oldSectionName].push(oldId);
-  addPlanItemToPatch(patch, oldId, item.name, item.amount, item.type);
-  if (item.type === "debt") upsertDebtPlan({ debtId: oldId, wallet, name: item.name, monthlyPayment: item.amount, notes: item.notes });
-  save();
-  showToast("Current month plan item updated");
-  render();
-}
-
-function deletePlanItem(key) {
-  const [mode, section, id] = key.split(":");
-  const wallet = state.activeWallet;
-  if (section === "pool") return;
-  if (mode === "current" && isClosed(state.currentMonth, wallet)) return showToast("Month is closed");
-  if (!confirm("Delete this plan item?")) return;
-
-  const sectionName = sectionToPlanSection(section);
-  if (mode === "year") {
-    const version = getOrCreateFuturePlanVersion();
-    removePlanItemFromPlan(version.plan[wallet], sectionName, id);
-    showToast(`Future plan item removed from ${version.effectiveFrom}`);
-  } else {
-    state.monthlyOverrides[state.currentMonth] ||= {};
-    state.monthlyOverrides[state.currentMonth][wallet] ||= {};
-    const patch = state.monthlyOverrides[state.currentMonth][wallet];
-    removePlanItemFromPatch(patch, sectionName, id);
-    patch.deleted ||= {};
-    patch.deleted[sectionName] ||= [];
-    if (!patch.deleted[sectionName].includes(id)) patch.deleted[sectionName].push(id);
-    showToast("Current month plan item removed");
-  }
-
-  save();
-  render();
-}
-
-function addPlanItemToPlan(plan, id, name, amount, type) {
-  if (type === "box") {
-    plan.boxes[id] = { name, budget: amount };
-    boxMeta[id] = { wallet: state.activeWallet, name };
-    return;
-  }
-  if (type === "debt") return;
-  const section = type === "income" ? "incomeDefaults" : type === "saving" ? "baselineSavingItems" : "autoFixedItems";
-  const existing = plan[section].find((item) => item.id === id);
-  if (existing) {
-    existing.name = name;
-    existing.amount = amount;
-  } else {
-    plan[section].push({ id, name, amount });
-  }
-}
-
-function addPlanItemToPatch(patch, id, name, amount, type) {
-  patch.additions ||= {};
-  if (type === "box") {
-    patch.additions.boxes ||= {};
-    patch.additions.boxes[id] = { name, budget: amount };
-    patch.boxes ||= {};
-    patch.boxes[id] = amount;
-    boxMeta[id] = { wallet: state.activeWallet, name };
-    return;
-  }
-  if (type === "debt") return;
-  const section = type === "income" ? "incomeDefaults" : type === "saving" ? "baselineSavingItems" : "autoFixedItems";
-  patch.additions[section] ||= [];
-  const existing = patch.additions[section].find((item) => item.id === id);
-  if (existing) {
-    existing.name = name;
-    existing.amount = amount;
-  } else {
-    patch.additions[section].push({ id, name, amount });
-  }
-  patch[section] ||= {};
-  patch[section][id] = amount;
-}
-
-function removePlanItemFromPlan(plan, sectionName, id) {
-  if (sectionName === "boxes") {
-    delete plan.boxes[id];
-    return;
-  }
-  plan[sectionName] = plan[sectionName].filter((item) => item.id !== id);
-}
-
-function removePlanItemFromPatch(patch, sectionName, id) {
-  if (sectionName === "boxes") {
-    if (patch.additions?.boxes) delete patch.additions.boxes[id];
-    if (patch.boxes) delete patch.boxes[id];
-    return;
-  }
-  if (patch.additions?.[sectionName]) {
-    patch.additions[sectionName] = patch.additions[sectionName].filter((item) => item.id !== id);
-  }
-  if (patch[sectionName]) delete patch[sectionName][id];
-}
-
-function removeFixedItemsFromPlans(wallet, ids) {
-  state.yearPlanVersions.forEach((version) => {
-    const plan = version.plan?.[wallet];
-    if (!plan) return;
-    plan.autoFixedItems = plan.autoFixedItems.filter((item) => !ids.includes(item.id));
-  });
-  Object.values(state.monthlyOverrides || {}).forEach((walletOverrides) => {
-    const patch = walletOverrides[wallet];
-    if (!patch) return;
-    ids.forEach((id) => {
-      if (patch.autoFixedItems) delete patch.autoFixedItems[id];
-      if (patch.additions?.autoFixedItems) {
-        patch.additions.autoFixedItems = patch.additions.autoFixedItems.filter((item) => item.id !== id);
-      }
-    });
-    patch.deleted ||= {};
-    patch.deleted.autoFixedItems ||= [];
-    ids.forEach((id) => {
-      if (!patch.deleted.autoFixedItems.includes(id)) patch.deleted.autoFixedItems.push(id);
-    });
-  });
-}
-
-function upsertDebtPlan(debt) {
-  const existing = state.debtPlans.find((item) => item.debtId === debt.debtId);
-  if (existing) {
-    existing.name = debt.name;
-    existing.monthlyPayment = debt.monthlyPayment;
-    existing.interestRate = Number(debt.interestRate) || Number(existing.interestRate) || 0;
-    existing.status = "active";
-    if (debt.notes) existing.notes = debt.notes;
-    return;
-  }
-  state.debtPlans.push({
-    debtId: debt.debtId,
-    wallet: debt.wallet,
-    name: debt.name,
-    startingBalance: 0,
-    currentBalance: 0,
-    monthlyPayment: debt.monthlyPayment,
-    interestRate: Number(debt.interestRate) || 0,
-    status: "active",
-    notes: debt.notes || "Created from Plan."
-  });
-}
-
-function getOrCreateFuturePlanVersion() {
-  const effectiveFrom = nextMonthKey(state.currentMonth);
-  let version = state.yearPlanVersions.find((item) => item.effectiveFrom === effectiveFrom);
-  if (version) return version;
-  const currentVersion = state.yearPlanVersions
-    .filter((item) => item.effectiveFrom <= state.currentMonth)
-    .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0];
-  version = {
-    versionId: uid("plan"),
-    effectiveFrom,
-    createdAt: new Date().toISOString(),
-    plan: structuredClone(currentVersion.plan)
-  };
-  state.yearPlanVersions.push(version);
-  return version;
-}
-
-function uniquePlanItemId(plan, name) {
-  const base = slugify(name);
-  const ids = new Set([
-    ...Object.keys(plan.boxes || {}),
-    ...(plan.incomeDefaults || []).map((item) => item.id),
-    ...(plan.autoFixedItems || []).map((item) => item.id),
-    ...(plan.baselineSavingItems || []).map((item) => item.id)
-  ]);
-  if (!ids.has(base)) return base;
-  let index = 2;
-  while (ids.has(`${base}-${index}`)) index += 1;
-  return `${base}-${index}`;
-}
-
-function sectionToPlanSection(section) {
-  if (section === "box") return "boxes";
-  if (section === "income") return "incomeDefaults";
-  if (section === "fixed") return "autoFixedItems";
-  return "baselineSavingItems";
-}
-
-function getDebtPlanIds(wallet) {
-  const ids = new Set();
-  state.debtPlans.filter((item) => item.wallet === wallet).forEach((debt) => {
-    ids.add(debt.debtId);
-    (debtFixedAliases[debt.debtId] || []).forEach((id) => ids.add(id));
-  });
-  return ids;
-}
-
-function getFixedItems(plan, wallet) {
-  const debtIds = getDebtPlanIds(wallet);
-  return (plan.autoFixedItems || []).filter((item) => !debtIds.has(item.id));
-}
-
-function getDebtPaymentTotal(wallet) {
-  return state.debtPlans
-    .filter((item) => item.wallet === wallet && item.status === "active")
-    .reduce((acc, item) => acc + (Number(item.monthlyPayment) || 0), 0);
-}
-
-function getDashboard(wallet) {
-  const plan = getPlan(state.currentMonth, wallet);
-  const boxes = getBoxes(wallet);
-  const pool = getPoolStatus(wallet, boxes);
-  const income = sumAmounts(plan.incomeDefaults);
-  const fixedBills = sumAmounts(getFixedItems(plan, wallet));
-  const debtPayments = getDebtPaymentTotal(wallet);
-  const autoLocked = fixedBills + debtPayments;
-  const plannedSaving = sumAmounts(plan.baselineSavingItems);
-  const cappedBoxSpend = boxes.reduce((acc, box) => acc + Math.min(box.actualSpent, box.budget), 0);
-  const projectedManualSpending = boxes.reduce((acc, box) => acc + box.projectedSpend, 0);
-  const totalBudgetAvailable = income - autoLocked - plannedSaving;
-  const monthRemaining = totalBudgetAvailable - cappedBoxSpend;
-  const projectedMonthEnd = income - autoLocked - plannedSaving - projectedManualSpending;
-  const daysLeft = getDaysLeft(state.currentMonth);
 
   return {
-    wallet,
-    plan,
-    income,
-    fixedBills,
-    debtPayments,
-    autoLocked,
-    plannedSaving,
-    totalBudgetAvailable,
+    scope,
+    reserve,
+    projections,
+    categories,
+    monitorCards: monitorDefs.map((item) => categories[item.id]).filter(Boolean),
+    discipline: calculateWeeklyDiscipline(monthKey, currentWeekKey),
+    overallStatus: calculateOverallMonitorStatus(categories, scope)
+  };
+}
+
+function buildReserveHeroData() {
+  const reserveBalanceNow = Number(state.settings.systemCore.reserveBalanceNow) || 0;
+  const stableBaseGapMonthly = Math.max(1, Number(state.settings.systemCore.stableBaseGapMonthly) || 0);
+  const runway = calculateReserveRunway(reserveBalanceNow, stableBaseGapMonthly);
+  const tone = runway.months >= 12 ? "green" : runway.months >= 6 ? "yellow" : "red";
+  return {
+    balance: reserveBalanceNow,
+    gap: stableBaseGapMonthly,
+    runwayMonths: runway.months,
+    runwayDays: runway.days,
+    status: tone === "green"
+      ? { label: "Green", tone }
+      : tone === "yellow"
+        ? { label: "Yellow", tone }
+        : { label: "Red", tone },
+    conclusion: tone === "green"
+      ? "Reserve is above the 12-month threshold."
+      : tone === "yellow"
+        ? "Reserve runway is below target. Do not expand fixed lifestyle."
+        : "Reserve runway is critical. Structural reduction is required.",
+    nextAction: tone === "green"
+      ? "Maintain reserve building."
+      : tone === "yellow"
+        ? "Hold discretionary growth and protect monthly surplus."
+        : "Reduce stable gap and freeze discretionary spending."
+  };
+}
+
+function buildProjectionData(referenceDateISO) {
+  const targets = getProjectionTargets(referenceDateISO);
+  const sepValue = calculateReserveProjection(targets.sep);
+  const janValue = calculateReserveProjection(targets.jan);
+  return {
+    sep: {
+      value: sepValue,
+      summary: `${countProjectionSteps(referenceDateISO, targets.sep)} months using current reserve schedule.`
+    },
+    jan: {
+      value: janValue,
+      summary: `${countProjectionSteps(referenceDateISO, targets.jan)} months using current reserve schedule.`
+    }
+  };
+}
+
+function calculateOverallMonitorStatus(categories, scope = state.ui.monitorScope || "week") {
+  const items = Object.values(categories);
+  const projectedSpend = sum(items.map((item) => item.primarySpent));
+  const budget = sum(items.map((item) => item.primaryBudget));
+  const discretionaryExceeded = items.some((item) => item.type === "discretionary" && item.actualExceededBudget);
+  let key = "safe";
+  let label = "Safe";
+  let action = scope === "month" ? "On pace this month." : "On pace this week.";
+
+  if (discretionaryExceeded) {
+    key = "freeze";
+    label = "Freeze";
+    action = scope === "month"
+      ? "Discretionary budget is already exceeded this month."
+      : "Discretionary spending should stop this week.";
+  } else if (projectedSpend > budget) {
+    key = "watch";
+    label = "Watch";
+    action = scope === "month"
+      ? "Month-end projection is over budget."
+      : "Spending pace is running ahead.";
+  }
+
+  return { key, label, action, projectedSpend, budget };
+}
+
+function calculateCategoryDisplay(category, scope = state.ui.monitorScope || "week", monthKey = state.ui.selectedMonth, weekKey = getWeekKey(getReferenceDateISO(monthKey))) {
+  return scope === "month"
+    ? calculateMonthCategoryStatus(category, monthKey, weekKey)
+    : calculateWeekCategoryStatus(category, monthKey, weekKey);
+}
+
+function calculateWeekCategoryStatus(category, monthKey = state.ui.selectedMonth, weekKey = getWeekKey(getReferenceDateISO(monthKey))) {
+  const categoryDef = getCategoryById(category);
+  const label = categoryDef.label;
+  const group = getMonitorBehaviorType(categoryDef);
+  const icon = categoryDef.icon;
+  const referenceDateISO = getReferenceDateISO(monthKey);
+  const timing = getWeekTiming(referenceDateISO);
+  const monthlyBudget = Number(categoryDef.monthlyBudget) || 0;
+  const monthSpent = getMonthSpent(category, monthKey);
+  const currentWeekBudget = getCurrentWeekBudget(category, weekKey, monthKey);
+  const weekSpent = getWeekSpent(category, weekKey, monthKey);
+  const monthRemaining = Math.max(0, monthlyBudget - monthSpent);
+  const nextWeekBudget = getNextWeekBudget(category, weekKey, monthKey);
+  const expectedSpendByToday = currentWeekBudget * timing.weekProgress;
+  const paceRatio = expectedSpendByToday > 0 ? weekSpent / expectedSpendByToday : 0;
+  const projectedWeekEndSpend = timing.weekProgress > 0 ? weekSpent / timing.weekProgress : weekSpent;
+  const projectedOvershoot = Math.max(0, projectedWeekEndSpend - currentWeekBudget);
+  const dailyAllowanceRemaining = monthRemaining / Math.max(1, timing.daysRemainingInWeek);
+  const penalty = group === "discretionary"
+    ? calculateDiscretionaryPenalty(category, weekSpent, currentWeekBudget).penalty
+    : 0;
+  const overshoot = group === "discretionary"
+    ? calculateDiscretionaryPenalty(category, weekSpent, currentWeekBudget).overshoot
+    : Math.max(0, weekSpent - currentWeekBudget);
+  const softCapMultiplier = Number(categoryDef.softCapMultiplier ?? state.settings.weeklyRules.defaultSoftCapMultiplier ?? 1.1) || 1.1;
+  const softCap = group === "essentials" ? currentWeekBudget * softCapMultiplier : currentWeekBudget;
+  const progressPercent = currentWeekBudget > 0 ? (weekSpent / currentWeekBudget) * 100 : 0;
+  const markerPercent = group === "essentials"
+    ? softCap > 0 && currentWeekBudget > 0 ? (softCap / currentWeekBudget) * 100 : 100
+    : 100;
+  const riskSentence = group === "essentials" ? "Soft cap risk. Slow non-urgent spending." : "Penalty active. Freeze this category.";
+
+  let statusKey = "ok";
+  let statusTone = "green";
+  let statusLabel = "OK";
+  let conclusion = "";
+
+  if (group === "essentials") {
+    if (paceRatio > 1.25 || weekSpent > softCap) {
+      statusKey = "risk";
+      statusTone = "red";
+      statusLabel = "Risk";
+    } else if (paceRatio > 1.05 || weekSpent > currentWeekBudget) {
+      statusKey = "watch";
+      statusTone = "yellow";
+      statusLabel = "Watch";
+    } else {
+      statusKey = "ok";
+      statusTone = "green";
+      statusLabel = "OK";
+    }
+    conclusion = statusKey === "ok" ? "On pace." : statusKey === "watch" ? "Running ahead of weekly pace." : "Soft cap risk. Slow non-urgent spending.";
+  } else {
+    if (weekSpent > currentWeekBudget || paceRatio > 1.5) {
+      statusKey = "freeze";
+      statusTone = "red";
+      statusLabel = "Freeze";
+    } else if (paceRatio > 1 && weekSpent <= currentWeekBudget) {
+      statusKey = "watch";
+      statusTone = "yellow";
+      statusLabel = "Watch";
+    } else {
+      statusKey = "ok";
+      statusTone = "green";
+      statusLabel = "OK";
+    }
+    conclusion = statusKey === "ok" ? "On pace." : statusKey === "watch" ? "Ahead of pace. Stop early if possible." : "Penalty active. Freeze this category.";
+  }
+
+  return {
+    category,
+    scope: "week",
+    label,
+    icon,
+    type: group,
+    monthlyBudget,
+    weekSpent,
+    currentWeekBudget,
+    expectedSpendByToday,
+    paceRatio,
+    projectedWeekEndSpend,
+    projectedOvershoot,
+    monthSpent,
     monthRemaining,
-    dailySafeSpend: monthRemaining / daysLeft,
-    projectedMonthEnd,
-    pool
-  };
-}
-
-function getMonthStatus(dashboard) {
-  if (dashboard.pool.unfundedOverspend > 0 || dashboard.projectedMonthEnd < 0) return { label: "Review", tone: "terra" };
-  if (dashboard.monthRemaining < dashboard.dailySafeSpend * 3) return { label: "Watch", tone: "amber" };
-  return { label: "On Track", tone: "sage" };
-}
-
-function getBoxStatusLabel(box) {
-  if (box.overage > 0 && box.coveredByPool < box.overage) return { label: "Uncovered", tone: "terra" };
-  if (box.overage > 0) return { label: "Covered", tone: "olive" };
-  if (box.usedPercent >= 1) return { label: "Over Budget", tone: "terra" };
-  if (box.paceRatio > 1.35) return { label: "Over Pace", tone: "terra" };
-  if (box.paceRatio > 1.15) return { label: "Watch", tone: "amber" };
-  return { label: "On Track", tone: "sage" };
-}
-
-function paceText(box) {
-  if (box.overage > 0) return `Over by ${money(box.overage)}`;
-  const delta = Math.round(Math.abs(box.paceRatio - 1) * 100);
-  if (box.paceRatio > 1.08) return `${delta}% faster than pace`;
-  if (box.paceRatio < 0.92) return `${delta}% under pace`;
-  return "On pace";
-}
-
-function getBoxes(wallet) {
-  const plan = getPlan(state.currentMonth, wallet);
-  const monthElapsed = getMonthElapsedPercent(state.currentMonth);
-  const elapsedDays = getElapsedDays(state.currentMonth);
-  const daysInMonth = getDaysInMonth(state.currentMonth);
-  const prelim = Object.entries(plan.boxes).map(([boxId, box]) => {
-    const spending = state.transactions
-      .filter((item) => item.wallet === wallet && item.month === state.currentMonth && item.box === boxId && item.type === "spending")
-      .reduce((acc, item) => acc + item.amount, 0);
-    const refunds = state.transactions
-      .filter((item) => item.wallet === wallet && item.month === state.currentMonth && item.box === boxId && item.type === "refund" && item.refundTarget === "box")
-      .reduce((acc, item) => acc + item.amount, 0);
-    const actualSpent = Math.max(0, spending - refunds);
-    const budget = Number(box.budget) || 0;
-    const usedPercent = budget ? actualSpent / budget : 0;
-    const paceRatio = monthElapsed ? usedPercent / monthElapsed : 0;
-    const projectedSpend = elapsedDays ? (actualSpent / elapsedDays) * daysInMonth : actualSpent;
-    const overage = Math.max(0, actualSpent - budget);
-    const visibleRemaining = Math.max(0, budget - actualSpent);
-    const status = overage > 0 || paceRatio > 1.35 ? "risk" : paceRatio > 1.15 ? "watch" : "good";
-    return {
-      boxId,
-      name: box.name,
-      budget,
-      actualSpent,
-      refunds,
-      visibleRemaining,
-      usedPercent,
-      monthElapsedPercent: monthElapsed,
-      paceRatio,
-      projectedSpend,
-      overage,
-      coveredByPool: overage,
-      status
-    };
-  });
-
-  const poolBase = getPoolBase(wallet);
-  const totalOverage = prelim.reduce((acc, box) => acc + box.overage, 0);
-  if (poolBase.availableBeforeCoverage < totalOverage && totalOverage > 0) {
-    const ratio = Math.max(0, poolBase.availableBeforeCoverage) / totalOverage;
-    prelim.forEach((box) => {
-      box.coveredByPool = box.overage * ratio;
-    });
-  }
-  return prelim;
-}
-
-function getPoolStatus(wallet, boxes = getBoxes(wallet)) {
-  const plan = getPlan(state.currentMonth, wallet);
-  const base = getPoolBase(wallet);
-  const overageCoverage = boxes.reduce((acc, box) => acc + box.overage, 0);
-  const available = base.startingBalance + base.inflows - base.outflows - overageCoverage;
-  const poolCapacity = base.startingBalance + base.inflows;
-  const poolUsed = base.outflows + overageCoverage;
-  return {
-    startingBalance: plan.pool.startingBalance,
-    inflows: base.inflows,
-    outflows: base.outflows,
-    overageCoverage,
-    committed: poolUsed,
-    available: Math.max(0, available),
-    unfundedOverspend: Math.max(0, -available),
-    pressure: poolCapacity ? poolUsed / poolCapacity : 0
-  };
-}
-
-function getPoolBase(wallet) {
-  const plan = getPlan(state.currentMonth, wallet);
-  const entries = getPoolEntries(wallet);
-  const inflows = entries.filter((item) => item.type === "inflow" || item.type === "adjustment").reduce((acc, item) => acc + item.amount, 0);
-  const outflows = entries.filter((item) => item.type === "spend").reduce((acc, item) => acc + item.amount, 0);
-  return {
-    startingBalance: Number(plan.pool.startingBalance) || 0,
-    inflows,
-    outflows,
-    availableBeforeCoverage: (Number(plan.pool.startingBalance) || 0) + inflows - outflows
-  };
-}
-
-function getPoolEntries(wallet) {
-  return state.poolEntries.filter((item) => item.wallet === wallet && item.month === state.currentMonth);
-}
-
-function getWarnings(wallet) {
-  const boxes = getBoxes(wallet);
-  const dashboard = getDashboard(wallet);
-  const day = getDayOfMonth(state.currentMonth);
-  const warnings = [];
-  boxes.forEach((box) => {
-    if (box.paceRatio > 1.35) warnings.push({ level: "risk", title: `${box.name} is too fast`, text: `Speed is ${box.paceRatio.toFixed(1)}x. Expected spend is ${money(box.projectedSpend)} if this pace continues.` });
-    else if (box.paceRatio > 1.15) warnings.push({ level: "watch", title: `${box.name} is ahead of the month`, text: `Speed is ${box.paceRatio.toFixed(1)}x compared with month progress.` });
-    if (box.projectedSpend > box.budget) warnings.push({ level: "watch", title: `${box.name} may exceed budget`, text: `Expected ${money(box.projectedSpend)} vs budget ${money(box.budget)} if this pace continues.` });
-    if (box.projectedSpend > box.budget + dashboard.pool.available) warnings.push({ level: "risk", title: `${box.name} may not be covered by reserve`, text: `Expected spend exceeds budget plus available reserve.` });
-    if (day <= 10 && box.actualSpent > box.budget * 0.45) warnings.push({ level: "risk", title: `${box.name} is heavy early`, text: `${money(box.actualSpent)} used in the first 10 days.` });
-  });
-
-  const eatOut = boxes.find((box) => box.boxId === "eatOut");
-  if (eatOut) {
-    const eatCount = getBoxTransactions(wallet, "eatOut").filter((item) => item.type === "spending").length;
-    const weekCount = getBoxTransactions(wallet, "eatOut").filter((item) => isThisWeek(item.date)).length;
-    if (day <= 10 && eatCount >= 5) warnings.push({ level: "watch", title: "Eating out frequency is high", text: `${eatCount} Eat Out entries by day ${day}.` });
-    if (weekCount >= 4) warnings.push({ level: "watch", title: "This week has many Eat Out entries", text: `${weekCount} Eat Out entries this week.` });
-  }
-
-  if (dashboard.pool.pressure > 0.75) warnings.push({ level: "risk", title: `${wallets[wallet].reserveLabel} is heavily used`, text: `${Math.round(dashboard.pool.pressure * 100)}% of available reserve has already been used this month.` });
-  else if (dashboard.pool.pressure > 0.5) warnings.push({ level: "watch", title: `${wallets[wallet].reserveLabel} is being used quickly`, text: `${Math.round(dashboard.pool.pressure * 100)}% of available reserve has already been used this month.` });
-
-  if (dashboard.pool.unfundedOverspend > 0) warnings.push({ level: "risk", title: "Overspend Not Covered", text: `${money(dashboard.pool.unfundedOverspend)} is not covered by reserve.` });
-  return warnings;
-}
-
-function getWeeklyStats(wallet) {
-  const today = getReferenceDate();
-  const start = new Date(today);
-  start.setDate(today.getDate() - 6);
-  start.setHours(0, 0, 0, 0);
-  const rows = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(start);
-    date.setDate(start.getDate() + index);
-    const key = date.toISOString().slice(0, 10);
-    const amount = state.transactions
-      .filter((item) => item.wallet === wallet && item.type === "spending" && item.date === key)
-      .reduce((acc, item) => acc + item.amount, 0);
-    return { date: key, label: date.toLocaleDateString("en-CA", { weekday: "short" }), amount };
-  });
-  const last7Spend = rows.reduce((acc, item) => acc + item.amount, 0);
-  return {
-    dailyRows: rows,
-    thisWeekSpend: rows.reduce((acc, item) => acc + item.amount, 0),
-    last7Spend,
-    last7Average: last7Spend / 7
-  };
-}
-
-function getRecommendations(wallet) {
-  const months = getRecentActualMonths(wallet, 4);
-  const recs = [];
-  const plan = getPlan(state.currentMonth, wallet);
-  Object.entries(plan.boxes).forEach(([boxId, box]) => {
-    const values = months.map((month) => month.boxes?.[boxId] || 0);
-    const budget = Number(box.budget) || 0;
-    if (!budget || values.length < 2) return;
-    const lastTwo = values.slice(-2);
-    if (lastTwo.every((value) => value > budget * 1.1)) recs.push(`${box.name} exceeded budget by more than 10% for 2 consecutive months. Increase by ${money(50)} or change behavior.`);
-    const lastThree = values.slice(-3);
-    if (lastThree.length === 3 && lastThree.every((value) => value < budget * 0.75)) recs.push(`${box.name} used less than 75% for 3 months. Move surplus to ${wallets[wallet].reserveLabel}.`);
-    if (lastThree.length === 3 && Math.max(...lastThree) - Math.min(...lastThree) > budget * 0.5) recs.push(`${box.name} is volatile. Keep base budget lower and use the reserve for one-offs.`);
-    const coveredMonths = values.filter((value) => value > budget).length;
-    if (coveredMonths >= 3) recs.push(`${box.name} needed reserve coverage in ${coveredMonths} of the last 4 months. Review this budget.`);
-    if (getDayOfMonth(state.currentMonth) >= 25) {
-      const current = getBoxes(wallet).find((item) => item.boxId === boxId);
-      if (current && current.visibleRemaining > budget * 0.4) recs.push(`${box.name} has more than 40% left near month-end. Consider lowering next month or moving surplus to the reserve.`);
+    dailyAllowanceRemaining,
+    nextWeekBudget,
+    overshoot,
+    penalty,
+    softCap,
+    riskSentence,
+    conclusion,
+    primarySpent: projectedWeekEndSpend,
+    primaryBudget: currentWeekBudget,
+    secondaryLine: group === "discretionary" && penalty > 0
+      ? `Penalty active: -${money(penalty)} next week`
+      : weekSpent === 0
+        ? "No spend yet. Full budget available."
+        : `Spent ${money(weekSpent)} so far · ${money(monthRemaining)} left this month`,
+    actualExceededBudget: weekSpent > currentWeekBudget,
+    actualAmount: weekSpent,
+    projectedAmount: projectedWeekEndSpend,
+    markerBudget: currentWeekBudget,
+    zoneBudget: currentWeekBudget,
+    zoneSoftCap: softCap,
+    displayRemaining: monthRemaining,
+    empty: weekSpent === 0,
+    secondaryHint: group === "discretionary" && penalty > 0
+      ? `Penalty active: -${money(penalty)} next week`
+      : `Spent ${money(weekSpent)} so far · ${money(monthRemaining)} left this month`,
+    status: {
+      key: statusKey,
+      label: statusLabel,
+      tone: statusTone
     }
-  });
-  return [...new Set(recs)].slice(0, 5);
-}
-
-function getCloseSummary(wallet) {
-  const dashboard = getDashboard(wallet);
-  const boxes = getBoxes(wallet);
-  const overages = boxes.filter((box) => box.overage > 0);
-  const biggestRemaining = boxes.slice().sort((a, b) => b.visibleRemaining - a.visibleRemaining)[0];
-  const status = dashboard.pool.unfundedOverspend > 0 || dashboard.projectedMonthEnd < 0 ? "needs review" : "on track";
-  const overageText = overages.length
-    ? `${overages.map((box) => `${box.name} ${money(box.overage)} over`).join(", ")} covered by reserve`
-    : "no box overages";
-  const remainingText = biggestRemaining ? `${biggestRemaining.name} has ${money(biggestRemaining.visibleRemaining)} left` : "no active boxes";
-  return {
-    text: `${state.currentMonth} ${wallets[wallet].label}: ${status}. Income ${money(dashboard.income)} from ${dashboard.plan.incomeDefaults.length} source${dashboard.plan.incomeDefaults.length === 1 ? "" : "s"}, fixed bills ${money(dashboard.fixedBills)}, debt payments ${money(dashboard.debtPayments)}, ${overageText}, ${remainingText}, reserve available ${money(dashboard.pool.available)}.`
   };
 }
 
-function renderCloseVisualization(wallet) {
-  const boxes = getBoxes(wallet);
-  const dashboard = getDashboard(wallet);
-  return `
-    <div class="visual-grid close-visuals">
-      <article class="visual-card">
-        <span>Box Close</span>
-        <div class="visual-list">
-          ${boxes.map(renderBudgetVisualRow).join("")}
-        </div>
-      </article>
-      <article class="visual-card">
-        <span>Locked Money</span>
-        <div class="close-stack">
-          ${renderCloseStackRow("Income", dashboard.income, dashboard.income, "sage")}
-          ${renderCloseStackRow("Fixed Bills", dashboard.fixedBills, dashboard.income, "blue")}
-          ${renderCloseStackRow("Debt Payments", dashboard.debtPayments, dashboard.income, "grey")}
-          ${renderCloseStackRow("Manual Boxes Used", boxes.reduce((acc, box) => acc + box.actualSpent, 0), dashboard.income, "amber")}
-          ${renderCloseStackRow("Planned Saving", dashboard.plannedSaving, dashboard.income, "olive")}
-        </div>
-      </article>
-      <article class="visual-card wide-visual">
-        <span>Reserve Close</span>
-        <div class="reserve-month">
-          <strong>${escapeHtml(wallets[wallet].reserveLabel)}</strong>
-          <div class="reserve-bars">
-            <i class="in" style="width:${barWidth(dashboard.pool.inflows, [{ inflow: dashboard.pool.inflows, outflow: dashboard.pool.committed, coverage: 0 }])}%"></i>
-            <i class="out" style="width:${barWidth(dashboard.pool.committed, [{ inflow: dashboard.pool.inflows, outflow: dashboard.pool.committed, coverage: 0 }])}%"></i>
-          </div>
-          <small>Starting ${money(dashboard.pool.startingBalance)} · In ${money(dashboard.pool.inflows)} · Used ${money(dashboard.pool.committed)} · Available ${money(dashboard.pool.available)}</small>
-        </div>
-      </article>
-    </div>
-  `;
-}
+function calculateMonthCategoryStatus(category, monthKey = state.ui.selectedMonth, weekKey = getWeekKey(getReferenceDateISO(monthKey))) {
+  const categoryDef = getCategoryById(category);
+  const label = categoryDef.label;
+  const group = getMonitorBehaviorType(categoryDef);
+  const icon = categoryDef.icon;
+  const monthlyBudget = Number(categoryDef.monthlyBudget) || 0;
+  const monthSpent = getMonthSpent(category, monthKey);
+  const timing = getMonthTiming(monthKey);
+  const monthRemaining = Math.max(0, monthlyBudget - monthSpent);
+  const projectedMonthEndSpend = timing.monthProgress > 0 ? monthSpent / timing.monthProgress : monthSpent;
+  const projectedMonthOvershoot = Math.max(0, projectedMonthEndSpend - monthlyBudget);
+  const currentWeekBudget = getCurrentWeekBudget(category, weekKey, monthKey);
+  const weekSpent = getWeekSpent(category, weekKey, monthKey);
+  const expectedSpendByToday = monthlyBudget * timing.monthProgress;
+  const paceRatio = expectedSpendByToday > 0 ? monthSpent / expectedSpendByToday : 0;
+  const penalty = group === "discretionary"
+    ? calculateDiscretionaryPenalty(category, weekSpent, currentWeekBudget).penalty
+    : 0;
+  const softCapMultiplier = Number(categoryDef.softCapMultiplier ?? state.settings.weeklyRules.defaultSoftCapMultiplier ?? 1.1) || 1.1;
+  const softCap = currentWeekBudget * softCapMultiplier;
 
-function renderCloseStackRow(label, value, max, tone) {
-  const width = Math.max(2, Math.min(100, max ? (Math.abs(value) / Math.abs(max)) * 100 : 2));
-  return `
-    <div class="close-stack-row">
-      <div class="row"><strong>${escapeHtml(label)}</strong><span>${money(value)}</span></div>
-      <div class="dual-bar"><i class="${escapeHtml(tone)}" style="width:${width}%"></i></div>
-    </div>
-  `;
-}
+  let statusKey = "ok";
+  let statusTone = "green";
+  let statusLabel = "OK";
+  let conclusion = "On pace.";
 
-function renderWarning(item) {
-  return `<div class="warning-item ${item.level}"><span><strong>${escapeHtml(item.title)}</strong>${item.text ? `<br><span class="muted">${escapeHtml(item.text)}</span>` : ""}</span><strong>${item.level === "risk" ? "Review" : "Watch"}</strong></div>`;
-}
-
-function renderBoxCard(box) {
-  return `<article class="box-card">${renderBoxCardInner(box)}</article>`;
-}
-
-function renderOverviewCategoryCard(box) {
-  const fill = Math.min(box.usedPercent * 100, 100);
-  const marker = Math.min(box.monthElapsedPercent * 100, 100);
-  const status = getBoxStatusLabel(box);
-  return `
-    <button class="box-card category-card ${state.highlightBox === box.boxId ? "just-updated" : ""}" type="button" data-view-box="${escapeHtml(box.boxId)}">
-      <div class="box-top">
-        <div><span class="${escapeHtml(status.tone)}-text">${escapeHtml(status.label)}</span><strong>${escapeHtml(box.name)}</strong></div>
-        <strong>${money(box.actualSpent)} / ${money(box.budget)}</strong>
-      </div>
-      <div class="box-meta single-line">
-        <span>${money(box.visibleRemaining)} left</span>
-        <span>${paceText(box)}</span>
-      </div>
-      <div class="progress-wrap">
-        <div class="progress-bar"><div class="progress-fill ${box.status}" style="width:${fill}%"></div></div>
-        <i class="today-marker" style="left:${marker}%"></i>
-      </div>
-      ${box.overage ? `<span class="covered">${money(box.coveredByPool)} covered</span>` : ""}
-    </button>
-  `;
-}
-
-function renderBoxCardInner(box) {
-  const fill = Math.min(box.usedPercent * 100, 100);
-  const marker = Math.min(box.monthElapsedPercent * 100, 100);
-  return `
-    <div class="box-top">
-      <div><span>${escapeHtml(getBoxStatusLabel(box).label)}</span><strong>${escapeHtml(box.name)}</strong></div>
-      <strong>${money(box.actualSpent)} / ${money(box.budget)}</strong>
-    </div>
-    <div class="progress-wrap">
-      <div class="progress-bar"><div class="progress-fill ${box.status}" style="width:${fill}%"></div></div>
-      <i class="today-marker" style="left:${marker}%"></i>
-    </div>
-    <div class="box-meta">
-      <span>${money(box.visibleRemaining)} left</span>
-      <span>${Math.round(box.usedPercent * 100)}% used</span>
-      <span>${paceText(box)}</span>
-      <span>Expected ${money(box.projectedSpend)}</span>
-    </div>
-    ${box.overage ? `<span class="covered">${money(box.coveredByPool)} covered by reserve</span>` : ""}
-  `;
-}
-
-function renderBoxDetail(box) {
-  return `
-    <div class="metric-grid">
-      <article class="metric-card grey"><span>Budget</span><strong>${money(box.budget)}</strong><p>Current month plan after overrides.</p></article>
-      <article class="metric-card blue"><span>Actual Spent</span><strong>${money(box.actualSpent)}</strong><p>Refunds applied to this box are offset.</p></article>
-      <article class="metric-card olive"><span>Covered by Reserve</span><strong>${money(box.coveredByPool)}</strong><p>Regular boxes never show negative remaining.</p></article>
-      <article class="metric-card ${box.status === "risk" ? "terra" : box.status === "watch" ? "amber" : "sage"}"><span>Speed vs Month</span><strong>${box.paceRatio.toFixed(1)}x</strong><p>Expected ${money(box.projectedSpend)} if this pace continues.</p></article>
-    </div>
-  `;
-}
-
-function openCategoryDetail(boxId) {
-  const box = getBoxes(state.activeWallet).find((item) => item.boxId === boxId);
-  if (!box) return;
-  const transactions = getBoxTransactions(state.activeWallet, boxId).slice().sort((a, b) => b.date.localeCompare(a.date));
-  modalRoot.innerHTML = `
-    <div class="modal-backdrop" role="presentation">
-      <section class="edit-modal" role="dialog" aria-modal="true" aria-labelledby="categoryDetailTitle">
-        <div class="modal-head">
-          <div>
-            <h2 id="categoryDetailTitle">${escapeHtml(box.name)}</h2>
-            <p>${money(box.actualSpent)} spent of ${money(box.budget)} · ${money(box.visibleRemaining)} left · ${paceText(box)}</p>
-          </div>
-          <button class="icon-button" type="button" data-close-modal aria-label="Close">×</button>
-        </div>
-        ${renderBoxDetail(box)}
-        <div class="transaction-list" style="margin-top: 12px;">
-          ${transactions.length ? transactions.map(renderTransaction).join("") : `<div class="transaction-item"><span>No entries yet.</span><strong>$0</strong></div>`}
-        </div>
-      </section>
-    </div>
-  `;
-  const backdrop = modalRoot.querySelector(".modal-backdrop");
-  backdrop.addEventListener("click", (event) => {
-    if (event.target === backdrop) closeEditModal();
-  });
-  modalRoot.querySelectorAll("[data-close-modal]").forEach((button) => button.addEventListener("click", closeEditModal));
-  modalRoot.querySelectorAll("[data-edit-txn]").forEach((button) => button.addEventListener("click", () => editTransaction(button.dataset.editTxn)));
-  modalRoot.querySelectorAll("[data-delete-txn]").forEach((button) => button.addEventListener("click", () => deleteTransaction(button.dataset.deleteTxn)));
-}
-
-function renderTransaction(item) {
-  return `
-    <div class="transaction-item">
-      <span><strong>${escapeHtml(item.note || boxMeta[item.box]?.name || "Entry")}</strong><br><span class="muted">${formatDate(item.date)} · ${escapeHtml(item.type)}</span></span>
-      <span><strong>${money(item.amount)}</strong><br><button class="mini-button" type="button" data-edit-txn="${item.transactionId}">Edit</button> <button class="mini-button" type="button" data-delete-txn="${item.transactionId}">Delete</button></span>
-    </div>
-  `;
-}
-
-function renderPoolEntry(item) {
-  return `<div class="pool-item"><span><strong>${escapeHtml(item.sourceOrUse)}</strong><br><span class="muted">${formatDate(item.date)} · ${escapeHtml(item.note)}</span></span><strong class="${item.type === "spend" ? "negative" : "positive"}">${item.type === "spend" ? "-" : "+"}${money(item.amount)}</strong></div>`;
-}
-
-function renderCurrentMonthAnalysis(wallet) {
-  const dashboard = getDashboard(wallet);
-  const boxes = getBoxes(wallet);
-  return `
-    <div class="visual-grid">
-      <article class="visual-card">
-        <span>Box Progress</span>
-        <div class="visual-list">
-          ${boxes.map(renderBudgetVisualRow).join("")}
-        </div>
-      </article>
-      <article class="visual-card">
-        <span>This Month Breakdown</span>
-        <div class="close-stack">
-          ${renderCloseStackRow("Income Sources", dashboard.income, dashboard.income, "sage")}
-          ${renderCloseStackRow("Fixed Bills", dashboard.fixedBills, dashboard.income, "blue")}
-          ${renderCloseStackRow("Debt Payments", dashboard.debtPayments, dashboard.income, "grey")}
-          ${renderCloseStackRow("Box Spending", boxes.reduce((acc, box) => acc + box.actualSpent, 0), dashboard.income, "amber")}
-          ${renderCloseStackRow("Planned Saving", dashboard.plannedSaving, dashboard.income, "olive")}
-        </div>
-      </article>
-    </div>
-  `;
-}
-
-function renderReserveAnalysis(wallet) {
-  const dashboard = getDashboard(wallet);
-  const rows = getPoolMonthSummaries(wallet);
-  return `
-    <div class="visual-grid">
-      <article class="visual-card">
-        <span>Reserve Used This Month</span>
-        <div class="close-stack">
-          ${renderCloseStackRow("Starting Reserve", dashboard.pool.startingBalance, dashboard.pool.startingBalance + dashboard.pool.inflows || 1, "olive")}
-          ${renderCloseStackRow("Inflows", dashboard.pool.inflows, dashboard.pool.startingBalance + dashboard.pool.inflows || 1, "sage")}
-          ${renderCloseStackRow("Paid From Reserve", dashboard.pool.outflows, dashboard.pool.startingBalance + dashboard.pool.inflows || 1, "terra")}
-          ${renderCloseStackRow("Covered Overages", dashboard.pool.overageCoverage, dashboard.pool.startingBalance + dashboard.pool.inflows || 1, "amber")}
-          ${renderCloseStackRow("Reserve Available", dashboard.pool.available, dashboard.pool.startingBalance + dashboard.pool.inflows || 1, "blue")}
-        </div>
-      </article>
-      <article class="visual-card">
-        <span>Reserve Ending Trend</span>
-        ${renderBarChart(`${wallets[wallet].reserveLabel} Ending`, "Recent month-end balances", rows.map((item) => item.month.slice(5)), rows.map((item) => item.ending), "olive")}
-      </article>
-      <article class="visual-card wide-visual">
-        <span>Reserve Flow</span>
-        <div class="reserve-flow">
-          ${rows.map((row) => `
-            <div class="reserve-month">
-              <strong>${escapeHtml(row.month.slice(5))}</strong>
-              <div class="reserve-bars">
-                <i class="in" style="width:${barWidth(row.inflow, rows)}%"></i>
-                <i class="out" style="width:${barWidth(row.outflow + row.coverage, rows)}%"></i>
-              </div>
-              <small>In ${money(row.inflow)} · Out ${money(row.outflow)} · Coverage ${money(row.coverage)} · End ${money(row.ending)}</small>
-            </div>
-          `).join("")}
-        </div>
-      </article>
-    </div>
-  `;
-}
-
-function renderYearBreakdown(wallet) {
-  const boxes = getBoxes(wallet);
-  const months = getRecentActualMonths(wallet, 12);
-  const manualTotals = months.map((month) => Object.values(month.boxes || {}).reduce((acc, value) => acc + value, 0));
-  return `
-    <div class="visual-grid">
-      <article class="visual-card">
-        <span>Manual Spending Trend</span>
-        ${renderBarChart("Box Spend", "All spending boxes", months.map((item) => item.month.slice(5)), manualTotals, "sage")}
-      </article>
-      <article class="visual-card">
-        <span>Reserve Trend</span>
-        ${renderBarChart(`${wallets[wallet].reserveLabel}`, "Ending balance", months.map((item) => item.month.slice(5)), months.map((item) => item.poolEnding || 0), "olive")}
-      </article>
-      <article class="visual-card wide-visual">
-        <span>Box Actuals</span>
-        <div class="trend-matrix">
-          <div></div>${months.map((month) => `<strong>${escapeHtml(month.month.slice(5))}</strong>`).join("")}
-          ${boxes.map((box) => `
-            <b>${escapeHtml(box.name)}</b>
-            ${months.map((month) => `<em>${money(month.boxes?.[box.boxId] || 0)}</em>`).join("")}
-          `).join("")}
-        </div>
-      </article>
-    </div>
-  `;
-}
-
-function renderDecisionVisuals(wallet) {
-  const boxes = getBoxes(wallet);
-  const months = getRecentActualMonths(wallet, 4);
-  const reserveRows = getPoolMonthSummaries(wallet);
-  return `
-    <div class="visual-grid">
-      <article class="visual-card">
-        <span>Actual vs Budget</span>
-        <div class="visual-list">
-          ${boxes.map(renderBudgetVisualRow).join("")}
-        </div>
-      </article>
-      <article class="visual-card">
-        <span>4-Month Actuals</span>
-        <div class="trend-matrix">
-          <div></div>${months.map((month) => `<strong>${escapeHtml(month.month.slice(5))}</strong>`).join("")}
-          ${boxes.map((box) => `
-            <b>${escapeHtml(box.name)}</b>
-            ${months.map((month) => `<em>${money(month.boxes?.[box.boxId] || 0)}</em>`).join("")}
-          `).join("")}
-        </div>
-      </article>
-      <article class="visual-card wide-visual">
-        <span>${escapeHtml(wallets[wallet].reserveLabel)} Flow</span>
-        <div class="reserve-flow">
-          ${reserveRows.map((row) => `
-            <div class="reserve-month">
-              <strong>${escapeHtml(row.month.slice(5))}</strong>
-              <div class="reserve-bars">
-                <i class="in" style="width:${barWidth(row.inflow, reserveRows)}%"></i>
-                <i class="out" style="width:${barWidth(row.outflow + row.coverage, reserveRows)}%"></i>
-              </div>
-              <small>In ${money(row.inflow)} · Out ${money(row.outflow)} · End ${money(row.ending)}</small>
-            </div>
-          `).join("")}
-        </div>
-      </article>
-    </div>
-  `;
-}
-
-function renderBudgetVisualRow(box) {
-  const actualWidth = Math.min(100, box.budget ? (box.actualSpent / box.budget) * 100 : 0);
-  const projectedWidth = Math.min(100, box.budget ? (box.projectedSpend / box.budget) * 100 : 0);
-  return `
-    <div class="budget-visual-row">
-      <div class="row">
-        <strong>${escapeHtml(box.name)}</strong>
-        <span>${money(box.actualSpent)} / ${money(box.budget)}</span>
-      </div>
-      <div class="dual-bar">
-        <i class="${box.status}" style="width:${actualWidth}%"></i>
-        <b style="left:${projectedWidth}%"></b>
-      </div>
-      <small class="muted">Expected ${money(box.projectedSpend)} if this pace continues · marker shows expected month-end</small>
-    </div>
-  `;
-}
-
-function renderDailySpendChart(rows) {
-  const max = Math.max(...rows.map((row) => row.amount), 1);
-  return `
-    <div class="mini-chart daily-chart">
-      ${rows.map((row) => `<div class="bar-col"><i class="amber" style="height:${Math.max(4, row.amount / max * 72)}px"></i><em>${escapeHtml(row.label)}</em><strong>${money(row.amount)}</strong></div>`).join("")}
-    </div>
-  `;
-}
-
-function renderEmptyState(title, action = "") {
-  return `<div class="empty-state"><strong>${escapeHtml(title)}</strong>${action ? `<span>${escapeHtml(action)}</span>` : ""}</div>`;
-}
-
-function barWidth(value, rows) {
-  const max = Math.max(...rows.map((row) => row.inflow), ...rows.map((row) => row.outflow + row.coverage), 1);
-  return Math.max(3, Math.min(100, (Math.abs(value) / max) * 100));
-}
-
-function renderMonthlySpendingTrend(wallet) {
-  const months = getRecentActualMonths(wallet, 4);
-  const totals = months.map((item) => Object.values(item.boxes || {}).reduce((acc, value) => acc + value, 0));
-  return renderBarChart("Monthly Spending", "Manual boxes only", months.map((item) => item.month.slice(5)), totals, "sage");
-}
-
-function renderBudgetAccuracy(wallet) {
-  const months = getRecentActualMonths(wallet, 4);
-  const boxes = Object.entries(getPlan(state.currentMonth, wallet).boxes);
-  const firstBox = boxes[0];
-  if (!firstBox) return "";
-  const [boxId, box] = firstBox;
-  const variances = months.map((item) => {
-    const actual = item.boxes?.[boxId] || 0;
-    return box.budget ? ((actual - box.budget) / box.budget) * 100 : 0;
-  });
-  return `
-    <article class="chart-card">
-      <span>Budget Accuracy</span>
-      <h3>${escapeHtml(box.name)}</h3>
-      <div class="variance-row">
-        ${variances.map((value, index) => `<div class="variance-pill ${value > 0 ? "terra" : "sage"}">${months[index].month.slice(5)} ${value > 0 ? "+" : ""}${Math.round(value)}%</div>`).join("")}
-      </div>
-    </article>
-  `;
-}
-
-function renderPoolTrend(wallet) {
-  const months = getRecentActualMonths(wallet, 4);
-  const values = months.map((item) => item.poolEnding || 0);
-  return renderBarChart(`${wallets[wallet].reserveLabel} Trend`, "Ending balance", months.map((item) => item.month.slice(5)), values, "olive");
-}
-
-function renderSavedTrend(wallet) {
-  const months = getRecentActualMonths(wallet, 4);
-  const values = months.map((item) => item.savedAmount || item.poolInflows || 0);
-  return renderBarChart(wallet === "pw" ? "Saved Money Trend" : "Saved / Investment Trend", "Monthly saved amount", months.map((item) => item.month.slice(5)), values, "blue");
-}
-
-function renderBarChart(title, subtitle, labels, values, tone) {
-  const max = Math.max(...values.map((value) => Math.abs(value)), 1);
-  return `
-    <article class="chart-card">
-      <span>${escapeHtml(title)}</span>
-      <h3>${escapeHtml(subtitle)}</h3>
-      <div class="mini-chart">
-        ${values.map((value, index) => `<div class="bar-col"><i class="${tone}" style="height:${Math.max(4, Math.abs(value) / max * 72)}px"></i><em>${escapeHtml(labels[index])}</em></div>`).join("")}
-      </div>
-    </article>
-  `;
-}
-
-function renderInvestmentVisualizer(items) {
-  const rows = items.map((item) => {
-    const previous = getPreviousInvestmentSnapshot(item.accountName, item.date);
-    const change = previous ? item.marketValue - previous.marketValue - item.contribution + item.withdrawal : 0;
-    return { ...item, change };
-  });
-  const maxChange = Math.max(...rows.map((item) => Math.abs(item.change)), 1);
-  return `
-    <div class="investment-visual">
-      ${rows.map((item) => `
-        <div class="investment-line">
-          <div class="row"><strong>${escapeHtml(item.accountName)}</strong><span>${money(item.marketValue)} · change ${money(item.change)}</span></div>
-          <div class="investment-track"><i class="${item.change < 0 ? "loss" : ""}" style="width:${Math.max(2, Math.abs(item.change) / maxChange * 100)}%"></i></div>
-        </div>
-      `).join("")}
-    </div>
-  `;
-}
-
-function getPreviousInvestmentSnapshot(accountName, beforeDate) {
-  return state.investmentSnapshots
-    .filter((item) => item.accountName === accountName && item.date < beforeDate)
-    .sort((a, b) => b.date.localeCompare(a.date))[0];
-}
-
-function getPlan(month, wallet) {
-  const plan = structuredClone(getBasePlan(month, wallet));
-  const override = state.monthlyOverrides?.[month]?.[wallet];
-  if (!override) return plan;
-  applyPlanPatch(plan, override);
-  return plan;
-}
-
-function getBasePlan(month, wallet) {
-  const version = state.yearPlanVersions
-    .filter((item) => item.effectiveFrom <= month)
-    .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0] || state.yearPlanVersions[0];
-  return structuredClone(version.plan[wallet]);
-}
-
-function getEditableYearPlan(wallet) {
-  const future = state.yearPlanVersions.find((item) => item.effectiveFrom === nextMonthKey(state.currentMonth));
-  if (future) return structuredClone(future.plan[wallet]);
-  return getBasePlan(state.currentMonth, wallet);
-}
-
-function applyPlanPatch(plan, patch) {
-  Object.entries(patch.deleted || {}).forEach(([section, ids]) => {
-    if (section === "boxes") {
-      ids.forEach((id) => delete plan.boxes[id]);
-      return;
+  if (group === "essentials") {
+    if (monthSpent > monthlyBudget || projectedMonthEndSpend > monthlyBudget * 1.15) {
+      statusKey = "risk";
+      statusTone = "red";
+      statusLabel = "Risk";
+      conclusion = "Month-end risk is elevated.";
+    } else if (projectedMonthEndSpend > monthlyBudget) {
+      statusKey = "watch";
+      statusTone = "yellow";
+      statusLabel = "Watch";
+      conclusion = "Month-end projection is running high.";
     }
-    plan[section] = plan[section].filter((item) => !ids.includes(item.id));
-  });
-
-  Object.entries(patch.additions || {}).forEach(([section, additions]) => {
-    if (section === "boxes") {
-      Object.entries(additions || {}).forEach(([id, box]) => {
-        plan.boxes[id] = { name: box.name, budget: Number(box.budget) || 0 };
-      });
-      return;
-    }
-    additions.forEach((item) => {
-      if (!plan[section].some((row) => row.id === item.id)) plan[section].push({ ...item });
-    });
-  });
-
-  ["incomeDefaults", "autoFixedItems", "baselineSavingItems"].forEach((section) => {
-    Object.entries(patch[section] || {}).forEach(([id, amount]) => {
-      const item = plan[section].find((row) => row.id === id);
-      if (item) item.amount = amount;
-    });
-  });
-  Object.entries(patch.boxes || {}).forEach(([id, budget]) => {
-    if (plan.boxes[id]) plan.boxes[id].budget = budget;
-  });
-  if (patch.pool?.startingBalance !== undefined) plan.pool.startingBalance = patch.pool.startingBalance;
-}
-
-function setCurrentOverride(key, amount) {
-  const [, section, id] = key.split(":");
-  const wallet = state.activeWallet;
-  state.monthlyOverrides[state.currentMonth] ||= {};
-  state.monthlyOverrides[state.currentMonth][wallet] ||= {};
-  const patch = state.monthlyOverrides[state.currentMonth][wallet];
-  if (section === "box") {
-    patch.boxes ||= {};
-    patch.boxes[id] = amount;
-  } else if (section === "pool") {
-    patch.pool ||= {};
-    patch.pool.startingBalance = amount;
   } else {
-    const sectionName = section === "income" ? "incomeDefaults" : section === "fixed" ? "autoFixedItems" : "baselineSavingItems";
-    patch[sectionName] ||= {};
-    patch[sectionName][id] = amount;
+    if (monthSpent > monthlyBudget || projectedMonthEndSpend > monthlyBudget * 1.25) {
+      statusKey = "freeze";
+      statusTone = "red";
+      statusLabel = "Freeze";
+      conclusion = "Discretionary month budget is at risk.";
+    } else if (projectedMonthEndSpend > monthlyBudget) {
+      statusKey = "watch";
+      statusTone = "yellow";
+      statusLabel = "Watch";
+      conclusion = "Month-end projection is over budget.";
+    }
   }
-  save();
-  showToast("This month plan changes saved");
-  render();
-}
 
-function setFutureYearPlan(key, amount) {
-  const [, section, id] = key.split(":");
-  const wallet = state.activeWallet;
-  const effectiveFrom = nextMonthKey(state.currentMonth);
-  let version = state.yearPlanVersions.find((item) => item.effectiveFrom === effectiveFrom);
-  if (!version) {
-    const currentVersion = state.yearPlanVersions
-      .filter((item) => item.effectiveFrom <= state.currentMonth)
-      .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0];
-    version = {
-      versionId: uid("plan"),
-      effectiveFrom,
-      createdAt: new Date().toISOString(),
-      plan: structuredClone(currentVersion.plan)
-    };
-    state.yearPlanVersions.push(version);
-  }
-  const plan = version.plan[wallet];
-  if (section === "box") plan.boxes[id].budget = amount;
-  else if (section === "pool") plan.pool.startingBalance = amount;
-  else {
-    const sectionName = section === "income" ? "incomeDefaults" : section === "fixed" ? "autoFixedItems" : "baselineSavingItems";
-    const item = plan[sectionName].find((row) => row.id === id);
-    if (item) item.amount = amount;
-  }
-  save();
-  showToast(`Future year plan starts ${effectiveFrom}`);
-  render();
-}
-
-function addDebtToYearPlan(debt) {
-  upsertDebtPlan(debt);
-}
-
-function syncDebtPaymentToPlan(debt) {
-  const amount = debt.status === "active" ? debt.monthlyPayment : 0;
-  const aliases = {
-    mortgage: ["mortgage"],
-    "car-loan": ["carPayment"],
-    ikea: ["ikea"]
-  };
-  const ids = [debt.debtId, ...(aliases[debt.debtId] || [])];
-  state.yearPlanVersions.forEach((version) => {
-    const plan = version.plan?.[debt.wallet];
-    if (!plan) return;
-    plan.autoFixedItems.forEach((item) => {
-      if (ids.includes(item.id)) {
-        item.name = debt.name;
-        item.amount = amount;
-      }
-    });
-  });
-  Object.values(state.monthlyOverrides || {}).forEach((walletOverrides) => {
-    const patch = walletOverrides[debt.wallet];
-    if (!patch?.autoFixedItems) return;
-    ids.forEach((id) => {
-      if (patch.autoFixedItems[id] !== undefined) patch.autoFixedItems[id] = amount;
-    });
-  });
-}
-
-function getBoxTransactions(wallet, boxId) {
-  return state.transactions.filter((item) => item.wallet === wallet && item.month === state.currentMonth && item.box === boxId);
-}
-
-function getPoolMonthSummaries(wallet) {
-  return getRecentActualMonths(wallet, 4).map((month) => ({
-    month: month.month,
-    inflow: month.poolInflows || 0,
-    outflow: month.poolOutflows || 0,
-    coverage: getMonthOverageFromSnapshot(month, wallet),
-    ending: month.poolEnding || 0
-  }));
-}
-
-function getRecentActualMonths(wallet, limit) {
-  const snapshots = state.historicalMonths.filter((item) => item.wallet === wallet && item.month <= state.currentMonth);
-  const current = getSnapshotForCurrentMonth(wallet);
-  const merged = snapshots.filter((item) => item.month !== state.currentMonth).concat(current);
-  return merged.sort((a, b) => a.month.localeCompare(b.month)).slice(-limit);
-}
-
-function getSnapshotForCurrentMonth(wallet) {
-  const dashboard = getDashboardNoHistory(wallet);
-  const boxes = {};
-  getBoxes(wallet).forEach((box) => {
-    boxes[box.boxId] = box.actualSpent;
-  });
   return {
-    month: state.currentMonth,
-    wallet,
-    incomeActual: dashboard.income,
-    fixedBillsActual: dashboard.fixedBills,
-    debtPaymentsActual: dashboard.debtPayments,
-    autoLockedActual: dashboard.autoLocked,
-    savedAmount: dashboard.plannedSaving + dashboard.pool.inflows,
-    boxes,
-    poolInflows: dashboard.pool.inflows,
-    poolOutflows: dashboard.pool.outflows,
-    poolEnding: dashboard.pool.available,
-    closed: isClosed(state.currentMonth, wallet)
-  };
-}
-
-function getDashboardNoHistory(wallet) {
-  const plan = getPlan(state.currentMonth, wallet);
-  const boxes = getBoxes(wallet);
-  const pool = getPoolStatus(wallet, boxes);
-  const fixedBills = sumAmounts(getFixedItems(plan, wallet));
-  const debtPayments = getDebtPaymentTotal(wallet);
-  return {
-    income: sumAmounts(plan.incomeDefaults),
-    fixedBills,
-    debtPayments,
-    autoLocked: fixedBills + debtPayments,
-    plannedSaving: sumAmounts(plan.baselineSavingItems),
-    pool
-  };
-}
-
-function getMonthOverageFromSnapshot(month, wallet) {
-  const plan = getPlan(month.month, wallet);
-  return Object.entries(month.boxes || {}).reduce((acc, [boxId, actual]) => {
-    const budget = plan.boxes?.[boxId]?.budget || 0;
-    return acc + Math.max(0, actual - budget);
-  }, 0);
-}
-
-function closeWalletMonth(wallet) {
-  const closeSummary = getCloseSummary(wallet);
-  state.closedMonths[state.currentMonth] ||= {};
-  state.closedMonths[state.currentMonth][wallet] = {
-    closed: true,
-    closedAt: new Date().toISOString(),
-    summaryText: closeSummary.text,
-    summary: getSnapshotForCurrentMonth(wallet)
-  };
-  const snapshot = getSnapshotForCurrentMonth(wallet);
-  state.historicalMonths = state.historicalMonths.filter((item) => !(item.month === state.currentMonth && item.wallet === wallet));
-  state.historicalMonths.push({ ...snapshot, closed: true });
-  save();
-  showToast(`${wallets[wallet].label} month closed`);
-  render();
-}
-
-function reopenWalletMonth(wallet) {
-  if (state.closedMonths[state.currentMonth]) delete state.closedMonths[state.currentMonth][wallet];
-  save();
-  showToast(`${wallets[wallet].label} reopened`);
-  render();
-}
-
-function isClosed(month, wallet) {
-  if (state.closedMonths?.[month]?.[wallet]) return Boolean(state.closedMonths[month][wallet].closed);
-  return Boolean(state.historicalMonths.find((item) => item.month === month && item.wallet === wallet && item.closed));
-}
-
-function getUnclosedMonths() {
-  const months = [...new Set(state.historicalMonths.map((item) => item.month).concat(state.currentMonth))].sort();
-  return months.flatMap((month) => Object.keys(wallets).map((wallet) => ({ month, wallet }))).filter((item) => !isClosed(item.month, item.wallet));
-}
-
-function getCloseReminder() {
-  const today = new Date();
-  if (today.getDate() > 7) return "";
-  const previous = previousMonthKey(state.currentMonth);
-  const needs = Object.keys(wallets).filter((wallet) => !isClosed(previous, wallet));
-  if (!needs.length) return "";
-  return `${previous} still needs closing for ${needs.map((wallet) => wallets[wallet].label).join(" and ")}.`;
-}
-
-function getLatestInvestments() {
-  const latest = {};
-  state.investmentSnapshots.forEach((item) => {
-    if (!latest[item.accountName] || latest[item.accountName].date < item.date) latest[item.accountName] = item;
-  });
-  return Object.values(latest);
-}
-
-function getPayoffLabel(balance, payment, annualRate, fallbackMonth = "") {
-  const months = estimatePayoffMonths(balance, payment, annualRate);
-  if (months === 0) return "paid off";
-  if (!Number.isFinite(months)) return fallbackMonth && fallbackMonth !== "TBD" ? `payoff ${fallbackMonth}` : "payoff unknown";
-  const years = Math.floor(months / 12);
-  const rest = months % 12;
-  const pieces = [];
-  if (years) pieces.push(`${years}y`);
-  if (rest || !pieces.length) pieces.push(`${rest}m`);
-  return `est. payoff ${pieces.join(" ")}`;
-}
-
-function estimatePayoffMonths(balance, payment, annualRate) {
-  const principal = Number(balance) || 0;
-  const monthlyPayment = Number(payment) || 0;
-  const monthlyRate = (Number(annualRate) || 0) / 100 / 12;
-  if (principal <= 0) return 0;
-  if (monthlyPayment <= 0) return Infinity;
-  if (monthlyRate <= 0) return Math.ceil(principal / monthlyPayment);
-  if (monthlyPayment <= principal * monthlyRate) return Infinity;
-  return Math.ceil(-Math.log(1 - (principal * monthlyRate) / monthlyPayment) / Math.log(1 + monthlyRate));
-}
-
-function sumAmounts(rows) {
-  return rows.reduce((acc, item) => acc + (Number(item.amount) || 0), 0);
-}
-
-function average(values) {
-  const clean = values.filter((value) => Number.isFinite(Number(value)));
-  if (!clean.length) return 0;
-  return clean.reduce((acc, value) => acc + Number(value), 0) / clean.length;
-}
-
-function exportCsv() {
-  const rows = [];
-  const add = (recordType, record) => {
-    rows.push({
-      app_version: APP_VERSION,
-      exported_at: new Date().toISOString(),
-      record_type: recordType,
-      ...record
-    });
-  };
-  state.transactions.forEach((item) => add("transaction", item));
-  state.poolEntries.forEach((item) => add("reserve_entry", item));
-  state.historicalMonths.forEach((item) => add("budget_month", { ...item, boxes: JSON.stringify(item.boxes || {}) }));
-  state.receivables.forEach((item) => add("receivable", item));
-  state.receivablePayments.forEach((item) => add("receivable_payment", item));
-  state.investmentSnapshots.forEach((item) => add("investment_snapshot", item));
-  state.netWorthSnapshots.forEach((item) => add("net_worth_snapshot", item));
-  state.debtPlans.forEach((item) => add("debt_plan", item));
-  state.yearPlanVersions.forEach((item) => add("year_plan_version", { versionId: item.versionId, effectiveFrom: item.effectiveFrom, createdAt: item.createdAt, plan: JSON.stringify(item.plan) }));
-  state.yearPlanVersions.forEach((version) => {
-    Object.entries(version.plan || {}).forEach(([wallet, plan]) => {
-      (plan.incomeDefaults || []).forEach((item) => add("plan_item", { versionId: version.versionId, effectiveFrom: version.effectiveFrom, wallet, section: "income_sources", itemId: item.id, name: item.name, amount: item.amount }));
-      getFixedItems(plan, wallet).forEach((item) => add("plan_item", { versionId: version.versionId, effectiveFrom: version.effectiveFrom, wallet, section: "fixed_bills", itemId: item.id, name: item.name, amount: item.amount }));
-      (plan.baselineSavingItems || []).forEach((item) => add("plan_item", { versionId: version.versionId, effectiveFrom: version.effectiveFrom, wallet, section: "baseline_saving", itemId: item.id, name: item.name, amount: item.amount }));
-      Object.entries(plan.boxes || {}).forEach(([itemId, box]) => add("plan_item", { versionId: version.versionId, effectiveFrom: version.effectiveFrom, wallet, section: "spending_boxes", itemId, name: box.name, amount: box.budget }));
-      add("plan_item", { versionId: version.versionId, effectiveFrom: version.effectiveFrom, wallet, section: "reserve", itemId: "startingBalance", name: `${plan.pool.name} Starting Balance`, amount: plan.pool.startingBalance });
-    });
-  });
-  Object.entries(state.monthlyOverrides || {}).forEach(([month, walletsById]) => {
-    Object.entries(walletsById).forEach(([wallet, patch]) => add("monthly_override", { month, wallet, patch: JSON.stringify(patch) }));
-  });
-  Object.entries(state.closedMonths || {}).forEach(([month, walletsById]) => {
-    Object.entries(walletsById).forEach(([wallet, close]) => add("month_close", { month, wallet, closed: close.closed, closedAt: close.closedAt, summaryText: close.summaryText || "", summary: JSON.stringify(close.summary) }));
-  });
-
-  const headers = [...new Set(rows.flatMap((row) => Object.keys(row)))];
-  const csv = [headers.join(",")]
-    .concat(rows.map((row) => headers.map((header) => csvCell(row[header])).join(",")))
-    .join("\n");
-  downloadText(`box-budget-${state.currentMonth}-${APP_VERSION}.csv`, csv, "text/csv");
-  showToast("CSV export ready");
-}
-
-function importCsv(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const rows = parseCsv(String(reader.result || ""));
-      const next = emptyImportState();
-      rows.forEach((row) => importCsvRow(next, row));
-      if (next._planItems.length) next.yearPlanVersions = buildPlanVersionsFromPlanItems(next._planItems);
-      delete next._planItems;
-      if (!next.yearPlanVersions.length) next.yearPlanVersions = structuredClone(demoState.yearPlanVersions);
-      const months = rows.map((row) => row.month || row.date?.slice(0, 7) || row.effectiveFrom).filter(Boolean).sort();
-      if (months.length) next.currentMonth = months.at(-1);
-      state = normalizeState(next);
-      save();
-      showToast("CSV import complete");
-      renderChrome();
-      render();
-    } catch {
-      showToast("CSV import failed");
+    category,
+    scope: "month",
+    label,
+    icon,
+    type: group,
+    monthlyBudget,
+    weekSpent,
+    currentWeekBudget,
+    expectedSpendByToday,
+    paceRatio,
+    projectedWeekEndSpend: weekSpent,
+    projectedOvershoot: projectedMonthOvershoot,
+    monthSpent,
+    monthRemaining,
+    dailyAllowanceRemaining: timing.daysRemainingInMonth > 0 ? monthRemaining / timing.daysRemainingInMonth : monthRemaining,
+    nextWeekBudget: getNextWeekBudget(category, weekKey, monthKey),
+    overshoot: Math.max(0, monthSpent - monthlyBudget),
+    penalty,
+    softCap,
+    riskSentence: conclusion,
+    conclusion,
+    primarySpent: projectedMonthEndSpend,
+    primaryBudget: monthlyBudget,
+    secondaryLine: monthSpent === 0
+      ? "No spend yet. Full budget available."
+      : `Spent ${money(monthSpent)} so far · ${money(monthRemaining)} left this month`,
+    actualExceededBudget: monthSpent > monthlyBudget,
+    actualAmount: monthSpent,
+    projectedAmount: projectedMonthEndSpend,
+    markerBudget: monthlyBudget,
+    zoneBudget: monthlyBudget,
+    zoneSoftCap: group === "essentials" ? monthlyBudget * 1.15 : monthlyBudget,
+    displayRemaining: monthRemaining,
+    empty: monthSpent === 0,
+    projectedMonthEndSpend,
+    projectedMonthOvershoot,
+    status: {
+      key: statusKey,
+      label: statusLabel,
+      tone: statusTone
     }
   };
-  reader.readAsText(file);
 }
 
-function exportJson() {
-  const backup = {
-    appVersion: APP_VERSION,
-    exportedAt: new Date().toISOString(),
-    storageKey: STORAGE_KEY,
-    data: state
+function calculateWeeklyDiscipline(monthKey = state.ui.selectedMonth, weekKey = getWeekKey(getReferenceDateISO(monthKey))) {
+  const tracked = getCategories()
+    .filter((item) => item.active && !item.archived && item.includeInWeeklyDiscipline);
+  const categories = tracked.map((item) => calculateWeekCategoryStatus(item.id, monthKey, weekKey));
+  const discretionary = categories.filter((item) => getCategoryById(item.category).ruleType === "penalty");
+  const thisWeekVariableBudget = sum(categories.map((item) => item.currentWeekBudget));
+  const thisWeekVariableSpent = sum(categories.map((item) => item.weekSpent));
+  const discretionaryOvershoot = sum(discretionary.map((item) => item.overshoot));
+  const projectedDiscretionaryOvershoot = sum(discretionary.map((item) => item.projectedOvershoot));
+  const nextWeekReduction = sum(discretionary.map((item) => item.penalty));
+  const isClosed = Boolean(state.weeklyClosures[weekKey]);
+  const penaltyBudgetBase = sum(discretionary.map((item) => item.currentWeekBudget));
+  const statusTone = nextWeekReduction === 0 ? "green" : nextWeekReduction <= penaltyBudgetBase * 0.2 ? "yellow" : "red";
+  return {
+    weekKey,
+    thisWeekVariableBudget,
+    thisWeekVariableSpent,
+    discretionaryOvershoot,
+    projectedDiscretionaryOvershoot,
+    nextWeekReduction,
+    entertainmentPenalty: discretionary.find((item) => item.category === "entertainment")?.penalty || 0,
+    miscPenalty: discretionary.find((item) => item.category === "misc")?.penalty || 0,
+    isClosed,
+    status: {
+      label: statusTone === "green" ? "Green" : statusTone === "yellow" ? "Yellow" : "Red",
+      tone: statusTone
+    },
+    conclusion: statusTone === "green"
+      ? "No penalty is projected for next week."
+      : statusTone === "yellow"
+        ? "A moderate penalty will reduce next week's discretionary budget."
+        : "A large penalty will materially reduce next week's discretionary budget.",
+    nextAction: statusTone === "green"
+      ? "Maintain current pace."
+      : statusTone === "yellow"
+        ? "Protect the remaining discretionary budget."
+        : "Treat discretionary spending as frozen."
   };
-  downloadText(`finance-tracker-${state.currentMonth}-${APP_VERSION}.json`, JSON.stringify(backup, null, 2), "application/json");
-  showToast("JSON export ready");
 }
 
-function importJson(event) {
+function getReferenceDateISO(monthKey) {
+  const today = currentDateISO();
+  if (today.slice(0, 7) === monthKey) return today;
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Date(year, month, 0).toISOString().slice(0, 10);
+}
+
+function getMonthTiming(monthKey) {
+  const today = currentDateISO();
+  const daysInMonth = getDaysInMonth(monthKey);
+  let dayOfMonth = daysInMonth;
+
+  if (today.slice(0, 7) === monthKey) {
+    dayOfMonth = Number(today.slice(8, 10));
+  } else if (monthKey > today.slice(0, 7)) {
+    dayOfMonth = 1;
+  }
+
+  const monthProgress = Math.min(1, Math.max(1 / daysInMonth, dayOfMonth / daysInMonth));
+  return {
+    daysInMonth,
+    dayOfMonth,
+    daysRemainingInMonth: Math.max(0, daysInMonth - dayOfMonth),
+    monthProgress
+  };
+}
+
+function getDaysInMonth(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Date(year, month, 0).getDate();
+}
+
+function getWeekTiming(referenceDateISO) {
+  const weekStartISO = getWeekStart(referenceDateISO);
+  const weekEndISO = getWeekEnd(referenceDateISO);
+  const elapsed = Math.floor((new Date(`${referenceDateISO}T00:00:00`) - new Date(`${weekStartISO}T00:00:00`)) / 86400000) + 1;
+  const daysElapsedInWeek = Math.min(7, Math.max(1, elapsed));
+  const daysRemainingInWeek = Math.min(7, Math.max(1, 8 - daysElapsedInWeek));
+  return {
+    weekStartISO,
+    weekEndISO,
+    daysElapsedInWeek,
+    daysRemainingInWeek,
+    weekProgress: daysElapsedInWeek / 7
+  };
+}
+
+function getCurrentWeekBudget(category, weekKey, monthKey = state.ui.selectedMonth) {
+  const monthlyBudget = Number(getCategoryById(category).monthlyBudget) || 0;
+  const weeks = getWeeksOverlappingMonth(monthKey);
+  const baseBudget = weeks.length ? monthlyBudget / weeks.length : monthlyBudget;
+  const adjustment = getWeekAdjustmentPenalty(weekKey, category);
+  return Math.max(0, baseBudget - adjustment);
+}
+
+function getNextWeekBudget(category, weekKey, monthKey = state.ui.selectedMonth) {
+  const monthlyBudget = Number(getCategoryById(category).monthlyBudget) || 0;
+  const weekEnd = getWeekEnd(weekKey);
+  const spentThroughCurrentWeek = getMonthSpentThroughDate(category, monthKey, weekEnd);
+  const remainingMonthlyBudget = Math.max(0, monthlyBudget - spentThroughCurrentWeek);
+  const weeks = getWeeksOverlappingMonth(monthKey);
+  const remainingWeeksAfterCurrentWeek = weeks.filter((startISO) => startISO > weekKey).length;
+  const nextWeekBaseBudget = Math.max(0, remainingMonthlyBudget / Math.max(1, remainingWeeksAfterCurrentWeek));
+  const nextWeekKey = shiftDateISO(weekKey, 7);
+  const adjustment = getWeekAdjustmentPenalty(nextWeekKey, category);
+  return Math.max(0, nextWeekBaseBudget - adjustment);
+}
+
+function getMonthSpent(category, monthKey = state.ui.selectedMonth) {
+  return sum(
+    state.transactions
+      .filter((item) => item.category === category && item.dateISO.slice(0, 7) === monthKey)
+      .map((item) => item.amount)
+  );
+}
+
+function getMonthSpentThroughDate(category, monthKey, dateISO) {
+  return sum(
+    state.transactions
+      .filter((item) => item.category === category && item.dateISO.slice(0, 7) === monthKey && item.dateISO <= dateISO)
+      .map((item) => item.amount)
+  );
+}
+
+function getWeekSpent(category, weekKey, monthKey = state.ui.selectedMonth) {
+  const weekEnd = getWeekEnd(weekKey);
+  return sum(
+    state.transactions
+      .filter((item) => item.category === category && item.dateISO.slice(0, 7) === monthKey && item.dateISO >= weekKey && item.dateISO <= weekEnd)
+      .map((item) => item.amount)
+  );
+}
+
+function calculateDiscretionaryPenalty(category, actual, budget) {
+  const categoryDef = getCategoryById(category);
+  if (categoryDef.ruleType !== "penalty") {
+    return { overshoot: 0, penalty: 0 };
+  }
+  const overshoot = Math.max(0, actual - budget);
+  const penaltyMultiplier = Number(categoryDef.penaltyMultiplier ?? state.settings.weeklyRules.penaltyMultiplier) || 1.5;
+  const minPenaltyUnit = Number(categoryDef.minPenaltyUnit ?? state.settings.weeklyRules.minPenaltyUnit) || 5;
+  const penalty = overshoot > 0 ? Math.max(minPenaltyUnit, penaltyMultiplier * overshoot) : 0;
+  return { overshoot, penalty };
+}
+
+function calculateReserveRunway(reserveBalance, stableGap) {
+  const safeGap = Math.max(1, Number(stableGap) || 0);
+  const months = Math.floor((Number(reserveBalance) || 0) / safeGap);
+  return {
+    months,
+    days: months * 30
+  };
+}
+
+function calculateReserveProjection(targetDateISO) {
+  const startDateISO = getReferenceDateISO(state.ui.selectedMonth);
+  let balance = Number(state.settings.systemCore.reserveBalanceNow) || 0;
+  let cursor = firstOfNextMonth(startDateISO);
+
+  while (cursor < targetDateISO) {
+    balance += getReserveMonthlyNet(cursor);
+    cursor = firstOfNextMonth(cursor);
+  }
+
+  return balance;
+}
+
+function getReserveMonthlyNet(monthISO) {
+  const month = Number(monthISO.slice(5, 7));
+  if (month >= 5 && month <= 8) return Number(state.settings.reserveSchedule.mayToAugMonthlyNet) || 0;
+  if (month >= 9 && month <= 12) return Number(state.settings.reserveSchedule.sepToDecMonthlyNet) || 0;
+  return Number(state.settings.reserveSchedule.janPlusMonthlyNet) || 0;
+}
+
+function projectionTone(value) {
+  const amount = Number(value) || 0;
+  const gap = Math.max(1, Number(state.settings.systemCore.stableBaseGapMonthly) || 0);
+  if (amount < 0) return "red";
+  if (amount <= gap * 2) return "yellow";
+  return "green";
+}
+
+function getProjectionTargets(referenceDateISO) {
+  const [year, month] = referenceDateISO.slice(0, 7).split("-").map(Number);
+  const sepThisYear = `${year}-09-01`;
+  const janNext = `${year + 1}-01-01`;
+  const sepTarget = referenceDateISO < sepThisYear ? sepThisYear : `${year + 1}-09-01`;
+  const janTarget = referenceDateISO < `${year}-01-01` ? `${year}-01-01` : janNext;
+  return { sep: sepTarget, jan: janTarget };
+}
+
+function getWeekStart(dateISO) {
+  const date = new Date(`${dateISO}T00:00:00`);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  return date.toISOString().slice(0, 10);
+}
+
+function getWeekEnd(dateISO) {
+  return shiftDateISO(getWeekStart(dateISO), 6);
+}
+
+function getWeekKey(dateISO) {
+  return getWeekStart(dateISO);
+}
+
+function getWeeksOverlappingMonth(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const seen = new Set();
+  const weeks = [];
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const dateISO = new Date(year, month - 1, day).toISOString().slice(0, 10);
+    const weekKey = getWeekKey(dateISO);
+    if (!seen.has(weekKey)) {
+      seen.add(weekKey);
+      weeks.push(weekKey);
+    }
+  }
+  return weeks.sort();
+}
+
+function getWeekAdjustmentPenalty(weekKey, category) {
+  const item = state.weeklyBudgetAdjustments[weekKey];
+  if (!item) return 0;
+  if (category === "entertainment") return Number(item.entertainmentPenalty) || 0;
+  if (category === "misc") return Number(item.miscPenalty) || 0;
+  return 0;
+}
+
+function getFilteredTransactions() {
+  const monthKey = state.ui.selectedMonth;
+  const filter = state.ui.txFilter || "month";
+  const weekKey = getWeekKey(getReferenceDateISO(monthKey));
+  const weekEnd = getWeekEnd(weekKey);
+  let list = state.transactions.filter((item) => item.dateISO.slice(0, 7) === monthKey);
+
+  if (filter === "week") {
+    list = list.filter((item) => item.dateISO >= weekKey && item.dateISO <= weekEnd);
+  }
+  if (filter === "essentials") {
+    list = list.filter((item) => getMonitorBehaviorType(getCategoryById(item.category)) === "essentials");
+  }
+  if (filter === "discretionary") {
+    list = list.filter((item) => getMonitorBehaviorType(getCategoryById(item.category)) === "discretionary");
+  }
+  if (filter === "all") {
+    list = state.transactions.slice();
+  }
+
+  return list.sort((a, b) => `${b.dateISO}-${b.id}`.localeCompare(`${a.dateISO}-${a.id}`));
+}
+
+function getEditingTransaction() {
+  return state.transactions.find((item) => item.id === state.ui.editingTransactionId) || null;
+}
+
+function saveTransaction(event) {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  const payload = Object.fromEntries(formData.entries());
+  const category = normalizeCategory(payload.category);
+  if (!category || !isCategoryAllowedForTransaction(category)) {
+    showToast("Invalid category.");
+    return;
+  }
+  const transaction = {
+    id: payload.id || uid("txn"),
+    dateISO: payload.dateISO,
+    amount: Number(payload.amount) || 0,
+    category,
+    note: String(payload.note || "").trim()
+  };
+  if (!transaction.dateISO || transaction.amount <= 0) {
+    showToast("Date and amount are required.");
+    return;
+  }
+
+  const index = state.transactions.findIndex((item) => item.id === transaction.id);
+  if (index >= 0) {
+    state.transactions[index] = transaction;
+  } else {
+    state.transactions.push(transaction);
+  }
+
+  state.ui.lastTransactionTemplate = {
+    amount: transaction.amount,
+    category: transaction.category,
+    note: transaction.note
+  };
+  state.ui.editingTransactionId = null;
+  modalRoot.innerHTML = "";
+  state.ui.activeTab = "monitor";
+  saveState();
+  showToast(index >= 0 ? "Transaction updated." : "Transaction added.");
+  render();
+}
+
+function deleteTransaction(id) {
+  state.transactions = state.transactions.filter((item) => item.id !== id);
+  if (state.ui.editingTransactionId === id) state.ui.editingTransactionId = null;
+  saveState();
+  showToast("Transaction deleted.");
+  render();
+}
+
+function categoryHasTransactions(categoryId) {
+  return state.transactions.some((item) => item.category === categoryId);
+}
+
+function cancelEditingTransaction() {
+  state.ui.editingTransactionId = null;
+  saveState();
+  render();
+}
+
+function closeWeek() {
+  const monthKey = state.ui.selectedMonth;
+  const weekKey = getWeekKey(getReferenceDateISO(monthKey));
+  if (state.weeklyClosures[weekKey]) {
+    showToast("This week has already been closed.");
+    return;
+  }
+
+  const entertainment = calculateWeekCategoryStatus("entertainment", monthKey, weekKey);
+  const misc = calculateWeekCategoryStatus("misc", monthKey, weekKey);
+  const nextWeekKey = shiftDateISO(weekKey, 7);
+  const entertainmentPenalty = entertainment.penalty;
+  const miscPenalty = misc.penalty;
+
+  state.weeklyBudgetAdjustments[nextWeekKey] = {
+    weekStartISO: nextWeekKey,
+    sourceWeekStartISO: weekKey,
+    entertainmentPenalty,
+    miscPenalty,
+    totalPenalty: entertainmentPenalty + miscPenalty
+  };
+
+  state.weeklyClosures[weekKey] = {
+    weekStartISO: weekKey,
+    closedAtISO: new Date().toISOString(),
+    entertainmentPenalty,
+    miscPenalty,
+    totalPenalty: entertainmentPenalty + miscPenalty
+  };
+
+  saveState();
+  showToast(`Week closed. Next week reduced by ${money(entertainmentPenalty + miscPenalty)}.`);
+  render();
+}
+
+function reopenWeek() {
+  const weekKey = getWeekKey(getReferenceDateISO(state.ui.selectedMonth));
+  const closure = state.weeklyClosures[weekKey];
+  if (!closure) {
+    showToast("No week close to clear.");
+    return;
+  }
+  const nextWeekKey = shiftDateISO(weekKey, 7);
+  delete state.weeklyClosures[weekKey];
+  delete state.weeklyBudgetAdjustments[nextWeekKey];
+  saveState();
+  showToast("Week close cleared.");
+  render();
+}
+
+function saveSettings(event) {
+  event.preventDefault();
+  const next = structuredClone(state);
+  const formData = new FormData(event.currentTarget);
+  for (const [path, rawValue] of formData.entries()) {
+    setByPath(next, path, rawValue === "" ? null : Number(rawValue));
+  }
+  state = normalizeState(next);
+  saveState();
+  showToast("Settings saved.");
+  render();
+}
+
+function saveCategoryEdits(event, categoryId) {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  const next = structuredClone(state);
+  const index = next.settings.monitorCategories.findIndex((item) => item.id === categoryId);
+  if (index < 0) return;
+  const current = next.settings.monitorCategories[index];
+  next.settings.monitorCategories[index] = {
+    ...current,
+    label: String(formData.get("label") || current.label).trim() || current.label,
+    icon: String(formData.get("icon") || current.icon).trim() || "•",
+    group: String(formData.get("group") || current.group),
+    monthlyBudget: Number(formData.get("monthlyBudget")) || 0,
+    ruleType: String(formData.get("ruleType") || current.ruleType),
+    softCapMultiplier: nullableNumber(formData.get("softCapMultiplier")),
+    penaltyMultiplier: nullableNumber(formData.get("penaltyMultiplier")),
+    minPenaltyUnit: nullableNumber(formData.get("minPenaltyUnit")),
+    priority: String(formData.get("priority") || current.priority),
+    displayOrder: Number(formData.get("displayOrder")) || current.displayOrder,
+    monitor: formData.has("monitor"),
+    allowTransactions: formData.has("allowTransactions"),
+    includeInVariableTotal: formData.has("includeInVariableTotal"),
+    includeInWeeklyDiscipline: formData.has("includeInWeeklyDiscipline"),
+    active: formData.has("active")
+  };
+  state = normalizeState(next);
+  saveState();
+  closeQuickAdd();
+  showToast("Category updated.");
+  render();
+}
+
+function archiveCategory(categoryId) {
+  const next = structuredClone(state);
+  const category = next.settings.monitorCategories.find((item) => item.id === categoryId);
+  if (!category) return;
+  category.active = false;
+  category.archived = true;
+  state = normalizeState(next);
+  saveState();
+  closeQuickAdd();
+  showToast("Category archived.");
+  render();
+}
+
+function deleteCategory(categoryId) {
+  if (categoryHasTransactions(categoryId)) {
+    showToast("This category has transactions and cannot be deleted.");
+    return;
+  }
+  if (!confirm("Delete this category permanently?")) return;
+  const next = structuredClone(state);
+  next.settings.monitorCategories = next.settings.monitorCategories.filter((item) => item.id !== categoryId);
+  state = normalizeState(next);
+  saveState();
+  closeQuickAdd();
+  showToast("Category deleted.");
+  render();
+}
+
+function restoreCategory(categoryId) {
+  const next = structuredClone(state);
+  const category = next.settings.monitorCategories.find((item) => item.id === categoryId);
+  if (!category) return;
+  category.active = true;
+  category.archived = false;
+  state = normalizeState(next);
+  saveState();
+  openManageBudgetCategories();
+}
+
+function saveBudgetCategoriesManager(event) {
+  event.preventDefault();
+  const next = structuredClone(state);
+  const formData = new FormData(event.currentTarget);
+  next.settings.monitorCategories.forEach((category) => {
+    const raw = formData.get(`order:${category.id}`);
+    if (raw != null) category.displayOrder = Number(raw) || category.displayOrder;
+  });
+  state = normalizeState(next);
+  saveState();
+  openManageBudgetCategories();
+  showToast("Category order saved.");
+}
+
+function addMonitorCategory(event) {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  const label = String(formData.get("label") || "").trim();
+  if (!label) return;
+  const next = structuredClone(state);
+  const id = uniqueCategoryId(label, next.settings.monitorCategories);
+  const rulePreset = String(formData.get("rulePreset") || "penalty");
+  next.settings.monitorCategories.push({
+    id,
+    label,
+    icon: String(formData.get("icon") || "•").trim() || "•",
+    group: String(formData.get("group") || "discretionary"),
+    monthlyBudget: Number(formData.get("monthlyBudget")) || 0,
+    monitor: formData.has("monitor"),
+    allowTransactions: formData.has("allowTransactions"),
+    includeInVariableTotal: true,
+    includeInWeeklyDiscipline: true,
+    ruleType: rulePreset,
+    softCapMultiplier: rulePreset === "softCap" ? Number(state.settings.weeklyRules.defaultSoftCapMultiplier) || 1.1 : null,
+    penaltyMultiplier: rulePreset === "penalty" ? Number(state.settings.weeklyRules.penaltyMultiplier) || 1.5 : null,
+    minPenaltyUnit: rulePreset === "penalty" ? Number(state.settings.weeklyRules.minPenaltyUnit) || 5 : null,
+    priority: String(formData.get("priority") || "secondary"),
+    displayOrder: next.settings.monitorCategories.length + 1,
+    active: true,
+    archived: false
+  });
+  state = normalizeState(next);
+  saveState();
+  openManageBudgetCategories();
+  showToast("Category added.");
+}
+
+function saveBackgroundItemEdits(event, sectionId, itemId) {
+  event.preventDefault();
+  const next = structuredClone(state);
+  const section = next.settings.backgroundSections.find((entry) => entry.id === sectionId);
+  const item = section?.items?.find((entry) => entry.id === itemId);
+  if (!section || !item) return;
+  const formData = new FormData(event.currentTarget);
+  item.label = String(formData.get("label") || item.label).trim() || item.label;
+  item.amount = Number(formData.get("amount")) || 0;
+  item.frequency = String(formData.get("frequency") || item.frequency);
+  item.type = String(formData.get("type") || item.type || section.type);
+  item.includeInGap = formData.has("includeInGap");
+  item.includeInProjection = formData.has("includeInProjection");
+  item.includeInSummary = formData.has("includeInSummary");
+  item.active = formData.has("active");
+  state = normalizeState(next);
+  saveState();
+  closeQuickAdd();
+  showToast("Background item updated.");
+  render();
+}
+
+function archiveBackgroundItem(sectionId, itemId) {
+  const next = structuredClone(state);
+  const item = next.settings.backgroundSections.find((entry) => entry.id === sectionId)?.items?.find((entry) => entry.id === itemId);
+  if (!item) return;
+  item.active = false;
+  item.archived = true;
+  state = normalizeState(next);
+  saveState();
+  closeQuickAdd();
+  showToast("Background item archived.");
+  render();
+}
+
+function saveBackgroundSectionsManager(event) {
+  event.preventDefault();
+  const next = structuredClone(state);
+  const formData = new FormData(event.currentTarget);
+  next.settings.backgroundSections.forEach((section) => {
+    const raw = formData.get(`section-order:${section.id}`);
+    const label = String(formData.get(`section-label:${section.id}`) || section.label).trim();
+    const type = String(formData.get(`section-type:${section.id}`) || section.type);
+    if (raw != null) section.displayOrder = Number(raw) || section.displayOrder;
+    section.label = label || section.label;
+    section.type = type || section.type;
+  });
+  state = normalizeState(next);
+  saveState();
+  openManageBackgroundSections();
+  showToast("Sections updated.");
+}
+
+function addBackgroundSection(event) {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  const label = String(formData.get("label") || "").trim();
+  if (!label) return;
+  const next = structuredClone(state);
+  next.settings.backgroundSections.push({
+    id: uniqueSectionId(label, next.settings.backgroundSections),
+    label,
+    type: String(formData.get("type") || "other"),
+    displayOrder: Number(formData.get("displayOrder")) || next.settings.backgroundSections.length + 1,
+    active: true,
+    archived: false,
+    items: []
+  });
+  state = normalizeState(next);
+  saveState();
+  openManageBackgroundSections();
+  showToast("Background section added.");
+}
+
+function addBackgroundItem(event) {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  const sectionId = String(formData.get("sectionId") || "");
+  const label = String(formData.get("label") || "").trim();
+  if (!sectionId || !label) return;
+  const next = structuredClone(state);
+  const section = next.settings.backgroundSections.find((entry) => entry.id === sectionId);
+  if (!section) return;
+  section.items.push({
+    id: uniqueBackgroundItemId(label, section.items),
+    label,
+    amount: Number(formData.get("amount")) || 0,
+    frequency: String(formData.get("frequency") || "monthly"),
+    type: String(formData.get("type") || section.type || "other"),
+    includeInGap: formData.has("includeInGap"),
+    includeInProjection: formData.has("includeInProjection"),
+    includeInSummary: formData.has("includeInSummary"),
+    active: formData.has("active"),
+    archived: false
+  });
+  state = normalizeState(next);
+  saveState();
+  openManageBackgroundSections();
+  showToast("Background item added.");
+}
+
+function renderBackgroundTypeOptions(selected = "other") {
+  const options = [
+    ["income", "Income"],
+    ["fixed", "Fixed"],
+    ["debt", "Debt"],
+    ["investment", "Investment"],
+    ["other", "Other"]
+  ];
+  return options
+    .map(([value, label]) => `<option value="${value}" ${selected === value ? "selected" : ""}>${label}</option>`)
+    .join("");
+}
+
+function archiveBackgroundSection(sectionId) {
+  const next = structuredClone(state);
+  const section = next.settings.backgroundSections.find((entry) => entry.id === sectionId);
+  if (!section) return;
+  section.active = false;
+  section.archived = true;
+  state = normalizeState(next);
+  saveState();
+  openManageBackgroundSections();
+}
+
+function restoreBackgroundSection(sectionId) {
+  const next = structuredClone(state);
+  const section = next.settings.backgroundSections.find((entry) => entry.id === sectionId);
+  if (!section) return;
+  section.active = true;
+  section.archived = false;
+  state = normalizeState(next);
+  saveState();
+  openManageBackgroundSections();
+}
+
+function recalcReserveFromLedger() {
+  state.settings.systemCore.reserveBalanceNow = calculateReserveFromLedger(state.settings.reserveSchedule);
+  saveState();
+  showToast("Reserve recalculated from ledger.");
+  render();
+}
+
+function exportJSON() {
+  downloadText(`finance-cashflow-os-v11-${state.ui.selectedMonth}.json`, JSON.stringify(state, null, 2), "application/json");
+  showToast("JSON exported.");
+}
+
+function importJSON(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
     try {
       const parsed = JSON.parse(String(reader.result || "{}"));
-      state = normalizeState(parsed.data || parsed);
-      save();
-      showToast("JSON import complete");
-      renderChrome();
+      const candidate = adaptImportedPayload(parsed.data || parsed);
+      state = normalizeState(deepMerge(state, candidate));
+      saveState();
+      showToast("JSON imported.");
       render();
     } catch {
-      showToast("JSON import failed");
+      showToast("Invalid JSON import.");
     }
   };
   reader.readAsText(file);
 }
 
-function emptyImportState() {
+function adaptImportedPayload(raw) {
+  if (!isObject(raw)) return {};
+  if (raw.schemaVersion === SCHEMA_VERSION || raw.appVersion === APP_VERSION) return raw;
+  if (raw.currentMonth || raw.yearPlanVersions || raw.poolEntries) return migrateFromBoxBudgetV3(raw);
+  if (raw.settings?.income || raw.settings?.coreIncome || raw.settings?.reserveIncome || raw.weeklyBudgetAdjustments) {
+    return migrateFromPlannerV2(raw);
+  }
+  return raw;
+}
+
+function resetData() {
+  if (!confirm("Reset local tracker data?")) return;
+  state = structuredClone(DEFAULT_STATE);
+  saveState();
+  showToast("Local data reset.");
+  render();
+}
+
+function calculateReserveFromLedger(schedule) {
+  return sum([
+    schedule?.preMay,
+    schedule?.may,
+    schedule?.june,
+    schedule?.july,
+    schedule?.august,
+    schedule?.september,
+    schedule?.october,
+    schedule?.november,
+    schedule?.december
+  ]);
+}
+
+function calculateTotals() {
+  const categories = getCategories().filter((item) => item.active && !item.archived);
   return {
-    ...structuredClone(demoState),
-    appVersion: APP_VERSION,
-    activeTab: "overview",
-    activeWallet: "vewu",
-    selectedBox: "",
-    yearPlanVersions: [],
-    monthlyOverrides: {},
-    transactions: [],
-    poolEntries: [],
-    historicalMonths: [],
-    receivables: [],
-    receivablePayments: [],
-    investmentSnapshots: [],
-    netWorthSnapshots: [],
-    debtPlans: [],
-    closedMonths: {},
-    _planItems: []
+    coreIncome: calculateSectionTotal("core-income"),
+    reserveIncome: calculateSectionTotal("reserve-income"),
+    investment: calculateInvestmentTotal(),
+    fixed: calculateTotalByType("fixed"),
+    debt: calculateTotalByType("debt"),
+    variableEssentials: sum(categories.filter((item) => item.includeInVariableTotal && getMonitorBehaviorType(item) === "essentials").map((item) => Number(item.monthlyBudget) || 0)),
+    discretionary: sum(categories.filter((item) => item.includeInVariableTotal && getMonitorBehaviorType(item) === "discretionary").map((item) => Number(item.monthlyBudget) || 0)),
+    variableTotal: sum(categories.filter((item) => item.includeInVariableTotal).map((item) => Number(item.monthlyBudget) || 0)),
+    reserveLedger: calculateReserveFromLedger(state.settings.reserveSchedule)
+    ,
+    reserveAccountsTotal: calculateReserveFromLedger(state.settings.reserveSchedule),
+    fixedDebtTotal: calculateFixedDebtTotal(),
+    incomeTotal: calculateIncomeTotal()
   };
 }
 
-function importCsvRow(next, row) {
-  const type = row.record_type;
-  if (type === "transaction") next.transactions.push(coerceRecord(row, ["amount"], ["excludedFromBudget"]));
-  if (type === "reserve_entry") next.poolEntries.push(coerceRecord(row, ["amount"], []));
-  if (type === "budget_month") next.historicalMonths.push({ ...coerceRecord(row, ["incomeActual", "fixedBillsActual", "debtPaymentsActual", "autoLockedActual", "savedAmount", "poolInflows", "poolOutflows", "poolEnding"], ["closed"]), boxes: parseJsonCell(row.boxes, {}) });
-  if (type === "receivable") next.receivables.push(coerceRecord(row, ["startingBalance", "currentBalance", "expectedPayment", "interestRate"], []));
-  if (type === "receivable_payment") next.receivablePayments.push(coerceRecord(row, ["amount"], []));
-  if (type === "investment_snapshot") next.investmentSnapshots.push(coerceRecord(row, ["marketValue", "contribution", "withdrawal"], []));
-  if (type === "net_worth_snapshot") next.netWorthSnapshots.push(coerceRecord(row, ["cashPool", "receivables", "investments", "homeEquity", "otherAssets", "mortgageBalance", "carLoanBalance", "otherLiabilities", "netWorth"], []));
-  if (type === "debt_plan") next.debtPlans.push(coerceRecord(row, ["startingBalance", "currentBalance", "monthlyPayment", "interestRate"], []));
-  if (type === "year_plan_version") next.yearPlanVersions.push({ versionId: row.versionId, effectiveFrom: row.effectiveFrom, createdAt: row.createdAt, plan: parseJsonCell(row.plan, {}) });
-  if (type === "plan_item") next._planItems.push(row);
-  if (type === "monthly_override") {
-    next.monthlyOverrides[row.month] ||= {};
-    next.monthlyOverrides[row.month][row.wallet] = parseJsonCell(row.patch, {});
+function deepMerge(base, extra) {
+  if (Array.isArray(base) || Array.isArray(extra)) {
+    return structuredClone(extra ?? base);
   }
-  if (type === "month_close") {
-    next.closedMonths[row.month] ||= {};
-    next.closedMonths[row.month][row.wallet] = {
-      closed: parseBoolean(row.closed),
-      closedAt: row.closedAt,
-      summaryText: row.summaryText || "",
-      summary: parseJsonCell(row.summary, {})
-    };
+  if (!isObject(base) || !isObject(extra)) {
+    return extra === undefined ? structuredClone(base) : structuredClone(extra);
   }
-}
-
-function buildPlanVersionsFromPlanItems(rows) {
-  const versions = new Map();
-  rows.forEach((row) => {
-    const versionId = row.versionId || `${row.effectiveFrom || APP_MONTH}-plan`;
-    const effectiveFrom = row.effectiveFrom || APP_MONTH;
-    if (!versions.has(versionId)) {
-      versions.set(versionId, {
-        versionId,
-        effectiveFrom,
-        createdAt: new Date().toISOString(),
-        plan: {
-          vewu: blankWalletPlan("vewu"),
-          pw: blankWalletPlan("pw")
-        }
-      });
-    }
-    const version = versions.get(versionId);
-    const wallet = row.wallet || "vewu";
-    version.plan[wallet] ||= blankWalletPlan(wallet);
-    const plan = version.plan[wallet];
-    const amount = Number(row.amount) || 0;
-    const itemId = row.itemId || slugify(row.name);
-    if (row.section === "income_sources") plan.incomeDefaults.push({ id: itemId, name: row.name, amount });
-    if (row.section === "fixed_bills") plan.autoFixedItems.push({ id: itemId, name: row.name, amount });
-    if (row.section === "baseline_saving") plan.baselineSavingItems.push({ id: itemId, name: row.name, amount });
-    if (row.section === "spending_boxes") plan.boxes[itemId] = { name: row.name, budget: amount };
-    if (row.section === "reserve") plan.pool.startingBalance = amount;
-  });
-  return [...versions.values()].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
-}
-
-function blankWalletPlan(wallet) {
-  return {
-    incomeDefaults: [],
-    autoFixedItems: [],
-    baselineSavingItems: [],
-    boxes: {},
-    pool: {
-      name: wallets[wallet]?.reserveLabel || "Reserve",
-      startingBalance: 0
-    },
-    extraIncomeRule: wallet === "pw" ? "Personal refunds default to Saved Money Reserve." : "Extra income defaults to Cash Reserve."
-  };
-}
-
-function coerceRecord(row, numberFields, booleanFields) {
-  const record = { ...row };
-  delete record.app_version;
-  delete record.exported_at;
-  delete record.record_type;
-  Object.keys(record).forEach((key) => {
-    if (record[key] === "") delete record[key];
-  });
-  numberFields.forEach((field) => {
-    if (record[field] !== undefined && record[field] !== "") record[field] = Number(record[field]) || 0;
-  });
-  booleanFields.forEach((field) => {
-    record[field] = parseBoolean(record[field]);
-  });
-  return record;
-}
-
-function parseBoolean(value) {
-  return value === true || value === "true" || value === "1";
-}
-
-function parseJsonCell(value, fallback) {
-  if (!value) return fallback;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return fallback;
-  }
-}
-
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
-  let cell = "";
-  let inQuotes = false;
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
-    const next = text[index + 1];
-    if (char === '"' && inQuotes && next === '"') {
-      cell += '"';
-      index += 1;
-    } else if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === "," && !inQuotes) {
-      row.push(cell);
-      cell = "";
-    } else if ((char === "\n" || char === "\r") && !inQuotes) {
-      if (char === "\r" && next === "\n") index += 1;
-      row.push(cell);
-      rows.push(row);
-      row = [];
-      cell = "";
+  const result = structuredClone(base);
+  Object.entries(extra).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      result[key] = structuredClone(value);
+    } else if (isObject(value) && isObject(result[key])) {
+      result[key] = deepMerge(result[key], value);
     } else {
-      cell += char;
+      result[key] = structuredClone(value);
     }
-  }
-  if (cell || row.length) {
-    row.push(cell);
-    rows.push(row);
-  }
-  const headers = rows.shift() || [];
-  return rows
-    .filter((values) => values.some((value) => value !== ""))
-    .map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""])));
+  });
+  return result;
 }
 
-function csvCell(value) {
-  const text = value === undefined || value === null ? "" : String(value);
-  return `"${text.replaceAll('"', '""')}"`;
+function setByPath(target, path, value) {
+  const parts = path.split(".");
+  let ref = target;
+  while (parts.length > 1) {
+    const key = parts.shift();
+    ref[key] ||= {};
+    ref = ref[key];
+  }
+  ref[parts[0]] = value;
+}
+
+function findAmount(items, aliases, fallback) {
+  if (!Array.isArray(items)) return fallback;
+  const match = items.find((item) => aliases.some((alias) => item?.id === alias || String(item?.name || "").includes(alias)));
+  return Number(match?.amount ?? match?.monthlyPayment) || fallback;
+}
+
+function pickReserveSchedule(ledger) {
+  if (!ledger || !isObject(ledger)) return {};
+  return {
+    preMay: ledger.preMay ?? 2700,
+    may: ledger.may ?? 1531,
+    june: ledger.june ?? null,
+    july: ledger.july ?? null,
+    august: ledger.august ?? null,
+    september: ledger.september ?? null,
+    october: ledger.october ?? null,
+    november: ledger.november ?? null,
+    december: ledger.december ?? null
+  };
+}
+
+function deriveReserveFromBoxBudget(raw) {
+  const poolEntries = Array.isArray(raw?.poolEntries) ? raw.poolEntries : [];
+  const net = poolEntries.reduce((acc, entry) => {
+    const amount = Number(entry?.amount) || 0;
+    const type = String(entry?.type || "").toLowerCase();
+    return acc + (type === "spend" ? -amount : amount);
+  }, 4231);
+  return Math.round(net);
+}
+
+function isObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value);
+}
+
+function currentMonthKey() {
+  return currentDateISO().slice(0, 7);
+}
+
+function currentDateISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function defaultDateForMonth(monthKey) {
+  return monthKey === currentMonthKey() ? currentDateISO() : `${monthKey}-01`;
+}
+
+function firstOfNextMonth(dateISO) {
+  const [year, month] = dateISO.slice(0, 7).split("-").map(Number);
+  const next = month === 12 ? [year + 1, 1] : [year, month + 1];
+  return `${next[0]}-${String(next[1]).padStart(2, "0")}-01`;
+}
+
+function monthDiffExclusive(startDateISO, targetDateISO) {
+  const startMonth = startDateISO.slice(0, 7);
+  const targetMonth = targetDateISO.slice(0, 7);
+  const [startYear, startMonthNumber] = startMonth.split("-").map(Number);
+  const [targetYear, targetMonthNumber] = targetMonth.split("-").map(Number);
+  const diff = (targetYear - startYear) * 12 + (targetMonthNumber - startMonthNumber);
+  return Math.max(0, diff);
+}
+
+function countProjectionSteps(startDateISO, targetDateISO) {
+  let steps = 0;
+  let cursor = firstOfNextMonth(startDateISO);
+  while (cursor < targetDateISO) {
+    steps += 1;
+    cursor = firstOfNextMonth(cursor);
+  }
+  return steps;
+}
+
+function shiftDateISO(dateISO, days) {
+  const date = new Date(`${dateISO}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function clampPercent(value) {
+  return Math.max(0, Math.min(100, Number(value) || 0));
+}
+
+function showToast(message) {
+  clearTimeout(toastTimer);
+  document.querySelectorAll(".toast").forEach((node) => node.remove());
+  const template = document.querySelector("#toastTemplate");
+  const node = template.content.firstElementChild.cloneNode(true);
+  node.textContent = message;
+  document.body.appendChild(node);
+  toastTimer = setTimeout(() => node.remove(), 2200);
 }
 
 function downloadText(filename, text, type) {
   const blob = new Blob([text], { type });
   const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
   URL.revokeObjectURL(url);
-}
-
-function resetDemo() {
-  if (!confirm("Reset demo data?")) return;
-  state = structuredClone(demoState);
-  save();
-  showToast("Demo restored");
-  renderChrome();
-  render();
-}
-
-function defaultDate() {
-  const today = getReferenceDate();
-  const month = today.toISOString().slice(0, 7);
-  if (month === state.currentMonth) return today.toISOString().slice(0, 10);
-  return `${state.currentMonth}-01`;
-}
-
-function getReferenceDate() {
-  const today = new Date();
-  const month = today.toISOString().slice(0, 7);
-  if (month === state.currentMonth) return today;
-  const [year, monthIndex] = state.currentMonth.split("-").map(Number);
-  return new Date(year, monthIndex, 0);
-}
-
-function getDaysInMonth(month) {
-  const [year, monthIndex] = month.split("-").map(Number);
-  return new Date(year, monthIndex, 0).getDate();
-}
-
-function getElapsedDays(month) {
-  const [year, monthIndex] = month.split("-").map(Number);
-  const today = new Date();
-  if (today.getFullYear() === year && today.getMonth() + 1 === monthIndex) return today.getDate();
-  if (today < new Date(year, monthIndex - 1, 1)) return 1;
-  return getDaysInMonth(month);
-}
-
-function getDayOfMonth(month) {
-  return getElapsedDays(month);
-}
-
-function getDaysLeft(month) {
-  return Math.max(1, getDaysInMonth(month) - getElapsedDays(month) + 1);
-}
-
-function getMonthElapsedPercent(month) {
-  return getElapsedDays(month) / getDaysInMonth(month);
-}
-
-function isThisWeek(dateString) {
-  const date = new Date(`${dateString}T00:00:00`);
-  const now = new Date();
-  const start = new Date(now);
-  start.setDate(now.getDate() - now.getDay());
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(start.getDate() + 7);
-  return date >= start && date < end;
-}
-
-function nextMonthKey(month) {
-  const [year, monthIndex] = month.split("-").map(Number);
-  const next = monthIndex === 12 ? { year: year + 1, month: 1 } : { year, month: monthIndex + 1 };
-  return `${next.year}-${String(next.month).padStart(2, "0")}`;
 }
 
 function money(value) {
   const amount = Number(value) || 0;
-  const displayAmount = Math.round(Math.abs(amount));
-  const formatted = displayAmount.toLocaleString("en-CA", { maximumFractionDigits: 0, minimumFractionDigits: 0 });
+  const rounded = Math.round(Math.abs(amount));
+  const formatted = rounded.toLocaleString("en-CA", { maximumFractionDigits: 0 });
   return amount < 0 ? `-$${formatted}` : `$${formatted}`;
 }
 
-function formatDate(date) {
-  return new Date(`${date}T00:00:00`).toLocaleDateString("en-CA", { month: "short", day: "numeric" });
+function percent(value) {
+  return `${Number(value || 0).toFixed(1)}%`;
 }
 
-function formatMonthLabel(month) {
-  return new Date(`${month}-01T00:00:00`).toLocaleDateString("en-CA", { month: "long", year: "numeric" });
+function formatDate(dateISO) {
+  return new Date(`${dateISO}T00:00:00`).toLocaleDateString("en-CA", {
+    month: "short",
+    day: "numeric"
+  });
+}
+
+function startCase(value) {
+  return String(value)
+    .replace(/([A-Z])/g, " $1")
+    .replace(/[_-]+/g, " ")
+    .replace(/^\w/, (letter) => letter.toUpperCase())
+    .trim();
+}
+
+function slugify(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function camelCaseFromSlug(value) {
+  return String(value || "")
+    .split("-")
+    .filter(Boolean)
+    .map((part, index) => (index === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)))
+    .join("");
+}
+
+function uniqueCategoryId(label, existing) {
+  return uniqueSlug(label, existing.map((item) => item.id));
+}
+
+function uniqueSectionId(label, existing) {
+  return uniqueSlug(label, existing.map((item) => item.id));
+}
+
+function uniqueBackgroundItemId(label, existing) {
+  return uniqueSlug(label, existing.map((item) => item.id));
+}
+
+function uniqueSlug(label, usedIds) {
+  const base = slugify(label) || "item";
+  let candidate = base;
+  let index = 2;
+  const used = new Set(usedIds);
+  while (used.has(candidate)) {
+    candidate = `${base}-${index}`;
+    index += 1;
+  }
+  return candidate;
+}
+
+function nullableNumber(value) {
+  if (value == null || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function sum(values) {
+  return values.reduce((acc, value) => acc + (Number(value) || 0), 0);
 }
 
 function uid(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function slugify(value) {
-  const slug = String(value || "")
-    .trim()
-    .toLowerCase()
-    .replaceAll("&", " and ")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return slug || uid("item");
 }
 
 function escapeHtml(value) {
@@ -3229,14 +3230,5 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function showToast(message) {
-  const template = document.querySelector("#toastTemplate");
-  const toast = template.content.firstElementChild.cloneNode(true);
-  toast.textContent = message;
-  document.body.appendChild(toast);
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.remove(), 1900);
+    .replaceAll("'", "&#39;");
 }

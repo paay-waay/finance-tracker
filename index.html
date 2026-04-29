@@ -2,39 +2,42 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Finance Tracker</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Finance Tracker · v13.1 Planning Edit Mode</title>
     <link rel="manifest" href="./manifest.json" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
     <meta name="theme-color" content="#111111" />
-    <meta name="application-name" content="Finance Tracker" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Finance Tracker" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <div>
+        <div class="topbar-main">
           <p class="eyebrow">Finance Tracker</p>
-          <h1 id="pageTitle">Overview</h1>
-          <p id="versionBadge" class="version-badge">v10.0-github-pages</p>
-        </div>
-        <div class="top-actions">
-          <label class="month-field">
-            <span>Month</span>
-            <input id="monthInput" type="month" />
-          </label>
+          <div class="title-row">
+            <h1 id="pageTitle">Monitor</h1>
+            <span id="headerStatus" class="header-status-pill safe">Safe</span>
+          </div>
+          <div class="topbar-controls">
+            <label class="month-field month-chip">
+              <span>Month</span>
+              <input id="monthInput" type="month" />
+            </label>
+            <div class="scope-switch" role="tablist" aria-label="Monitor scope">
+              <button id="scopeWeekButton" class="scope-button is-active" type="button" data-scope="week">Week</button>
+              <button id="scopeMonthButton" class="scope-button" type="button" data-scope="month">Month</button>
+            </div>
+          </div>
+          <p class="version-badge">v13.1 Planning Edit Mode</p>
         </div>
       </header>
 
-      <div id="walletToggle" class="wallet-toggle" aria-label="Wallet toggle"></div>
+      <main id="app" class="app-main"></main>
 
-      <main id="app" class="app-main" aria-live="polite"></main>
-
-      <nav id="bottomNav" class="bottom-nav" aria-label="Main navigation"></nav>
+      <nav id="bottomNav" class="bottom-nav" aria-label="Primary"></nav>
     </div>
 
     <div id="modalRoot"></div>
@@ -45,7 +48,7 @@
 
     <script src="./app.js"></script>
     <script>
-      if ("serviceWorker" in navigator) {
+      if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => {
           navigator.serviceWorker.register("./sw.js").catch(() => {});
         });

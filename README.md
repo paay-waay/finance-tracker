@@ -1,10 +1,20 @@
 # Finance Tracker
 
-Personal monthly finance dashboard for GitHub Pages.
+Household Cashflow Operating System for GitHub Pages.
 
 ## What this app does
 
-Finance Tracker is a static, private-use budget dashboard. It tracks monthly spending, category pace, reserve coverage, income/fixed/debt plans, CSV/JSON backups, receivables, investments, and long-term reports using browser `localStorage`.
+Finance Tracker is a static, private-use household cashflow dashboard. It focuses on three questions:
+
+1. Is reserve still safe?
+2. Is this week's variable spending under control?
+3. If nothing changes, what happens by September and January?
+
+The app keeps all data in browser `localStorage` and uses a three-tab structure:
+
+- `Home`: reserve hero, projections, variable pace, weekly discipline
+- `Transactions`: only four variable categories
+- `Settings`: reserve schedule, budgets, background data, import/export/reset
 
 There is no backend, login system, database, serverless function, third-party deployment platform, or paid service dependency.
 
@@ -67,9 +77,10 @@ The PWA manifest uses `/finance-tracker/` as both `start_url` and `scope`.
 
 All tracker data is stored locally in the browser. Export backups regularly.
 
-- Use **Settings → Data → Export JSON** for full restore backups.
-- Use **Settings → Data → Export CSV** for spreadsheet analysis.
+- Use **Settings → Export JSON** for full restore backups.
 - Restore after Safari data loss by importing JSON.
+- Current primary storage key: `financeCashflowOS_v11`
+- Compatible legacy keys: `financePlanner_v2`, `finance-box-budget-v3`
 
 ## Troubleshooting
 
