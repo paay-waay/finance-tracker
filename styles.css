@@ -91,7 +91,11 @@ h3 {
 
 .topbar-main {
   display: grid;
-  gap: 8px;
+  gap: 6px;
+}
+
+.topbar > .topbar-main > .eyebrow {
+  display: none;
 }
 
 .title-row {
@@ -346,6 +350,11 @@ h3 {
 .tone-red {
   background: var(--red-soft);
   color: #8f4637;
+}
+
+.tone-neutral {
+  background: var(--slate-soft);
+  color: var(--muted);
 }
 
 .status-dot {
@@ -693,6 +702,11 @@ h3 {
   color: #8f4637;
 }
 
+.tone-neutral .visual-head span {
+  background: var(--slate-soft);
+  color: var(--muted);
+}
+
 .runway-blocks {
   display: grid;
   gap: 6px;
@@ -890,6 +904,10 @@ h3 {
 
 .budget-bar.red .budget-fill {
   background: var(--red);
+}
+
+.budget-bar.neutral .budget-fill {
+  background: #879194;
 }
 
 .budget-marker,
@@ -1157,8 +1175,16 @@ h3 {
   position: relative;
 }
 
+.monitor-box[data-monitor-card] {
+  cursor: pointer;
+}
+
 .monitor-box.ok {
   background: linear-gradient(180deg, rgba(250, 253, 248, 0.98), rgba(244, 249, 241, 0.94));
+}
+
+.monitor-box.info {
+  background: linear-gradient(180deg, rgba(250, 251, 251, 0.98), rgba(239, 243, 244, 0.94));
 }
 
 .monitor-box.watch {
@@ -1186,6 +1212,14 @@ h3 {
 
 .monitor-box.ok::before {
   background: var(--green);
+}
+
+.monitor-box.info {
+  border-color: rgba(117, 132, 136, 0.42);
+}
+
+.monitor-box.info::before {
+  background: #879194;
 }
 
 .monitor-box.watch,
@@ -1243,6 +1277,27 @@ h3 {
   margin-top: auto;
 }
 
+.monitor-details {
+  border-top: 1px solid rgba(122, 111, 95, 0.16);
+  display: grid;
+  gap: 7px;
+  padding-top: 10px;
+}
+
+.monitor-details span {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 12px;
+  font-weight: 800;
+  justify-content: space-between;
+}
+
+.monitor-details strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
 .empty-inline {
   color: var(--muted);
   font-size: 12px;
@@ -1259,6 +1314,11 @@ h3 {
 .ok .monitor-status {
   background: var(--green-soft);
   color: #4e6648;
+}
+
+.info .monitor-status {
+  background: #e9eeef;
+  color: #586568;
 }
 
 .watch .monitor-status {
@@ -1417,6 +1477,71 @@ h3 {
   padding: 11px;
 }
 
+.planning-status-tile {
+  background: var(--paper-soft);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: grid;
+  gap: 7px;
+  padding: 11px;
+}
+
+.planning-status-tile strong {
+  font-size: 14px;
+  line-height: 1.15;
+}
+
+.planning-status-tile em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.review-checklist {
+  background: var(--paper-soft);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.review-checklist span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.weak-card {
+  box-shadow: none;
+}
+
+.legacy-details summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  list-style: none;
+}
+
+.legacy-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.legacy-details summary span {
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.legacy-details summary em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
 .budget-card-head,
 .background-item-card {
   justify-content: space-between;
@@ -1501,6 +1626,11 @@ h3 {
   font-size: 23px;
   font-weight: 950;
   margin-top: 3px;
+}
+
+.planning-status-tile strong {
+  font-size: 14px;
+  margin-top: 0;
 }
 
 .reserve-planning-card {

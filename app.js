@@ -1,4 +1,4 @@
-const APP_VERSION = "v13.1 Planning Edit Mode";
+const APP_VERSION = "v13.3 Workflow Simplification + Review Rituals";
 const SCHEMA_VERSION = 11;
 const STORAGE_KEY = "financeCashflowOS_v11";
 const LEGACY_KEYS = ["financePlanner_v2", "finance-box-budget-v3"];
@@ -148,6 +148,60 @@ const DEFAULT_BACKGROUND_SECTIONS = [
   }
 ];
 
+const DEFAULT_RESERVE = {
+  projectionAnchorMonth: currentMonthKey(),
+  accounts: [
+    {
+      id: "cash-reserve",
+      label: "Cash Reserve",
+      balance: 4231,
+      includeInRunway: true,
+      includeInVaultTotal: true,
+      active: true,
+      archived: false,
+      displayOrder: 1
+    }
+  ],
+  events: [
+    {
+      id: "stable-gap",
+      label: "Stable Base Gap",
+      type: "monthly",
+      amount: -669,
+      startMonth: "2026-05",
+      endMonth: null,
+      active: true,
+      archived: false,
+      affectsProjection: true,
+      displayOrder: 1
+    },
+    {
+      id: "mv-contrib-may-aug",
+      label: "MV Contrib",
+      type: "monthly",
+      amount: 1500,
+      startMonth: "2026-05",
+      endMonth: "2026-08",
+      active: true,
+      archived: false,
+      affectsProjection: true,
+      displayOrder: 2
+    },
+    {
+      id: "leo-debt-2026",
+      label: "Leo Debt",
+      type: "monthly",
+      amount: 700,
+      startMonth: "2026-05",
+      endMonth: "2026-12",
+      active: true,
+      archived: false,
+      affectsProjection: true,
+      displayOrder: 3
+    }
+  ]
+};
+
 const LEGACY_CATEGORY_ALIASES = {
   groceries: ["groceries", "grocery", "food & groceries"],
   charging: ["charging", "charging/407", "car407", "407", "car / charging / 407"],
@@ -171,13 +225,15 @@ const DEFAULT_STATE = {
     monitorScope: "week",
     planningOpenSections: {
       summary: true,
+      review: false,
       budget: false,
       reserve: false,
       ledger: false,
       background: false,
       data: false
     },
-    lastTransactionTemplate: null
+    lastTransactionTemplate: null,
+    monitorExpandedCards: {}
   },
   settings: {
     systemCore: {
@@ -213,6 +269,7 @@ const DEFAULT_STATE = {
       sepToDecMonthlyNet: 31,
       janPlusMonthlyNet: -669
     },
+    reserve: structuredClone(DEFAULT_RESERVE),
     background: {
       coreIncome: {
         pwSalary: 5897
@@ -241,7 +298,8 @@ const DEFAULT_STATE = {
   },
   transactions: [],
   weeklyBudgetAdjustments: {},
-  weeklyClosures: {}
+  weeklyClosures: {},
+  monthReviews: {}
 };
 
 let state = loadState();
@@ -326,6 +384,7 @@ function normalizeState(raw) {
     merged.ui.planningOpenSections || {}
   );
   merged.ui.lastTransactionTemplate = normalizeTemplate(merged.ui.lastTransactionTemplate);
+  merged.ui.monitorExpandedCards = isObject(merged.ui.monitorExpandedCards) ? merged.ui.monitorExpandedCards : {};
   merged.settings ||= structuredClone(DEFAULT_STATE.settings);
   merged.settings.weeklyRules ||= structuredClone(DEFAULT_STATE.settings.weeklyRules);
   merged.settings.weeklyRules.defaultSoftCapMultiplier ||= 1.1;
@@ -339,11 +398,17 @@ function normalizeState(raw) {
       ? raw.settings.backgroundSections
       : buildBackgroundSectionsFromLegacy(merged.settings.background)
   );
+  merged.settings.reserve = normalizeReserve(
+    isObject(raw?.settings?.reserve) ? raw.settings.reserve : buildReserveFromLegacy(merged.settings, merged.ui.selectedMonth)
+  );
+  merged.settings.systemCore.reserveBalanceNow = calculateReserveVaultTotalFromSettings(merged.settings);
+  merged.settings.systemCore.stableBaseGapMonthly = getStableGapFromSettings(merged.settings);
   merged.settings.budgetsMonthly = buildLegacyBudgetsMonthly(merged.settings.monitorCategories);
   merged.settings.background = buildLegacyBackgroundFromSections(merged.settings.backgroundSections, merged.settings.background);
   merged.transactions = Array.isArray(merged.transactions) ? merged.transactions.map(normalizeTransaction).filter(Boolean) : [];
   merged.weeklyBudgetAdjustments = normalizeAdjustments(merged.weeklyBudgetAdjustments);
   merged.weeklyClosures = normalizeClosures(merged.weeklyClosures);
+  merged.monthReviews = isObject(merged.monthReviews) ? merged.monthReviews : {};
   return merged;
 }
 
@@ -411,16 +476,115 @@ function normalizeBackgroundSections(sections) {
     .sort((a, b) => a.displayOrder - b.displayOrder);
 }
 
+function normalizeReserve(reserve) {
+  const source = isObject(reserve) ? reserve : DEFAULT_RESERVE;
+  const accounts = Array.isArray(source.accounts) && source.accounts.length ? source.accounts : DEFAULT_RESERVE.accounts;
+  const events = Array.isArray(source.events) && source.events.length ? source.events : DEFAULT_RESERVE.events;
+  return {
+    projectionAnchorMonth: normalizeMonthValue(source.projectionAnchorMonth || source.anchorMonth) || currentMonthKey(),
+    accounts: accounts
+      .map((account, index) => ({
+        id: String(account?.id || slugify(account?.label || `reserve-account-${index + 1}`)),
+        label: String(account?.label || `Reserve Account ${index + 1}`),
+        balance: Number(account?.balance) || 0,
+        includeInRunway: account?.includeInRunway !== false,
+        includeInVaultTotal: account?.includeInVaultTotal !== false,
+        active: account?.active !== false,
+        archived: Boolean(account?.archived),
+        displayOrder: Number(account?.displayOrder ?? index + 1) || index + 1
+      }))
+      .sort((a, b) => a.displayOrder - b.displayOrder),
+    events: events
+      .map((event, index) => ({
+        id: String(event?.id || slugify(event?.label || `reserve-event-${index + 1}`)),
+        label: String(event?.label || `Reserve Event ${index + 1}`),
+        type: event?.type === "oneTime" ? "oneTime" : "monthly",
+        amount: Number(event?.amount) || 0,
+        startMonth: normalizeMonthValue(event?.startMonth) || currentMonthKey(),
+        endMonth: normalizeMonthValue(event?.endMonth),
+        month: normalizeMonthValue(event?.month),
+        active: event?.active !== false,
+        archived: Boolean(event?.archived),
+        affectsProjection: event?.affectsProjection !== false,
+        displayOrder: Number(event?.displayOrder ?? index + 1) || index + 1
+      }))
+      .sort((a, b) => a.displayOrder - b.displayOrder)
+  };
+}
+
+function buildReserveFromLegacy(settings = {}, selectedMonth = currentMonthKey()) {
+  const background = settings?.background || {};
+  const reserveIncome = background.reserveIncome || {};
+  return {
+    projectionAnchorMonth: currentMonthKey(),
+    accounts: [
+      {
+        id: "cash-reserve",
+        label: "Cash Reserve",
+        balance: Number(settings?.systemCore?.reserveBalanceNow) || 4231,
+        includeInRunway: true,
+        includeInVaultTotal: true,
+        active: true,
+        archived: false,
+        displayOrder: 1
+      }
+    ],
+    events: [
+      {
+        id: "stable-gap",
+        label: "Stable Base Gap",
+        type: "monthly",
+        amount: -(Number(settings?.systemCore?.stableBaseGapMonthly) || 669),
+        startMonth: selectedMonth || currentMonthKey(),
+        endMonth: null,
+        active: true,
+        archived: false,
+        affectsProjection: true,
+        displayOrder: 1
+      },
+      {
+        id: "mv-contrib-may-aug",
+        label: "MV Contrib",
+        type: "monthly",
+        amount: Number(reserveIncome.mvContrib) || 1500,
+        startMonth: "2026-05",
+        endMonth: "2026-08",
+        active: true,
+        archived: false,
+        affectsProjection: true,
+        displayOrder: 2
+      },
+      {
+        id: "leo-debt-2026",
+        label: "Leo Debt",
+        type: "monthly",
+        amount: Number(reserveIncome.leoDebt) || 700,
+        startMonth: "2026-05",
+        endMonth: "2026-12",
+        active: true,
+        archived: false,
+        affectsProjection: true,
+        displayOrder: 3
+      }
+    ]
+  };
+}
+
 function normalizeAdjustments(raw) {
   const result = {};
   if (!isObject(raw)) return result;
   Object.entries(raw).forEach(([weekStartISO, item]) => {
+    const categoryPenalties = normalizeCategoryPenalties(item);
+    const legacy = {
+      entertainmentPenalty: Number(item?.entertainmentPenalty ?? item?.entertainment ?? 0) || 0,
+      miscPenalty: Number(item?.miscPenalty ?? item?.misc ?? 0) || 0
+    };
     result[weekStartISO] = {
       weekStartISO,
       sourceWeekStartISO: item?.sourceWeekStartISO || item?.sourceWeekKey || weekStartISO,
-      entertainmentPenalty: Number(item?.entertainmentPenalty ?? item?.entertainment ?? 0) || 0,
-      miscPenalty: Number(item?.miscPenalty ?? item?.misc ?? 0) || 0,
-      totalPenalty: Number(item?.totalPenalty ?? item?.total ?? 0) || 0
+      categoryPenalties,
+      totalPenalty: Number(item?.totalPenalty ?? item?.total) || sum(Object.values(categoryPenalties)),
+      legacy
     };
   });
   return result;
@@ -430,15 +594,35 @@ function normalizeClosures(raw) {
   const result = {};
   if (!isObject(raw)) return result;
   Object.entries(raw).forEach(([weekStartISO, item]) => {
+    const categoryPenalties = normalizeCategoryPenalties(item);
+    const legacy = {
+      entertainmentPenalty: Number(item?.entertainmentPenalty ?? 0) || 0,
+      miscPenalty: Number(item?.miscPenalty ?? 0) || 0
+    };
     result[weekStartISO] = {
       weekStartISO,
       closedAtISO: item?.closedAtISO || item?.closedAt || new Date().toISOString(),
-      entertainmentPenalty: Number(item?.entertainmentPenalty ?? 0) || 0,
-      miscPenalty: Number(item?.miscPenalty ?? 0) || 0,
-      totalPenalty: Number(item?.totalPenalty ?? 0) || 0
+      categoryPenalties,
+      totalPenalty: Number(item?.totalPenalty) || sum(Object.values(categoryPenalties)),
+      legacy
     };
   });
   return result;
+}
+
+function normalizeCategoryPenalties(item) {
+  const penalties = {};
+  if (isObject(item?.categoryPenalties)) {
+    Object.entries(item.categoryPenalties).forEach(([categoryId, amount]) => {
+      const value = Number(amount) || 0;
+      if (value > 0) penalties[categoryId] = value;
+    });
+  }
+  const entertainmentPenalty = Number(item?.entertainmentPenalty ?? item?.entertainment ?? 0) || 0;
+  const miscPenalty = Number(item?.miscPenalty ?? item?.misc ?? 0) || 0;
+  if (entertainmentPenalty > 0 && penalties.entertainment == null) penalties.entertainment = entertainmentPenalty;
+  if (miscPenalty > 0 && penalties.misc == null) penalties.misc = miscPenalty;
+  return penalties;
 }
 
 function buildMonitorCategoriesFromLegacy(settings = {}) {
@@ -811,7 +995,37 @@ function compareCategoryOrder(a, b) {
 }
 
 function getMonitorBehaviorType(category) {
-  return category?.ruleType === "penalty" ? "discretionary" : "essentials";
+  return getCategoryDisplayGroup(category);
+}
+
+function getCategoryDisplayGroup(category) {
+  const group = category?.group || "custom";
+  return ["essentials", "discretionary", "custom"].includes(group) ? group : "custom";
+}
+
+function getCategoryRuleType(category) {
+  const ruleType = category?.ruleType || "trackOnly";
+  return ["softCap", "penalty", "trackOnly"].includes(ruleType) ? ruleType : "trackOnly";
+}
+
+function isPenaltyCategory(category) {
+  return getCategoryRuleType(category) === "penalty";
+}
+
+function isSoftCapCategory(category) {
+  return getCategoryRuleType(category) === "softCap";
+}
+
+function isTrackOnlyCategory(category) {
+  return getCategoryRuleType(category) === "trackOnly";
+}
+
+function isWeeklyDisciplineCategory(category) {
+  return category?.active !== false && !category?.archived && category?.includeInWeeklyDiscipline === true;
+}
+
+function isVariableTotalCategory(category) {
+  return category?.active !== false && !category?.archived && category?.includeInVariableTotal === true;
 }
 
 function getBackgroundSections() {
@@ -860,6 +1074,82 @@ function calculateIncomeTotal() {
 
 function calculateInvestmentTotal() {
   return calculateTotalByType("investment");
+}
+
+function getReserveAccounts() {
+  return normalizeReserve(state?.settings?.reserve || DEFAULT_RESERVE).accounts;
+}
+
+function getReserveAccountById(accountId) {
+  return getReserveAccounts().find((account) => account.id === accountId) || null;
+}
+
+function getActiveReserveAccounts() {
+  return getReserveAccounts().filter((account) => account.active && !account.archived);
+}
+
+function getProjectionEvents() {
+  return normalizeReserve(state?.settings?.reserve || DEFAULT_RESERVE).events;
+}
+
+function getProjectionEventById(eventId) {
+  return getProjectionEvents().find((event) => event.id === eventId) || null;
+}
+
+function getActiveProjectionEvents() {
+  return getProjectionEvents().filter((event) => event.active && !event.archived);
+}
+
+function calculateReserveVaultTotal() {
+  return calculateReserveVaultTotalFromSettings(state.settings);
+}
+
+function calculateReserveVaultTotalFromSettings(settings) {
+  return sum(
+    normalizeReserve(settings?.reserve || DEFAULT_RESERVE).accounts
+      .filter((account) => account.active && !account.archived && account.includeInVaultTotal)
+      .map((account) => Number(account.balance) || 0)
+  );
+}
+
+function calculateReserveRunwayBalance() {
+  return calculateReserveRunwayBalanceFromSettings(state.settings);
+}
+
+function calculateReserveRunwayBalanceFromSettings(settings) {
+  return sum(
+    normalizeReserve(settings?.reserve || DEFAULT_RESERVE).accounts
+      .filter((account) => account.active && !account.archived && account.includeInRunway)
+      .map((account) => Number(account.balance) || 0)
+  );
+}
+
+function getStableGapFromSettings(settings) {
+  const stableGapEvent = normalizeReserve(settings?.reserve || DEFAULT_RESERVE).events.find(
+    (event) => event.active && !event.archived && event.id === "stable-gap"
+  );
+  if (stableGapEvent) return Math.abs(Number(stableGapEvent.amount) || 0) || Number(settings?.systemCore?.stableBaseGapMonthly) || 669;
+  return Number(settings?.systemCore?.stableBaseGapMonthly) || 669;
+}
+
+function calculateActiveProjectionMonthlyNet(monthKey) {
+  return calculateProjectionMonthlyNet(monthKey, state.settings);
+}
+
+function calculateProjectionMonthlyNet(monthKey, settings) {
+  return sum(
+    normalizeReserve(settings?.reserve || DEFAULT_RESERVE).events
+      .filter((event) => event.active && !event.archived && event.affectsProjection)
+      .filter((event) => reserveEventAppliesToMonth(event, monthKey))
+      .map((event) => Number(event.amount) || 0)
+  );
+}
+
+function reserveEventAppliesToMonth(event, monthKey) {
+  if (event.type === "oneTime") return event.month === monthKey;
+  if (!event.startMonth || monthKey < event.startMonth) return false;
+  if (event.endMonth && monthKey > event.endMonth) return false;
+  return true;
 }
 
 function isActiveBackgroundItem(item) {
@@ -960,6 +1250,15 @@ function bindPageEvents() {
   document.querySelectorAll("[data-manage-transactions]").forEach((button) => {
     button.addEventListener("click", openTransactionsManager);
   });
+  document.querySelectorAll("[data-monitor-card]").forEach((card) => {
+    card.addEventListener("click", () => toggleMonitorCardDetails(card.dataset.monitorCard));
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        toggleMonitorCardDetails(card.dataset.monitorCard);
+      }
+    });
+  });
   document.querySelector("#cancelEditButton")?.addEventListener("click", cancelEditingTransaction);
   document.querySelectorAll("[data-close-sheet]").forEach((button) => {
     button.addEventListener("click", closeQuickAdd);
@@ -969,6 +1268,9 @@ function bindPageEvents() {
   });
   document.querySelector("#closeWeekButton")?.addEventListener("click", closeWeek);
   document.querySelector("#reopenWeekButton")?.addEventListener("click", reopenWeek);
+  document.querySelector("#reviewLastWeekButton")?.addEventListener("click", reviewLastWeek);
+  document.querySelector("#markMonthReviewedButton")?.addEventListener("click", () => markMonthReviewed(state.ui.selectedMonth));
+  document.querySelector("#markBackupDoneButton")?.addEventListener("click", () => markMonthBackupDone(state.ui.selectedMonth));
   document.querySelector("#settingsForm")?.addEventListener("submit", saveSettings);
   document.querySelector("#recalcReserveButton")?.addEventListener("click", recalcReserveFromLedger);
   document.querySelector("#exportJsonButton")?.addEventListener("click", exportJSON);
@@ -983,6 +1285,9 @@ function bindPageEvents() {
   document.querySelectorAll("[data-toggle-planning]").forEach((button) => {
     button.addEventListener("click", () => togglePlanningSection(button.dataset.togglePlanning));
   });
+  document.querySelectorAll("[data-open-planning-section]").forEach((button) => {
+    button.addEventListener("click", () => openPlanningSection(button.dataset.openPlanningSection));
+  });
   document.querySelectorAll("[data-manage-budget-categories]").forEach((button) => {
     button.addEventListener("click", openManageBudgetCategories);
   });
@@ -994,6 +1299,18 @@ function bindPageEvents() {
   });
   document.querySelectorAll("[data-edit-background-item]").forEach((button) => {
     button.addEventListener("click", () => openManageBackgroundItem(button.dataset.sectionId, button.dataset.editBackgroundItem));
+  });
+  document.querySelectorAll("[data-manage-reserve-accounts]").forEach((button) => {
+    button.addEventListener("click", openManageReserveAccounts);
+  });
+  document.querySelectorAll("[data-manage-projection-events]").forEach((button) => {
+    button.addEventListener("click", openManageProjectionEvents);
+  });
+  document.querySelectorAll("[data-edit-reserve-account]").forEach((button) => {
+    button.addEventListener("click", () => openManageReserveAccount(button.dataset.editReserveAccount));
+  });
+  document.querySelectorAll("[data-edit-projection-event]").forEach((button) => {
+    button.addEventListener("click", () => openManageProjectionEvent(button.dataset.editProjectionEvent));
   });
 }
 
@@ -1007,23 +1324,45 @@ function renderMonitorPage() {
       <section class="monitor-grid" aria-label="Variable monitors">
         ${cards.length ? cards.map(renderMonitorBox).join("") : `<article class="monitor-box empty"><div class="empty-state">No monitor categories configured. Add one in Planning.</div></article>`}
       </section>
-      ${renderWeeklyDiscipline(dashboard.discipline)}
+      ${dashboard.scope === "month" ? renderMonthOutlook(dashboard.monthOutlook) : renderWeeklyDiscipline(dashboard.discipline)}
       ${renderRecentTransactionsPreview(dashboard.scope)}
     </section>
   `;
 }
 
 function renderMonitorBox(card) {
+  const isExpanded = Boolean(state.ui.monitorExpandedCards?.[card.category]);
   return `
-    <article class="monitor-box ${card.status.key}">
+    <article class="monitor-box ${card.status.key}" data-monitor-card="${escapeHtml(card.category)}" tabindex="0" aria-expanded="${isExpanded ? "true" : "false"}">
       <div class="monitor-box-head">
         <h2><span class="category-icon" aria-hidden="true">${escapeHtml(card.icon)}</span>${escapeHtml(card.label)}</h2>
         <span class="monitor-status">${escapeHtml(card.status.label)}</span>
       </div>
       <div class="monitor-spend">${money(card.primarySpent)} / ${money(card.primaryBudget)}</div>
       ${renderProgressBar(card)}
-      <p class="monitor-warning">${escapeHtml(card.secondaryLine)}</p>
+      <p class="monitor-warning">${escapeHtml(getMonitorShortLine(card))}</p>
+      ${isExpanded ? renderMonitorCardDetails(card) : ""}
     </article>
+  `;
+}
+
+function getMonitorShortLine(card) {
+  if (card.status.key === "info") return "Track only.";
+  if (card.status.key === "watch") return "Ahead of pace.";
+  if (card.status.key === "risk") return "Soft cap risk.";
+  if (card.status.key === "freeze") return "Penalty active.";
+  return "On pace.";
+}
+
+function renderMonitorCardDetails(card) {
+  return `
+    <div class="monitor-details">
+      <span>Spent so far <strong>${money(card.scope === "month" ? card.monthSpent : card.weekSpent)}</strong></span>
+      <span>Remaining this month <strong>${money(card.monthRemaining)}</strong></span>
+      <span>${card.scope === "month" ? "Monthly budget" : "Current week budget"} <strong>${money(card.primaryBudget)}</strong></span>
+      <span>Projected overshoot <strong>${money(card.projectedOvershoot)}</strong></span>
+      ${card.penalty > 0 ? `<span>Penalty detail <strong>-${money(card.penalty)} next week</strong></span>` : ""}
+    </div>
   `;
 }
 
@@ -1049,7 +1388,7 @@ function renderCompactReserveHero(reserve, projections) {
       </div>
       <div class="compact-projection-line">
         <span>Gap -${money(reserve.gap)}/mo</span>
-        <span>Sep ${money(projections.sep.value)} · Jan ${money(projections.jan.value)}</span>
+        <span>${escapeHtml(projections.sep.label)} ${money(projections.sep.value)} · ${escapeHtml(projections.jan.label)} ${money(projections.jan.value)}</span>
       </div>
     </section>
   `;
@@ -1075,7 +1414,7 @@ function renderReserveMiniStrip(reserve, projections) {
       <div class="mini-runway gold" aria-hidden="true">
         ${Array.from({ length: 12 }, (_, index) => `<i class="${index < filled ? "is-filled" : ""}"></i>`).join("")}
       </div>
-      <span>Sep ${money(projections.sep.value)} · Jan ${money(projections.jan.value)}</span>
+      <span>${escapeHtml(projections.sep.label)} ${money(projections.sep.value)} · ${escapeHtml(projections.jan.label)} ${money(projections.jan.value)}</span>
     </section>
   `;
 }
@@ -1104,8 +1443,8 @@ function renderRunwayMeter(reserve) {
 function renderProjectionTimeline(reserve, projections) {
   const nodes = [
     { label: "Now", value: reserve.balance },
-    { label: "Sep 1", value: projections.sep.value },
-    { label: "Jan 1", value: projections.jan.value }
+    { label: projections.sep.label, value: projections.sep.value },
+    { label: projections.jan.label, value: projections.jan.value }
   ];
   return `
     <section class="projection-timeline" aria-label="Reserve projection timeline">
@@ -1157,36 +1496,40 @@ function renderCategoryCard(card) {
 }
 
 function renderProgressBar(card) {
-  const maxValue = card.type === "essentials"
+  const isSoft = card.ruleType === "softCap";
+  const isPenalty = card.ruleType === "penalty";
+  const maxValue = isSoft
     ? Math.max(card.zoneSoftCap, card.markerBudget, card.projectedAmount, card.actualAmount, 1)
     : Math.max(card.markerBudget * 1.35, card.projectedAmount, card.actualAmount, 1);
   const actualFill = card.actualAmount / maxValue * 100;
   const projectedFill = Math.max(0, card.projectedAmount - card.actualAmount) / maxValue * 100;
   const budgetMarker = card.markerBudget / maxValue * 100;
-  const softMarker = card.type === "essentials" ? card.zoneSoftCap / maxValue * 100 : budgetMarker;
-  const zoneEnd = card.type === "essentials" ? softMarker : 100;
-  const penaltyWidth = card.type === "discretionary" && card.projectedOvershoot > 0
+  const softMarker = isSoft ? card.zoneSoftCap / maxValue * 100 : budgetMarker;
+  const zoneEnd = isSoft ? softMarker : 100;
+  const penaltyWidth = isPenalty && card.projectedOvershoot > 0
     ? Math.min(100 - budgetMarker, card.projectedOvershoot / maxValue * 100)
     : 0;
 
   return `
-    <div class="budget-bar ${card.type} ${card.status.tone} ${card.scope}">
-      <div class="budget-zone" style="left:${clampPercent(budgetMarker)}%; width:${clampPercent(zoneEnd - budgetMarker)}%"></div>
-      ${card.type === "discretionary" ? `<div class="penalty-zone" style="left:${clampPercent(budgetMarker)}%; width:${clampPercent(penaltyWidth)}%"></div>` : ""}
+    <div class="budget-bar ${card.ruleType} ${card.status.tone} ${card.scope}">
+      ${card.ruleType !== "trackOnly" ? `<div class="budget-zone" style="left:${clampPercent(budgetMarker)}%; width:${clampPercent(zoneEnd - budgetMarker)}%"></div>` : ""}
+      ${isPenalty ? `<div class="penalty-zone" style="left:${clampPercent(budgetMarker)}%; width:${clampPercent(penaltyWidth)}%"></div>` : ""}
       <div class="budget-fill" style="width:${clampPercent(actualFill)}%"></div>
       <div class="projected-fill" style="left:${clampPercent(actualFill)}%; width:${clampPercent(projectedFill)}%"></div>
       <i class="budget-marker" style="left:${clampPercent(budgetMarker)}%"></i>
-      ${card.type === "essentials" && card.scope === "week" ? `<i class="soft-marker" style="left:${clampPercent(softMarker)}%"></i>` : ""}
+      ${isSoft && card.scope === "week" ? `<i class="soft-marker" style="left:${clampPercent(softMarker)}%"></i>` : ""}
     </div>
   `;
 }
 
 function renderWeeklyDiscipline(discipline) {
+  const closeStatus = discipline.closeStatus || getWeeklyCloseStatus(discipline.weekKey);
+  const weakClose = closeStatus.key === "in-progress" || closeStatus.key === "last-week-open";
   return `
-    <article class="discipline-card impact-card tone-${discipline.status.tone}">
+    <article class="discipline-card impact-card tone-${closeStatus.tone}">
       <div class="visual-head">
-        <h2>This Week Impact</h2>
-        <span>${discipline.isClosed ? "Closed" : discipline.status.label}</span>
+        <h2>Weekly Close</h2>
+        <span>${escapeHtml(closeStatus.label)}</span>
       </div>
       <div class="impact-main">${discipline.nextWeekReduction > 0 ? "-" : ""}${money(discipline.nextWeekReduction)} if closed now</div>
       <div class="impact-flow">
@@ -1196,12 +1539,36 @@ function renderWeeklyDiscipline(discipline) {
         <i></i>
         <span>next week reduced</span>
       </div>
+      ${discipline.penaltyRows?.length ? `<p class="visual-note">${discipline.penaltyRows.map((row) => `${escapeHtml(row.label)} ${money(row.penalty)}`).join(" · ")}</p>` : ""}
       <p class="visual-note">Projected discretionary overshoot by Sunday: ${money(discipline.projectedDiscretionaryOvershoot)}</p>
       <div class="button-row">
-        <button id="closeWeekButton" class="action-button" type="button" ${discipline.isClosed ? "disabled" : ""}>Close Week</button>
-        <button id="reopenWeekButton" class="ghost-button" type="button">Clear Close</button>
+        ${closeStatus.key === "last-week-open" ? `<button id="reviewLastWeekButton" class="ghost-button" type="button">Review Last Week</button>` : ""}
+        <button id="closeWeekButton" class="${weakClose ? "ghost-button" : "action-button"}" type="button" ${closeStatus.key === "closed" ? "disabled" : ""}>Close Week</button>
+        ${closeStatus.key === "closed" ? `<button id="reopenWeekButton" class="ghost-button" type="button">Reopen Week</button>` : ""}
       </div>
-      <p class="visual-note">${discipline.isClosed ? "This week has already been closed." : escapeHtml(discipline.conclusion)}</p>
+      <p class="visual-note">${escapeHtml(closeStatus.message)}</p>
+    </article>
+  `;
+}
+
+function renderMonthOutlook(outlook) {
+  const diffLabel = outlook.projectedDiff >= 0 ? `${money(outlook.projectedDiff)} over` : `${money(Math.abs(outlook.projectedDiff))} under`;
+  const tone = outlook.status.key === "safe" ? "green" : outlook.status.key === "watch" ? "yellow" : "red";
+  return `
+    <article class="discipline-card impact-card month-outlook-card tone-${tone}">
+      <div class="visual-head">
+        <h2>Month Outlook</h2>
+        <span>${escapeHtml(outlook.status.label)}</span>
+      </div>
+      <div class="impact-main">${money(outlook.projectedMonthEndVariableSpend)} projected</div>
+      <div class="impact-flow">
+        <span>${money(outlook.monthlyVariableBudget)} budget</span>
+        <i></i>
+        <span>${diffLabel}</span>
+        <i></i>
+        <span>${escapeHtml(outlook.status.action)}</span>
+      </div>
+      <p class="visual-note">${outlook.atRisk.length ? outlook.atRisk.map((item) => `${escapeHtml(item.label)} ${money(item.projectedOvershoot)} over`).join(" · ") : "No categories at risk."}</p>
     </article>
   `;
 }
@@ -1330,6 +1697,66 @@ function bindManageBackgroundSectionsEvents() {
   bindSheetCloseOnly();
 }
 
+function openManageReserveAccount(accountId) {
+  const account = getReserveAccountById(accountId);
+  if (!account) return;
+  modalRoot.innerHTML = renderReserveAccountEditorSheet(account);
+  bindManageReserveAccountEvents(accountId);
+}
+
+function bindManageReserveAccountEvents(accountId) {
+  modalRoot.querySelector("#reserveAccountEditorForm")?.addEventListener("submit", (event) => saveReserveAccountEdits(event, accountId));
+  modalRoot.querySelector("[data-archive-reserve-account]")?.addEventListener("click", () => archiveReserveAccount(accountId));
+  bindSheetCloseOnly();
+}
+
+function openManageReserveAccounts() {
+  modalRoot.innerHTML = renderReserveAccountsManagerSheet();
+  bindManageReserveAccountsEvents();
+}
+
+function bindManageReserveAccountsEvents() {
+  modalRoot.querySelector("#reserveAccountsManagerForm")?.addEventListener("submit", saveReserveAccountsManager);
+  modalRoot.querySelector("#addReserveAccountForm")?.addEventListener("submit", addReserveAccount);
+  modalRoot.querySelectorAll("[data-edit-reserve-account]").forEach((button) => {
+    button.addEventListener("click", () => openManageReserveAccount(button.dataset.editReserveAccount));
+  });
+  modalRoot.querySelectorAll("[data-restore-reserve-account]").forEach((button) => {
+    button.addEventListener("click", () => restoreReserveAccount(button.dataset.restoreReserveAccount));
+  });
+  bindSheetCloseOnly();
+}
+
+function openManageProjectionEvent(eventId) {
+  const item = getProjectionEventById(eventId);
+  if (!item) return;
+  modalRoot.innerHTML = renderProjectionEventEditorSheet(item);
+  bindManageProjectionEventEvents(eventId);
+}
+
+function bindManageProjectionEventEvents(eventId) {
+  modalRoot.querySelector("#projectionEventEditorForm")?.addEventListener("submit", (event) => saveProjectionEventEdits(event, eventId));
+  modalRoot.querySelector("[data-archive-projection-event]")?.addEventListener("click", () => archiveProjectionEvent(eventId));
+  bindSheetCloseOnly();
+}
+
+function openManageProjectionEvents() {
+  modalRoot.innerHTML = renderProjectionEventsManagerSheet();
+  bindManageProjectionEventsEvents();
+}
+
+function bindManageProjectionEventsEvents() {
+  modalRoot.querySelector("#projectionEventsManagerForm")?.addEventListener("submit", saveProjectionEventsManager);
+  modalRoot.querySelector("#addProjectionEventForm")?.addEventListener("submit", addProjectionEvent);
+  modalRoot.querySelectorAll("[data-edit-projection-event]").forEach((button) => {
+    button.addEventListener("click", () => openManageProjectionEvent(button.dataset.editProjectionEvent));
+  });
+  modalRoot.querySelectorAll("[data-restore-projection-event]").forEach((button) => {
+    button.addEventListener("click", () => restoreProjectionEvent(button.dataset.restoreProjectionEvent));
+  });
+  bindSheetCloseOnly();
+}
+
 function bindSheetCloseOnly() {
   modalRoot.querySelectorAll("[data-close-sheet]").forEach((button) => {
     button.addEventListener("click", closeQuickAdd);
@@ -1382,11 +1809,11 @@ function renderRecentTransactionsPreview(scope = state.ui.monitorScope || "week"
   return `
     <section class="recent-preview">
       <div class="recent-head">
-        <h2>Recent</h2>
-        <button class="mini-button" type="button" data-manage-transactions>View all</button>
+        <h2>Recent Activity</h2>
+        <button class="mini-button" type="button" data-manage-transactions>View / Edit</button>
       </div>
       <div class="recent-feed">
-        ${recent.length ? recent.map(renderRecentTransaction).join("") : `<div class="empty-state">No transactions recorded yet.</div>`}
+        ${recent.length ? recent.map(renderRecentTransaction).join("") : `<div class="empty-state">No activity yet. Add your first entry with +.</div>`}
       </div>
     </section>
   `;
@@ -1634,6 +2061,178 @@ function renderBackgroundSectionsManagerSheet() {
   `;
 }
 
+function renderReserveAccountEditorSheet(account) {
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Edit Reserve Account">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Edit Reserve Account</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        <form id="reserveAccountEditorForm" class="quick-form">
+          <label class="field"><span>Name</span><input name="label" type="text" value="${escapeHtml(account.label)}" required /></label>
+          <label class="field"><span>Balance</span><input name="balance" type="number" step="0.01" value="${account.balance}" /></label>
+          <label class="field"><span>Display Order</span><input name="displayOrder" type="number" step="1" value="${account.displayOrder}" /></label>
+          <div class="boolean-grid">
+            ${renderCheckbox("includeInRunway", "Include in runway", account.includeInRunway)}
+            ${renderCheckbox("includeInVaultTotal", "Include in vault total", account.includeInVaultTotal)}
+            ${renderCheckbox("active", "Active", account.active)}
+          </div>
+          <div class="button-row">
+            <button class="action-button" type="submit">Save Account</button>
+            <button class="ghost-button" type="button" data-archive-reserve-account>Archive</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  `;
+}
+
+function renderReserveAccountsManagerSheet() {
+  const active = getReserveAccounts().filter((account) => !account.archived);
+  const archived = getReserveAccounts().filter((account) => account.archived);
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Manage Reserve Accounts">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Manage Reserve Accounts</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        <form id="reserveAccountsManagerForm" class="quick-form">
+          <div class="manager-list">
+            ${active.map((account) => `
+              <div class="manager-row">
+                <div class="manager-stack">
+                  <strong>${escapeHtml(account.label)}</strong>
+                  <div class="settings-note">${money(account.balance)} · ${account.includeInVaultTotal ? "in vault" : "excluded"} · ${account.includeInRunway ? "in runway" : "excluded"}</div>
+                </div>
+                <div class="manager-actions">
+                  <input class="order-input" name="account-order:${account.id}" type="number" step="1" value="${account.displayOrder}" />
+                  <button class="mini-button" type="button" data-edit-reserve-account="${account.id}">Edit</button>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+          <button class="action-button" type="submit">Save Account Order</button>
+        </form>
+        <form id="addReserveAccountForm" class="quick-form add-form">
+          <h3>Add Account</h3>
+          <label class="field"><span>Name</span><input name="label" type="text" required /></label>
+          <label class="field"><span>Balance</span><input name="balance" type="number" step="0.01" value="0" /></label>
+          <div class="boolean-grid">
+            ${renderCheckbox("includeInRunway", "Include in runway", true)}
+            ${renderCheckbox("includeInVaultTotal", "Include in vault total", true)}
+            ${renderCheckbox("active", "Active", true)}
+          </div>
+          <button class="action-button" type="submit">Add Account</button>
+        </form>
+        ${archived.length ? `
+          <section class="manager-archived">
+            <h3>Archived Accounts</h3>
+            ${archived.map((account) => `
+              <div class="manager-row">
+                <div><strong>${escapeHtml(account.label)}</strong></div>
+                <button class="mini-button" type="button" data-restore-reserve-account="${account.id}">Restore</button>
+              </div>
+            `).join("")}
+          </section>
+        ` : ""}
+      </section>
+    </div>
+  `;
+}
+
+function renderProjectionEventEditorSheet(event) {
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Edit Projection Event">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Edit Projection Event</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        <form id="projectionEventEditorForm" class="quick-form">
+          <label class="field"><span>Name</span><input name="label" type="text" value="${escapeHtml(event.label)}" required /></label>
+          <label class="field"><span>Type</span><select name="type"><option value="monthly" ${event.type === "monthly" ? "selected" : ""}>Monthly</option><option value="oneTime" ${event.type === "oneTime" ? "selected" : ""}>One Time</option></select></label>
+          <label class="field"><span>Amount</span><input name="amount" type="number" step="0.01" value="${event.amount}" /></label>
+          <label class="field"><span>Start Month</span><input name="startMonth" type="month" value="${event.startMonth || ""}" /></label>
+          <label class="field"><span>End Month</span><input name="endMonth" type="month" value="${event.endMonth || ""}" /></label>
+          <label class="field"><span>One-time Month</span><input name="month" type="month" value="${event.month || ""}" /></label>
+          <label class="field"><span>Display Order</span><input name="displayOrder" type="number" step="1" value="${event.displayOrder}" /></label>
+          <div class="boolean-grid">
+            ${renderCheckbox("affectsProjection", "Affects projection", event.affectsProjection)}
+            ${renderCheckbox("active", "Active", event.active)}
+          </div>
+          <div class="button-row">
+            <button class="action-button" type="submit">Save Event</button>
+            <button class="ghost-button" type="button" data-archive-projection-event>Archive</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  `;
+}
+
+function renderProjectionEventsManagerSheet() {
+  const active = getProjectionEvents().filter((event) => !event.archived);
+  const archived = getProjectionEvents().filter((event) => event.archived);
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Manage Projection Events">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Manage Projection Events</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        <form id="projectionEventsManagerForm" class="quick-form">
+          <div class="manager-list">
+            ${active.map((event) => `
+              <div class="manager-row">
+                <div class="manager-stack">
+                  <strong>${escapeHtml(event.label)}</strong>
+                  <div class="settings-note">${money(event.amount)} · ${event.type} · ${escapeHtml(event.startMonth || "—")}${event.endMonth ? ` to ${escapeHtml(event.endMonth)}` : ""}${event.type === "oneTime" && event.month ? ` · ${escapeHtml(event.month)}` : ""}</div>
+                </div>
+                <div class="manager-actions">
+                  <input class="order-input" name="event-order:${event.id}" type="number" step="1" value="${event.displayOrder}" />
+                  <button class="mini-button" type="button" data-edit-projection-event="${event.id}">Edit</button>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+          <button class="action-button" type="submit">Save Event Order</button>
+        </form>
+        <form id="addProjectionEventForm" class="quick-form add-form">
+          <h3>Add Event</h3>
+          <label class="field"><span>Name</span><input name="label" type="text" required /></label>
+          <label class="field"><span>Type</span><select name="type"><option value="monthly">Monthly</option><option value="oneTime">One Time</option></select></label>
+          <label class="field"><span>Amount</span><input name="amount" type="number" step="0.01" value="0" /></label>
+          <label class="field"><span>Start Month</span><input name="startMonth" type="month" value="${state.ui.selectedMonth}" /></label>
+          <label class="field"><span>End Month</span><input name="endMonth" type="month" value="" /></label>
+          <label class="field"><span>One-time Month</span><input name="month" type="month" value="" /></label>
+          <div class="boolean-grid">
+            ${renderCheckbox("affectsProjection", "Affects projection", true)}
+            ${renderCheckbox("active", "Active", true)}
+          </div>
+          <button class="action-button" type="submit">Add Event</button>
+        </form>
+        ${archived.length ? `
+          <section class="manager-archived">
+            <h3>Archived Events</h3>
+            ${archived.map((event) => `
+              <div class="manager-row">
+                <div><strong>${escapeHtml(event.label)}</strong></div>
+                <button class="mini-button" type="button" data-restore-projection-event="${event.id}">Restore</button>
+              </div>
+            `).join("")}
+          </section>
+        ` : ""}
+      </section>
+    </div>
+  `;
+}
+
 function renderSheetFilter(key, label) {
   return `<button class="filter-chip ${state.ui.txFilter === key ? "is-active" : ""}" type="button" data-sheet-filter="${key}">${escapeHtml(label)}</button>`;
 }
@@ -1707,10 +2306,12 @@ function renderQuickAddSheet() {
 }
 
 function renderPlanningPage() {
-  const core = state.settings.systemCore;
-  const runway = calculateReserveRunway(core.reserveBalanceNow, core.stableBaseGapMonthly);
-  const projections = buildProjectionData(getReferenceDateISO(state.ui.selectedMonth));
+  const core = getReservePlanningCore();
+  const runway = calculateReserveRunway(core.runwayBalance, core.stableBaseGapMonthly);
+  const projections = buildProjectionData();
   const totals = calculateTotals();
+  const reserveAccounts = getActiveReserveAccounts();
+  const projectionEvents = getActiveProjectionEvents();
   return `
     <section class="page planning-page">
       <form id="settingsForm" class="stack">
@@ -1721,6 +2322,8 @@ function renderPlanningPage() {
           summary: renderPlanningSectionSummary("summary", { core, totals }),
           expanded: ``
         })}
+
+        ${renderMonthlyReviewCard()}
 
         ${renderPlanningAccordionCard({
           sectionKey: "budget",
@@ -1749,39 +2352,57 @@ function renderPlanningPage() {
           eyebrow: "Reserve Planning",
           summary: renderPlanningSectionSummary("reserve", { core, runway, projections }),
           accentClass: "reserve-planning-card",
+          manageAction: `
+            <button class="mini-button" type="button" data-manage-reserve-accounts aria-label="Manage Reserve Accounts">Accounts</button>
+            <button class="mini-button" type="button" data-manage-projection-events aria-label="Manage Projection Events">Events</button>
+          `,
           expanded: `
             <div class="planning-metrics">
-              <label class="field"><span>Reserve Balance Now</span><input name="settings.systemCore.reserveBalanceNow" type="number" step="0.01" value="${core.reserveBalanceNow}" /></label>
-              <label class="field"><span>Stable Base Gap Monthly</span><input name="settings.systemCore.stableBaseGapMonthly" type="number" step="0.01" value="${core.stableBaseGapMonthly}" /></label>
+              <div class="readonly-card"><span class="tiny-label">Reserve Vault Total</span><strong>${money(core.reserveBalanceNow)}</strong></div>
+              <div class="readonly-card"><span class="tiny-label">Runway Balance</span><strong>${money(core.runwayBalance)}</strong></div>
+              <div class="readonly-card"><span class="tiny-label">Stable Gap Source</span><strong>${money(core.stableBaseGapMonthly)}/mo</strong></div>
+              <label class="field"><span>Projection Anchor Month</span><input name="settings.reserve.projectionAnchorMonth" type="month" value="${state.settings.reserve.projectionAnchorMonth}" /></label>
               <div class="readonly-card"><span class="tiny-label">Runway Months</span><strong>${runway.months}</strong></div>
-              <div class="readonly-card"><span class="tiny-label">Sep 1 Projection</span><strong>${money(projections.sep.value)}</strong></div>
-              <div class="readonly-card"><span class="tiny-label">Jan 1 Projection</span><strong>${money(projections.jan.value)}</strong></div>
+              <div class="readonly-card"><span class="tiny-label">${escapeHtml(projections.sep.label)} Projection</span><strong>${money(projections.sep.value)}</strong></div>
+              <div class="readonly-card"><span class="tiny-label">${escapeHtml(projections.jan.label)} Projection</span><strong>${money(projections.jan.value)}</strong></div>
             </div>
-          `
-        })}
-
-        ${renderPlanningAccordionCard({
-          sectionKey: "ledger",
-          title: "Reserve Ledger",
-          eyebrow: "Reserve Ledger",
-          summary: renderPlanningSectionSummary("ledger", { totals }),
-          expanded: `
-            <div class="settings-grid">
-              ${renderReserveField("preMay", "Pre May reserve")}
-              ${renderReserveField("may", "May reserved")}
-              ${renderReserveField("june", "Jun reserved")}
-              ${renderReserveField("july", "Jul reserved")}
-              ${renderReserveField("august", "Aug reserved")}
-              ${renderReserveField("september", "Sep reserved")}
-              ${renderReserveField("october", "Oct reserved")}
-              ${renderReserveField("november", "Nov reserved")}
-              ${renderReserveField("december", "Dec reserved")}
-              <label class="field"><span>May to Aug monthly net</span><input name="settings.reserveSchedule.mayToAugMonthlyNet" type="number" step="0.01" value="${state.settings.reserveSchedule.mayToAugMonthlyNet}" /></label>
-              <label class="field"><span>Sep to Dec monthly net</span><input name="settings.reserveSchedule.sepToDecMonthlyNet" type="number" step="0.01" value="${state.settings.reserveSchedule.sepToDecMonthlyNet}" /></label>
-              <label class="field"><span>Jan+ monthly net</span><input name="settings.reserveSchedule.janPlusMonthlyNet" type="number" step="0.01" value="${state.settings.reserveSchedule.janPlusMonthlyNet}" /></label>
-            </div>
-            <div class="button-row">
-              <button id="recalcReserveButton" class="ghost-button" type="button">Recalculate Reserve From Ledger</button>
+            <p class="settings-note">Vault total includes accounts marked “Include in vault total.” Runway only uses accounts marked “Include in runway.”</p>
+            <div class="stack">
+              <section class="readonly-card">
+                <div class="section-head">
+                  <h3>Reserve Accounts</h3>
+                  <span class="tiny-label">${reserveAccounts.length} active</span>
+                </div>
+                <div class="settings-grid" style="margin-top:10px;">
+                  ${reserveAccounts.map((account) => `
+                    <div class="background-item-card">
+                      <div class="field">
+                        <span>${escapeHtml(account.label)}</span>
+                        <input type="text" value="${money(account.balance)}" readonly />
+                      </div>
+                      <button class="mini-button" type="button" data-edit-reserve-account="${account.id}" aria-label="Edit reserve account: ${escapeHtml(account.label)}">⚙</button>
+                    </div>
+                  `).join("") || `<div class="empty-state">No reserve accounts yet.</div>`}
+                </div>
+              </section>
+              <section class="readonly-card">
+                <div class="section-head">
+                  <h3>Projection Events</h3>
+                  <span class="tiny-label">${projectionEvents.length} active</span>
+                </div>
+                <div class="settings-grid" style="margin-top:10px;">
+                  ${projectionEvents.map((event) => `
+                    <div class="background-item-card">
+                      <div class="field">
+                        <span>${escapeHtml(event.label)}</span>
+                        <input type="text" value="${money(event.amount)} · ${escapeHtml(event.type)}" readonly />
+                      </div>
+                      <button class="mini-button" type="button" data-edit-projection-event="${event.id}" aria-label="Edit projection event: ${escapeHtml(event.label)}">⚙</button>
+                    </div>
+                  `).join("") || `<div class="empty-state">No projection events yet.</div>`}
+                </div>
+              </section>
+              <p class="settings-note">Background income is descriptive. Reserve projection is controlled by Reserve Events.</p>
             </div>
           `
         })}
@@ -1807,6 +2428,7 @@ function renderPlanningPage() {
               ${renderTotalChip("Total Investment", totals.investment)}
               ${renderTotalChip("Total Variable Essentials", totals.variableEssentials)}
               ${renderTotalChip("Total Discretionary", totals.discretionary)}
+              ${renderTotalChip("Total Custom Variable", totals.customVariable)}
               ${renderTotalChip("Total Reserve Ledger", totals.reserveLedger)}
             </div>
           `
@@ -1814,17 +2436,11 @@ function renderPlanningPage() {
 
         ${renderPlanningAccordionCard({
           sectionKey: "data",
-          title: "Data Management",
-          eyebrow: "Data",
+          title: "Data / Compatibility",
+          eyebrow: "Backup & Restore",
           summary: renderPlanningSectionSummary("data"),
           weak: true,
-          expanded: `
-            <div class="button-row">
-              <button id="exportJsonButton" class="action-button" type="button">Export JSON</button>
-              <label class="ghost-button">Import JSON<input id="importJsonInput" class="hidden" type="file" accept=".json,application/json" /></label>
-              <button id="resetButton" class="danger-button" type="button">Reset local data</button>
-            </div>
-          `
+          expanded: renderDataCompatibilityBody()
         })}
 
         <div class="button-row">
@@ -1841,7 +2457,7 @@ function renderBudgetField(category, index) {
     <div class="budget-input-card">
       <div class="budget-card-head">
         <strong>${escapeHtml(category.label)}</strong>
-        <button class="mini-button" type="button" data-edit-category="${category.id}" aria-label="Manage ${escapeHtml(category.label)}">⚙</button>
+        <button class="mini-button" type="button" data-edit-category="${category.id}" aria-label="Edit category settings: ${escapeHtml(category.label)}">⚙</button>
       </div>
       <label class="field"><span>${escapeHtml(category.label)}</span><input name="settings.monitorCategories.${index}.monthlyBudget" type="number" step="0.01" value="${category.monthlyBudget}" /></label>
       <small>Est. weekly ${money(weekly)}</small>
@@ -1861,7 +2477,7 @@ function renderPlanningAccordionCard({ sectionKey, title, eyebrow, summary, expa
         </div>
         <div class="planning-card-actions">
           ${manageAction}
-          <button class="mini-button" type="button" data-toggle-planning="${sectionKey}">${isOpen ? "Close" : "Edit"}</button>
+          <button class="mini-button" type="button" data-toggle-planning="${sectionKey}">${isOpen ? "Close" : "Open"}</button>
         </div>
       </div>
       <div class="planning-accordion-summary">
@@ -1872,37 +2488,121 @@ function renderPlanningAccordionCard({ sectionKey, title, eyebrow, summary, expa
   `;
 }
 
+function renderMonthlyReviewCard() {
+  const status = getMonthReviewStatus(state.ui.selectedMonth);
+  return renderPlanningAccordionCard({
+    sectionKey: "review",
+    title: "Month Setup",
+    eyebrow: "Monthly Review",
+    summary: `
+      <div class="accordion-inline-summary">
+        <strong>${escapeHtml(formatMonthLabel(state.ui.selectedMonth))} · ${status.reviewed ? "Reviewed" : "Not reviewed"}</strong>
+        <span>Last month ${escapeHtml(status.lastMonthResult.label)} · Reserve ${escapeHtml(status.reserveUpdate)}</span>
+        <span>Backup ${status.backupDone ? "done" : "due"}</span>
+      </div>
+    `,
+    expanded: `
+      <div class="review-checklist">
+        <span>1. Review previous month spending</span>
+        <span>2. Adjust current month category budgets</span>
+        <span>3. Update reserve account balance</span>
+        <span>4. Export JSON backup</span>
+        <span>5. Mark month reviewed</span>
+      </div>
+      <div class="button-row">
+        <button id="markMonthReviewedButton" class="action-button" type="button">Mark Month Reviewed</button>
+        <button id="markBackupDoneButton" class="ghost-button" type="button">Mark Backup Done</button>
+        <button class="ghost-button" type="button" data-open-planning-section="budget">Open Budget Planning</button>
+        <button class="ghost-button" type="button" data-open-planning-section="reserve">Open Reserve Planning</button>
+      </div>
+    `
+  });
+}
+
+function renderDataCompatibilityBody() {
+  return `
+    <section class="readonly-card weak-card">
+      <div class="section-head">
+        <h3>Backup & Restore</h3>
+        <span class="tiny-label">Low frequency</span>
+      </div>
+      <div class="button-row">
+        <button id="exportJsonButton" class="action-button" type="button">Export JSON</button>
+        <label class="ghost-button">Import JSON<input id="importJsonInput" class="hidden" type="file" accept=".json,application/json" /></label>
+        <button id="resetButton" class="danger-button" type="button">Reset local data</button>
+      </div>
+    </section>
+    <details class="readonly-card weak-card legacy-details">
+      <summary>
+        <span>Legacy Reserve Ledger</span>
+        <em>Compatibility</em>
+      </summary>
+      <div class="settings-grid" style="margin-top:10px;">
+          ${renderReserveField("preMay", "Pre May reserve")}
+          ${renderReserveField("may", "May reserved")}
+          ${renderReserveField("june", "Jun reserved")}
+          ${renderReserveField("july", "Jul reserved")}
+          ${renderReserveField("august", "Aug reserved")}
+          ${renderReserveField("september", "Sep reserved")}
+          ${renderReserveField("october", "Oct reserved")}
+          ${renderReserveField("november", "Nov reserved")}
+          ${renderReserveField("december", "Dec reserved")}
+          <label class="field"><span>May to Aug monthly net</span><input name="settings.reserveSchedule.mayToAugMonthlyNet" type="number" step="0.01" value="${state.settings.reserveSchedule.mayToAugMonthlyNet}" /></label>
+          <label class="field"><span>Sep to Dec monthly net</span><input name="settings.reserveSchedule.sepToDecMonthlyNet" type="number" step="0.01" value="${state.settings.reserveSchedule.sepToDecMonthlyNet}" /></label>
+          <label class="field"><span>Jan+ monthly net</span><input name="settings.reserveSchedule.janPlusMonthlyNet" type="number" step="0.01" value="${state.settings.reserveSchedule.janPlusMonthlyNet}" /></label>
+        </div>
+        <div class="button-row">
+          <button id="recalcReserveButton" class="ghost-button" type="button">Recalculate Reserve From Ledger</button>
+        </div>
+        <p class="settings-note">Legacy ledger is preserved for compatibility. Reserve Vault now uses accounts and projection events.</p>
+    </details>
+  `;
+}
+
+function renderPlanningStatusTile(title, summary, status, sectionKey) {
+  return `
+    <div class="planning-status-tile">
+      <span>${escapeHtml(title)}</span>
+      <strong>${escapeHtml(summary)}</strong>
+      <em>${escapeHtml(status)}</em>
+      <button class="mini-button" type="button" data-open-planning-section="${sectionKey}">Open</button>
+    </div>
+  `;
+}
+
 function renderPlanningSectionSummary(sectionKey, context = {}) {
   const totals = context.totals || calculateTotals();
-  const core = context.core || state.settings.systemCore;
-  const projections = context.projections || buildProjectionData(getReferenceDateISO(state.ui.selectedMonth));
-  const runway = context.runway || calculateReserveRunway(core.reserveBalanceNow, core.stableBaseGapMonthly);
+  const core = context.core || getReservePlanningCore();
+  const projections = context.projections || buildProjectionData();
+  const runway = context.runway || calculateReserveRunway(core.runwayBalance, core.stableBaseGapMonthly);
 
   if (sectionKey === "summary") {
     return `
-      <div class="planning-summary-grid">
-        <div><span>Reserve Balance</span><strong>${money(core.reserveBalanceNow)}</strong></div>
-        <div><span>Stable Gap</span><strong>${money(core.stableBaseGapMonthly)}</strong></div>
-        <div><span>Monthly Variable Budget</span><strong>${money(totals.variableEssentials + totals.discretionary)}</strong></div>
-        <div><span>Fixed + Debt</span><strong>${money(totals.fixed + totals.debt)}</strong></div>
+      <div class="planning-summary-grid status-nav-grid">
+        ${renderPlanningStatusTile("Budget", `${getCategories().filter((item) => item.active && !item.archived).length} active categories`, totals.variableTotal > 0 ? "OK" : "Needs review", "budget")}
+        ${renderPlanningStatusTile("Reserve", `${getActiveReserveAccounts().length} vault accounts · ${getActiveProjectionEvents().length} projection events`, runway.months >= 12 ? "Healthy" : runway.months >= 6 ? "Below target" : "Critical", "reserve")}
+        ${renderPlanningStatusTile("Background", `${getBackgroundSections().filter((item) => item.active && !item.archived).length} active sections · ${getBackgroundSections().flatMap((section) => section.items || []).filter((item) => item.active && !item.archived).length} active items`, "Configured", "background")}
+        ${renderPlanningStatusTile("Data", getMonthReviewStatus(state.ui.selectedMonth).backupDone ? "Backup done" : "Backup due", "Backup", "data")}
       </div>
     `;
   }
   if (sectionKey === "budget") {
     return `
       <div class="accordion-inline-summary">
-        <strong>Monthly Variable Budget: ${money(totals.variableEssentials + totals.discretionary)}</strong>
+        <strong>Monthly Variable Budget: ${money(totals.variableTotal)}</strong>
         <span>Essentials ${money(totals.variableEssentials)} · Discretionary ${money(totals.discretionary)}</span>
         <span>Rules: penalty ${state.settings.weeklyRules.penaltyMultiplier}x · soft cap ${state.settings.weeklyRules.defaultSoftCapMultiplier}x</span>
       </div>
     `;
   }
   if (sectionKey === "reserve") {
+    const net = calculateActiveProjectionMonthlyNet(state.settings.reserve.projectionAnchorMonth || currentMonthKey());
     return `
       <div class="accordion-inline-summary">
-        <strong>Reserve ${money(core.reserveBalanceNow)} · Gap ${money(core.stableBaseGapMonthly)}/mo</strong>
+        <strong>Reserve Vault ${money(core.reserveBalanceNow)} · Gap ${money(core.stableBaseGapMonthly)}/mo</strong>
         <span>Runway ${runway.months} months</span>
-        <span>Sep ${money(projections.sep.value)} · Jan ${money(projections.jan.value)}</span>
+        <span>Active monthly net ${money(net)}</span>
+        <span>${escapeHtml(projections.sep.label)} ${money(projections.sep.value)} · ${escapeHtml(projections.jan.label)} ${money(projections.jan.value)}</span>
       </div>
     `;
   }
@@ -1911,6 +2611,7 @@ function renderPlanningSectionSummary(sectionKey, context = {}) {
       <div class="accordion-inline-summary">
         <strong>Ledger Total ${money(totals.reserveLedger)}</strong>
         <span>Pre-May ${money(state.settings.reserveSchedule.preMay)} · May ${money(state.settings.reserveSchedule.may)}</span>
+        <span>Legacy compatibility only</span>
       </div>
     `;
   }
@@ -1924,7 +2625,8 @@ function renderPlanningSectionSummary(sectionKey, context = {}) {
   }
   return `
     <div class="accordion-inline-summary">
-      <strong>Export / Import / Reset</strong>
+      <strong>Backup & Restore</strong>
+      <span>Legacy ledger preserved for compatibility</span>
     </div>
   `;
 }
@@ -1932,6 +2634,20 @@ function renderPlanningSectionSummary(sectionKey, context = {}) {
 function togglePlanningSection(sectionKey) {
   const next = !Boolean(state.ui.planningOpenSections?.[sectionKey]);
   state.ui.planningOpenSections[sectionKey] = next;
+  saveState();
+  render();
+}
+
+function openPlanningSection(sectionKey) {
+  state.ui.activeTab = "planning";
+  state.ui.planningOpenSections[sectionKey] = true;
+  saveState();
+  render();
+}
+
+function toggleMonitorCardDetails(categoryId) {
+  if (!categoryId) return;
+  state.ui.monitorExpandedCards[categoryId] = !Boolean(state.ui.monitorExpandedCards?.[categoryId]);
   saveState();
   render();
 }
@@ -1958,7 +2674,7 @@ function renderBackgroundGroup(section, sectionIndex, total) {
               <span>${escapeHtml(item.label)}</span>
               <input name="settings.backgroundSections.${sectionIndex}.items.${itemIndex}.amount" type="number" step="0.01" value="${item.amount}" />
             </label>
-            <button class="mini-button" type="button" data-section-id="${section.id}" data-edit-background-item="${item.id}" aria-label="Manage ${escapeHtml(item.label)}">⚙</button>
+            <button class="mini-button" type="button" data-section-id="${section.id}" data-edit-background-item="${item.id}" aria-label="Edit background item: ${escapeHtml(item.label)}">⚙</button>
           </div>
         `;
         }).join("")}
@@ -2001,17 +2717,32 @@ function getDashboard() {
     categories,
     monitorCards: monitorDefs.map((item) => categories[item.id]).filter(Boolean),
     discipline: calculateWeeklyDiscipline(monthKey, currentWeekKey),
+    monthOutlook: calculateMonthOutlook(monthKey, categories),
     overallStatus: calculateOverallMonitorStatus(categories, scope)
   };
 }
 
+function getReservePlanningCore() {
+  const reserveBalanceNow = calculateReserveVaultTotal();
+  const runwayBalance = calculateReserveRunwayBalance();
+  const stableBaseGapMonthly = getStableGapFromSettings(state.settings);
+  return {
+    reserveBalanceNow,
+    runwayBalance,
+    stableBaseGapMonthly
+  };
+}
+
 function buildReserveHeroData() {
-  const reserveBalanceNow = Number(state.settings.systemCore.reserveBalanceNow) || 0;
-  const stableBaseGapMonthly = Math.max(1, Number(state.settings.systemCore.stableBaseGapMonthly) || 0);
-  const runway = calculateReserveRunway(reserveBalanceNow, stableBaseGapMonthly);
+  const core = getReservePlanningCore();
+  const reserveBalanceNow = Number(core.reserveBalanceNow) || 0;
+  const runwayBalance = Number(core.runwayBalance) || 0;
+  const stableBaseGapMonthly = Math.max(1, Number(core.stableBaseGapMonthly) || 0);
+  const runway = calculateReserveRunway(runwayBalance, stableBaseGapMonthly);
   const tone = runway.months >= 12 ? "green" : runway.months >= 6 ? "yellow" : "red";
   return {
     balance: reserveBalanceNow,
+    runwayBalance,
     gap: stableBaseGapMonthly,
     runwayMonths: runway.months,
     runwayDays: runway.days,
@@ -2033,27 +2764,33 @@ function buildReserveHeroData() {
   };
 }
 
-function buildProjectionData(referenceDateISO) {
-  const targets = getProjectionTargets(referenceDateISO);
-  const sepValue = calculateReserveProjection(targets.sep);
-  const janValue = calculateReserveProjection(targets.jan);
+function buildProjectionData() {
+  const anchorDateISO = getProjectionAnchorDateISO();
+  const targets = getProjectionTargets(anchorDateISO);
+  const sepValue = calculateReserveProjection(targets.sep.targetDateISO);
+  const janValue = calculateReserveProjection(targets.jan.targetDateISO);
   return {
     sep: {
+      label: targets.sep.label,
       value: sepValue,
-      summary: `${countProjectionSteps(referenceDateISO, targets.sep)} months using current reserve schedule.`
+      targetDateISO: targets.sep.targetDateISO,
+      summary: `${countProjectionSteps(anchorDateISO, targets.sep.targetDateISO)} months using reserve events.`
     },
     jan: {
+      label: targets.jan.label,
       value: janValue,
-      summary: `${countProjectionSteps(referenceDateISO, targets.jan)} months using current reserve schedule.`
+      targetDateISO: targets.jan.targetDateISO,
+      summary: `${countProjectionSteps(anchorDateISO, targets.jan.targetDateISO)} months using reserve events.`
     }
   };
 }
 
 function calculateOverallMonitorStatus(categories, scope = state.ui.monitorScope || "week") {
   const items = Object.values(categories);
-  const projectedSpend = sum(items.map((item) => item.primarySpent));
-  const budget = sum(items.map((item) => item.primaryBudget));
-  const discretionaryExceeded = items.some((item) => item.type === "discretionary" && item.actualExceededBudget);
+  const totalItems = items.filter((item) => isVariableTotalCategory(getCategoryById(item.category)));
+  const projectedSpend = sum(totalItems.map((item) => item.primarySpent));
+  const budget = sum(totalItems.map((item) => item.primaryBudget));
+  const discretionaryExceeded = totalItems.some((item) => item.group === "discretionary" && item.actualExceededBudget);
   let key = "safe";
   let label = "Safe";
   let action = scope === "month" ? "On pace this month." : "On pace this week.";
@@ -2084,7 +2821,8 @@ function calculateCategoryDisplay(category, scope = state.ui.monitorScope || "we
 function calculateWeekCategoryStatus(category, monthKey = state.ui.selectedMonth, weekKey = getWeekKey(getReferenceDateISO(monthKey))) {
   const categoryDef = getCategoryById(category);
   const label = categoryDef.label;
-  const group = getMonitorBehaviorType(categoryDef);
+  const group = getCategoryDisplayGroup(categoryDef);
+  const ruleType = getCategoryRuleType(categoryDef);
   const icon = categoryDef.icon;
   const referenceDateISO = getReferenceDateISO(monthKey);
   const timing = getWeekTiming(referenceDateISO);
@@ -2099,26 +2837,27 @@ function calculateWeekCategoryStatus(category, monthKey = state.ui.selectedMonth
   const projectedWeekEndSpend = timing.weekProgress > 0 ? weekSpent / timing.weekProgress : weekSpent;
   const projectedOvershoot = Math.max(0, projectedWeekEndSpend - currentWeekBudget);
   const dailyAllowanceRemaining = monthRemaining / Math.max(1, timing.daysRemainingInWeek);
-  const penalty = group === "discretionary"
+  const penalty = isPenaltyCategory(categoryDef)
     ? calculateDiscretionaryPenalty(category, weekSpent, currentWeekBudget).penalty
     : 0;
-  const overshoot = group === "discretionary"
+  const overshoot = isPenaltyCategory(categoryDef)
     ? calculateDiscretionaryPenalty(category, weekSpent, currentWeekBudget).overshoot
     : Math.max(0, weekSpent - currentWeekBudget);
   const softCapMultiplier = Number(categoryDef.softCapMultiplier ?? state.settings.weeklyRules.defaultSoftCapMultiplier ?? 1.1) || 1.1;
-  const softCap = group === "essentials" ? currentWeekBudget * softCapMultiplier : currentWeekBudget;
-  const progressPercent = currentWeekBudget > 0 ? (weekSpent / currentWeekBudget) * 100 : 0;
-  const markerPercent = group === "essentials"
-    ? softCap > 0 && currentWeekBudget > 0 ? (softCap / currentWeekBudget) * 100 : 100
-    : 100;
-  const riskSentence = group === "essentials" ? "Soft cap risk. Slow non-urgent spending." : "Penalty active. Freeze this category.";
+  const softCap = isSoftCapCategory(categoryDef) ? currentWeekBudget * softCapMultiplier : currentWeekBudget;
+  const riskSentence = isSoftCapCategory(categoryDef) ? "Soft cap risk. Slow non-urgent spending." : isPenaltyCategory(categoryDef) ? "Penalty active. Freeze this category." : "Track only. No warning or penalty.";
 
   let statusKey = "ok";
   let statusTone = "green";
   let statusLabel = "OK";
   let conclusion = "";
 
-  if (group === "essentials") {
+  if (isTrackOnlyCategory(categoryDef)) {
+    statusKey = "info";
+    statusTone = "neutral";
+    statusLabel = "Track";
+    conclusion = "Track only. No warning or penalty.";
+  } else if (isSoftCapCategory(categoryDef)) {
     if (paceRatio > 1.25 || weekSpent > softCap) {
       statusKey = "risk";
       statusTone = "red";
@@ -2133,7 +2872,7 @@ function calculateWeekCategoryStatus(category, monthKey = state.ui.selectedMonth
       statusLabel = "OK";
     }
     conclusion = statusKey === "ok" ? "On pace." : statusKey === "watch" ? "Running ahead of weekly pace." : "Soft cap risk. Slow non-urgent spending.";
-  } else {
+  } else if (isPenaltyCategory(categoryDef)) {
     if (weekSpent > currentWeekBudget || paceRatio > 1.5) {
       statusKey = "freeze";
       statusTone = "red";
@@ -2155,7 +2894,9 @@ function calculateWeekCategoryStatus(category, monthKey = state.ui.selectedMonth
     scope: "week",
     label,
     icon,
-    type: group,
+    type: ruleType,
+    group,
+    ruleType,
     monthlyBudget,
     weekSpent,
     currentWeekBudget,
@@ -2174,12 +2915,14 @@ function calculateWeekCategoryStatus(category, monthKey = state.ui.selectedMonth
     conclusion,
     primarySpent: projectedWeekEndSpend,
     primaryBudget: currentWeekBudget,
-    secondaryLine: group === "discretionary" && penalty > 0
+    secondaryLine: isTrackOnlyCategory(categoryDef)
+      ? "Track only. No warning or penalty."
+      : isPenaltyCategory(categoryDef) && penalty > 0
       ? `Penalty active: -${money(penalty)} next week`
       : weekSpent === 0
         ? "No spend yet. Full budget available."
         : `Spent ${money(weekSpent)} so far · ${money(monthRemaining)} left this month`,
-    actualExceededBudget: weekSpent > currentWeekBudget,
+    actualExceededBudget: isPenaltyCategory(categoryDef) && weekSpent > currentWeekBudget,
     actualAmount: weekSpent,
     projectedAmount: projectedWeekEndSpend,
     markerBudget: currentWeekBudget,
@@ -2187,7 +2930,9 @@ function calculateWeekCategoryStatus(category, monthKey = state.ui.selectedMonth
     zoneSoftCap: softCap,
     displayRemaining: monthRemaining,
     empty: weekSpent === 0,
-    secondaryHint: group === "discretionary" && penalty > 0
+    secondaryHint: isTrackOnlyCategory(categoryDef)
+      ? "Track only. No warning or penalty."
+      : isPenaltyCategory(categoryDef) && penalty > 0
       ? `Penalty active: -${money(penalty)} next week`
       : `Spent ${money(weekSpent)} so far · ${money(monthRemaining)} left this month`,
     status: {
@@ -2201,7 +2946,8 @@ function calculateWeekCategoryStatus(category, monthKey = state.ui.selectedMonth
 function calculateMonthCategoryStatus(category, monthKey = state.ui.selectedMonth, weekKey = getWeekKey(getReferenceDateISO(monthKey))) {
   const categoryDef = getCategoryById(category);
   const label = categoryDef.label;
-  const group = getMonitorBehaviorType(categoryDef);
+  const group = getCategoryDisplayGroup(categoryDef);
+  const ruleType = getCategoryRuleType(categoryDef);
   const icon = categoryDef.icon;
   const monthlyBudget = Number(categoryDef.monthlyBudget) || 0;
   const monthSpent = getMonthSpent(category, monthKey);
@@ -2213,7 +2959,7 @@ function calculateMonthCategoryStatus(category, monthKey = state.ui.selectedMont
   const weekSpent = getWeekSpent(category, weekKey, monthKey);
   const expectedSpendByToday = monthlyBudget * timing.monthProgress;
   const paceRatio = expectedSpendByToday > 0 ? monthSpent / expectedSpendByToday : 0;
-  const penalty = group === "discretionary"
+  const penalty = isPenaltyCategory(categoryDef)
     ? calculateDiscretionaryPenalty(category, weekSpent, currentWeekBudget).penalty
     : 0;
   const softCapMultiplier = Number(categoryDef.softCapMultiplier ?? state.settings.weeklyRules.defaultSoftCapMultiplier ?? 1.1) || 1.1;
@@ -2224,7 +2970,12 @@ function calculateMonthCategoryStatus(category, monthKey = state.ui.selectedMont
   let statusLabel = "OK";
   let conclusion = "On pace.";
 
-  if (group === "essentials") {
+  if (isTrackOnlyCategory(categoryDef)) {
+    statusKey = "info";
+    statusTone = "neutral";
+    statusLabel = "Track";
+    conclusion = "Track only. No budget enforcement.";
+  } else if (isSoftCapCategory(categoryDef)) {
     if (monthSpent > monthlyBudget || projectedMonthEndSpend > monthlyBudget * 1.15) {
       statusKey = "risk";
       statusTone = "red";
@@ -2236,7 +2987,7 @@ function calculateMonthCategoryStatus(category, monthKey = state.ui.selectedMont
       statusLabel = "Watch";
       conclusion = "Month-end projection is running high.";
     }
-  } else {
+  } else if (isPenaltyCategory(categoryDef)) {
     if (monthSpent > monthlyBudget || projectedMonthEndSpend > monthlyBudget * 1.25) {
       statusKey = "freeze";
       statusTone = "red";
@@ -2255,7 +3006,9 @@ function calculateMonthCategoryStatus(category, monthKey = state.ui.selectedMont
     scope: "month",
     label,
     icon,
-    type: group,
+    type: ruleType,
+    group,
+    ruleType,
     monthlyBudget,
     weekSpent,
     currentWeekBudget,
@@ -2277,12 +3030,12 @@ function calculateMonthCategoryStatus(category, monthKey = state.ui.selectedMont
     secondaryLine: monthSpent === 0
       ? "No spend yet. Full budget available."
       : `Spent ${money(monthSpent)} so far · ${money(monthRemaining)} left this month`,
-    actualExceededBudget: monthSpent > monthlyBudget,
+    actualExceededBudget: isPenaltyCategory(categoryDef) && monthSpent > monthlyBudget,
     actualAmount: monthSpent,
     projectedAmount: projectedMonthEndSpend,
     markerBudget: monthlyBudget,
     zoneBudget: monthlyBudget,
-    zoneSoftCap: group === "essentials" ? monthlyBudget * 1.15 : monthlyBudget,
+    zoneSoftCap: isSoftCapCategory(categoryDef) ? monthlyBudget * 1.15 : monthlyBudget,
     displayRemaining: monthRemaining,
     empty: monthSpent === 0,
     projectedMonthEndSpend,
@@ -2295,18 +3048,109 @@ function calculateMonthCategoryStatus(category, monthKey = state.ui.selectedMont
   };
 }
 
+function calculateMonthOutlook(monthKey = state.ui.selectedMonth, categoryMap = null) {
+  const categories = categoryMap
+    ? Object.values(categoryMap)
+    : getCategories().filter(isVariableTotalCategory).map((category) => calculateMonthCategoryStatus(category.id, monthKey));
+  const included = categories.filter((item) => isVariableTotalCategory(getCategoryById(item.category)));
+  const projectedMonthEndVariableSpend = sum(included.map((item) => item.primarySpent));
+  const monthlyVariableBudget = sum(included.map((item) => item.primaryBudget));
+  const projectedDiff = projectedMonthEndVariableSpend - monthlyVariableBudget;
+  const freeze = included.some((item) => item.group === "discretionary" && item.monthSpent > item.monthlyBudget);
+  const atRisk = included
+    .filter((item) => item.projectedOvershoot > 0)
+    .sort((a, b) => b.projectedOvershoot - a.projectedOvershoot)
+    .slice(0, 3);
+  const statusKey = freeze ? "freeze" : projectedDiff > 0 ? "watch" : "safe";
+  return {
+    projectedMonthEndVariableSpend,
+    monthlyVariableBudget,
+    projectedDiff,
+    atRisk,
+    status: {
+      key: statusKey,
+      label: statusKey === "safe" ? "Safe" : statusKey === "watch" ? "Watch" : "Freeze",
+      action: statusKey === "safe"
+        ? "Month is on pace."
+        : statusKey === "watch"
+          ? "Month-end projection is over budget."
+          : "Discretionary budget is already exceeded this month."
+    }
+  };
+}
+
+function getMonthReviewStatus(monthKey) {
+  const review = state.monthReviews?.[monthKey] || {};
+  const lastMonthResult = calculateLastMonthResult(monthKey);
+  return {
+    reviewed: Boolean(review.reviewed),
+    backupDone: Boolean(review.backupDone),
+    lastMonthResult,
+    reserveUpdate: review.reviewed ? "ok" : "suggested"
+  };
+}
+
+function markMonthReviewed(monthKey) {
+  state.monthReviews ||= {};
+  state.monthReviews[monthKey] = {
+    ...(state.monthReviews[monthKey] || {}),
+    reviewed: true,
+    reviewedAtISO: new Date().toISOString()
+  };
+  saveState();
+  showToast("Month marked reviewed.");
+  render();
+}
+
+function markMonthBackupDone(monthKey) {
+  state.monthReviews ||= {};
+  state.monthReviews[monthKey] = {
+    ...(state.monthReviews[monthKey] || {}),
+    backupDone: true,
+    backupDoneAtISO: new Date().toISOString()
+  };
+  saveState();
+  showToast("Backup marked done.");
+  render();
+}
+
+function calculateLastMonthResult(monthKey) {
+  const lastMonth = shiftMonthKey(monthKey, -1);
+  const categories = getCategories().filter(isVariableTotalCategory).map((category) => calculateMonthCategoryStatus(category.id, lastMonth));
+  if (!categories.some((item) => item.monthSpent > 0)) return { key: "none", label: "no data", amount: 0 };
+  const spent = sum(categories.map((item) => item.monthSpent));
+  const budget = sum(categories.map((item) => item.monthlyBudget));
+  const diff = spent - budget;
+  return {
+    key: diff > 0 ? "over" : "under",
+    label: diff > 0 ? `${money(diff)} over` : `${money(Math.abs(diff))} under`,
+    amount: diff
+  };
+}
+
 function calculateWeeklyDiscipline(monthKey = state.ui.selectedMonth, weekKey = getWeekKey(getReferenceDateISO(monthKey))) {
   const tracked = getCategories()
-    .filter((item) => item.active && !item.archived && item.includeInWeeklyDiscipline);
+    .filter(isWeeklyDisciplineCategory);
   const categories = tracked.map((item) => calculateWeekCategoryStatus(item.id, monthKey, weekKey));
-  const discretionary = categories.filter((item) => getCategoryById(item.category).ruleType === "penalty");
+  const penaltyRows = categories
+    .filter((item) => isPenaltyCategory(getCategoryById(item.category)))
+    .filter((item) => item.penalty > 0)
+    .map((item) => ({
+      categoryId: item.category,
+      label: item.label,
+      overshoot: item.overshoot,
+      penalty: item.penalty
+    }));
+  const penaltyCategories = categories.filter((item) => isPenaltyCategory(getCategoryById(item.category)));
+  const categoryPenalties = Object.fromEntries(penaltyRows.map((row) => [row.categoryId, row.penalty]));
   const thisWeekVariableBudget = sum(categories.map((item) => item.currentWeekBudget));
   const thisWeekVariableSpent = sum(categories.map((item) => item.weekSpent));
-  const discretionaryOvershoot = sum(discretionary.map((item) => item.overshoot));
-  const projectedDiscretionaryOvershoot = sum(discretionary.map((item) => item.projectedOvershoot));
-  const nextWeekReduction = sum(discretionary.map((item) => item.penalty));
+  const discretionaryOvershoot = sum(penaltyCategories.map((item) => item.overshoot));
+  const projectedDiscretionaryOvershoot = sum(penaltyCategories.map((item) => item.projectedOvershoot));
+  const nextWeekReduction = sum(Object.values(categoryPenalties));
   const isClosed = Boolean(state.weeklyClosures[weekKey]);
-  const penaltyBudgetBase = sum(discretionary.map((item) => item.currentWeekBudget));
+  const closeStatus = getWeeklyCloseStatus(weekKey);
+  const penaltyBudgetBase = sum(penaltyCategories.map((item) => item.currentWeekBudget));
   const statusTone = nextWeekReduction === 0 ? "green" : nextWeekReduction <= penaltyBudgetBase * 0.2 ? "yellow" : "red";
   return {
     weekKey,
@@ -2315,9 +3159,10 @@ function calculateWeeklyDiscipline(monthKey = state.ui.selectedMonth, weekKey = 
     discretionaryOvershoot,
     projectedDiscretionaryOvershoot,
     nextWeekReduction,
-    entertainmentPenalty: discretionary.find((item) => item.category === "entertainment")?.penalty || 0,
-    miscPenalty: discretionary.find((item) => item.category === "misc")?.penalty || 0,
+    categoryPenalties,
+    penaltyRows,
     isClosed,
+    closeStatus,
     status: {
       label: statusTone === "green" ? "Green" : statusTone === "yellow" ? "Yellow" : "Red",
       tone: statusTone
@@ -2365,6 +3210,12 @@ function getMonthTiming(monthKey) {
 function getDaysInMonth(monthKey) {
   const [year, month] = monthKey.split("-").map(Number);
   return new Date(year, month, 0).getDate();
+}
+
+function shiftMonthKey(monthKey, offset) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const date = new Date(year, month - 1 + offset, 1);
+  return date.toISOString().slice(0, 7);
 }
 
 function getWeekTiming(referenceDateISO) {
@@ -2430,7 +3281,7 @@ function getWeekSpent(category, weekKey, monthKey = state.ui.selectedMonth) {
 
 function calculateDiscretionaryPenalty(category, actual, budget) {
   const categoryDef = getCategoryById(category);
-  if (categoryDef.ruleType !== "penalty") {
+  if (!isPenaltyCategory(categoryDef)) {
     return { overshoot: 0, penalty: 0 };
   }
   const overshoot = Math.max(0, actual - budget);
@@ -2450,40 +3301,42 @@ function calculateReserveRunway(reserveBalance, stableGap) {
 }
 
 function calculateReserveProjection(targetDateISO) {
-  const startDateISO = getReferenceDateISO(state.ui.selectedMonth);
-  let balance = Number(state.settings.systemCore.reserveBalanceNow) || 0;
+  const startDateISO = getProjectionAnchorDateISO();
+  let balance = calculateReserveVaultTotal();
+  if (targetDateISO <= startDateISO) return balance;
   let cursor = firstOfNextMonth(startDateISO);
 
   while (cursor < targetDateISO) {
-    balance += getReserveMonthlyNet(cursor);
+    balance += calculateProjectionMonthlyNet(cursor.slice(0, 7), state.settings);
     cursor = firstOfNextMonth(cursor);
   }
 
   return balance;
 }
 
-function getReserveMonthlyNet(monthISO) {
-  const month = Number(monthISO.slice(5, 7));
-  if (month >= 5 && month <= 8) return Number(state.settings.reserveSchedule.mayToAugMonthlyNet) || 0;
-  if (month >= 9 && month <= 12) return Number(state.settings.reserveSchedule.sepToDecMonthlyNet) || 0;
-  return Number(state.settings.reserveSchedule.janPlusMonthlyNet) || 0;
+function getProjectionAnchorDateISO() {
+  const anchorMonth = normalizeMonthValue(state.settings.reserve?.projectionAnchorMonth) || currentMonthKey();
+  return `${anchorMonth}-01`;
 }
 
 function projectionTone(value) {
   const amount = Number(value) || 0;
-  const gap = Math.max(1, Number(state.settings.systemCore.stableBaseGapMonthly) || 0);
+  const gap = Math.max(1, getStableGapFromSettings(state.settings) || 0);
   if (amount < 0) return "red";
   if (amount <= gap * 2) return "yellow";
   return "green";
 }
 
 function getProjectionTargets(referenceDateISO) {
-  const [year, month] = referenceDateISO.slice(0, 7).split("-").map(Number);
+  const [year] = referenceDateISO.slice(0, 7).split("-").map(Number);
   const sepThisYear = `${year}-09-01`;
   const janNext = `${year + 1}-01-01`;
   const sepTarget = referenceDateISO < sepThisYear ? sepThisYear : `${year + 1}-09-01`;
-  const janTarget = referenceDateISO < `${year}-01-01` ? `${year}-01-01` : janNext;
-  return { sep: sepTarget, jan: janTarget };
+  const janTarget = janNext;
+  return {
+    sep: { targetDateISO: sepTarget, label: formatProjectionLabel(sepTarget) },
+    jan: { targetDateISO: janTarget, label: formatProjectionLabel(janTarget) }
+  };
 }
 
 function getWeekStart(dateISO) {
@@ -2500,6 +3353,46 @@ function getWeekEnd(dateISO) {
 
 function getWeekKey(dateISO) {
   return getWeekStart(dateISO);
+}
+
+function getPreviousWeekKey(weekKey) {
+  return shiftDateISO(weekKey, -7);
+}
+
+function getWeeklyCloseStatus(weekKey) {
+  if (state.weeklyClosures[weekKey]) {
+    return {
+      key: "closed",
+      label: "Closed",
+      tone: "green",
+      message: "This week has already been closed."
+    };
+  }
+  const referenceDateISO = getReferenceDateISO(state.ui.selectedMonth);
+  const day = new Date(`${referenceDateISO}T00:00:00`).getDay();
+  const previousWeekKey = getPreviousWeekKey(weekKey);
+  if (day === 1 && !state.weeklyClosures[previousWeekKey]) {
+    return {
+      key: "last-week-open",
+      label: "Last week not closed",
+      tone: "yellow",
+      message: "Last week was not closed. Review before continuing."
+    };
+  }
+  if (day === 0) {
+    return {
+      key: "ready",
+      label: "Ready to close",
+      tone: "yellow",
+      message: "Ready to close this week."
+    };
+  }
+  return {
+    key: "in-progress",
+    label: "In progress",
+    tone: "neutral",
+    message: "Week is still in progress."
+  };
 }
 
 function getWeeksOverlappingMonth(monthKey) {
@@ -2521,8 +3414,11 @@ function getWeeksOverlappingMonth(monthKey) {
 function getWeekAdjustmentPenalty(weekKey, category) {
   const item = state.weeklyBudgetAdjustments[weekKey];
   if (!item) return 0;
-  if (category === "entertainment") return Number(item.entertainmentPenalty) || 0;
-  if (category === "misc") return Number(item.miscPenalty) || 0;
+  if (item.categoryPenalties && item.categoryPenalties[category] != null) {
+    return Number(item.categoryPenalties[category]) || 0;
+  }
+  if (category === "entertainment") return Number(item.entertainmentPenalty ?? item.legacy?.entertainmentPenalty) || 0;
+  if (category === "misc") return Number(item.miscPenalty ?? item.legacy?.miscPenalty) || 0;
   return 0;
 }
 
@@ -2537,10 +3433,10 @@ function getFilteredTransactions() {
     list = list.filter((item) => item.dateISO >= weekKey && item.dateISO <= weekEnd);
   }
   if (filter === "essentials") {
-    list = list.filter((item) => getMonitorBehaviorType(getCategoryById(item.category)) === "essentials");
+    list = list.filter((item) => getCategoryDisplayGroup(getCategoryById(item.category)) === "essentials");
   }
   if (filter === "discretionary") {
-    list = list.filter((item) => getMonitorBehaviorType(getCategoryById(item.category)) === "discretionary");
+    list = list.filter((item) => getCategoryDisplayGroup(getCategoryById(item.category)) === "discretionary");
   }
   if (filter === "all") {
     list = state.transactions.slice();
@@ -2620,30 +3516,33 @@ function closeWeek() {
     return;
   }
 
-  const entertainment = calculateWeekCategoryStatus("entertainment", monthKey, weekKey);
-  const misc = calculateWeekCategoryStatus("misc", monthKey, weekKey);
   const nextWeekKey = shiftDateISO(weekKey, 7);
-  const entertainmentPenalty = entertainment.penalty;
-  const miscPenalty = misc.penalty;
+  const categoryPenalties = {};
+  getCategories()
+    .filter(isWeeklyDisciplineCategory)
+    .filter(isPenaltyCategory)
+    .forEach((category) => {
+      const status = calculateWeekCategoryStatus(category.id, monthKey, weekKey);
+      if (status.penalty > 0) categoryPenalties[category.id] = status.penalty;
+    });
+  const totalPenalty = sum(Object.values(categoryPenalties));
 
   state.weeklyBudgetAdjustments[nextWeekKey] = {
     weekStartISO: nextWeekKey,
     sourceWeekStartISO: weekKey,
-    entertainmentPenalty,
-    miscPenalty,
-    totalPenalty: entertainmentPenalty + miscPenalty
+    categoryPenalties,
+    totalPenalty
   };
 
   state.weeklyClosures[weekKey] = {
     weekStartISO: weekKey,
     closedAtISO: new Date().toISOString(),
-    entertainmentPenalty,
-    miscPenalty,
-    totalPenalty: entertainmentPenalty + miscPenalty
+    categoryPenalties,
+    totalPenalty
   };
 
   saveState();
-  showToast(`Week closed. Next week reduced by ${money(entertainmentPenalty + miscPenalty)}.`);
+  showToast(`Week closed. Next week reduced by ${money(totalPenalty)}.`);
   render();
 }
 
@@ -2651,14 +3550,23 @@ function reopenWeek() {
   const weekKey = getWeekKey(getReferenceDateISO(state.ui.selectedMonth));
   const closure = state.weeklyClosures[weekKey];
   if (!closure) {
-    showToast("No week close to clear.");
+    showToast("No week close to reopen.");
     return;
   }
+  const ok = window.confirm("Reopen this week? This removes the week closure and the next-week budget adjustment created from it.");
+  if (!ok) return;
   const nextWeekKey = shiftDateISO(weekKey, 7);
   delete state.weeklyClosures[weekKey];
   delete state.weeklyBudgetAdjustments[nextWeekKey];
   saveState();
-  showToast("Week close cleared.");
+  showToast("Week reopened.");
+  render();
+}
+
+function reviewLastWeek() {
+  state.ui.txFilter = "week";
+  showToast("Review last week's activity, then close when ready.");
+  saveState();
   render();
 }
 
@@ -2667,7 +3575,10 @@ function saveSettings(event) {
   const next = structuredClone(state);
   const formData = new FormData(event.currentTarget);
   for (const [path, rawValue] of formData.entries()) {
-    setByPath(next, path, rawValue === "" ? null : Number(rawValue));
+    const value = path === "settings.reserve.projectionAnchorMonth"
+      ? normalizeMonthValue(rawValue) || currentMonthKey()
+      : rawValue === "" ? null : Number(rawValue);
+    setByPath(next, path, value);
   }
   state = normalizeState(next);
   saveState();
@@ -2929,16 +3840,194 @@ function restoreBackgroundSection(sectionId) {
   openManageBackgroundSections();
 }
 
+function saveReserveAccountEdits(event, accountId) {
+  event.preventDefault();
+  const next = structuredClone(state);
+  const account = next.settings.reserve.accounts.find((entry) => entry.id === accountId);
+  if (!account) return;
+  const formData = new FormData(event.currentTarget);
+  account.label = String(formData.get("label") || account.label).trim() || account.label;
+  account.balance = Number(formData.get("balance")) || 0;
+  account.displayOrder = Number(formData.get("displayOrder")) || account.displayOrder;
+  account.includeInRunway = formData.has("includeInRunway");
+  account.includeInVaultTotal = formData.has("includeInVaultTotal");
+  account.active = formData.has("active");
+  state = normalizeState(next);
+  saveState();
+  closeQuickAdd();
+  showToast("Reserve account updated.");
+  render();
+}
+
+function archiveReserveAccount(accountId) {
+  const next = structuredClone(state);
+  const account = next.settings.reserve.accounts.find((entry) => entry.id === accountId);
+  if (!account) return;
+  account.active = false;
+  account.archived = true;
+  state = normalizeState(next);
+  saveState();
+  closeQuickAdd();
+  showToast("Reserve account archived.");
+  render();
+}
+
+function restoreReserveAccount(accountId) {
+  const next = structuredClone(state);
+  const account = next.settings.reserve.accounts.find((entry) => entry.id === accountId);
+  if (!account) return;
+  account.active = true;
+  account.archived = false;
+  state = normalizeState(next);
+  saveState();
+  openManageReserveAccounts();
+}
+
+function saveReserveAccountsManager(event) {
+  event.preventDefault();
+  const next = structuredClone(state);
+  const formData = new FormData(event.currentTarget);
+  next.settings.reserve.accounts.forEach((account) => {
+    const raw = formData.get(`account-order:${account.id}`);
+    if (raw != null) account.displayOrder = Number(raw) || account.displayOrder;
+  });
+  state = normalizeState(next);
+  saveState();
+  openManageReserveAccounts();
+  showToast("Reserve account order saved.");
+}
+
+function addReserveAccount(event) {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  const label = String(formData.get("label") || "").trim();
+  if (!label) return;
+  const next = structuredClone(state);
+  next.settings.reserve.accounts.push({
+    id: uniqueReserveAccountId(label, next.settings.reserve.accounts),
+    label,
+    balance: Number(formData.get("balance")) || 0,
+    includeInRunway: formData.has("includeInRunway"),
+    includeInVaultTotal: formData.has("includeInVaultTotal"),
+    active: formData.has("active"),
+    archived: false,
+    displayOrder: next.settings.reserve.accounts.length + 1
+  });
+  state = normalizeState(next);
+  saveState();
+  openManageReserveAccounts();
+  showToast("Reserve account added.");
+}
+
+function saveProjectionEventEdits(event, eventId) {
+  event.preventDefault();
+  const next = structuredClone(state);
+  const item = next.settings.reserve.events.find((entry) => entry.id === eventId);
+  if (!item) return;
+  const formData = new FormData(event.currentTarget);
+  item.label = String(formData.get("label") || item.label).trim() || item.label;
+  item.type = String(formData.get("type") || item.type) === "oneTime" ? "oneTime" : "monthly";
+  item.amount = Number(formData.get("amount")) || 0;
+  item.startMonth = normalizeMonthValue(formData.get("startMonth")) || item.startMonth || state.ui.selectedMonth;
+  item.endMonth = normalizeMonthValue(formData.get("endMonth"));
+  item.month = normalizeMonthValue(formData.get("month"));
+  item.displayOrder = Number(formData.get("displayOrder")) || item.displayOrder;
+  item.affectsProjection = formData.has("affectsProjection");
+  item.active = formData.has("active");
+  state = normalizeState(next);
+  saveState();
+  closeQuickAdd();
+  showToast("Projection event updated.");
+  render();
+}
+
+function archiveProjectionEvent(eventId) {
+  const next = structuredClone(state);
+  const item = next.settings.reserve.events.find((entry) => entry.id === eventId);
+  if (!item) return;
+  item.active = false;
+  item.archived = true;
+  state = normalizeState(next);
+  saveState();
+  closeQuickAdd();
+  showToast("Projection event archived.");
+  render();
+}
+
+function restoreProjectionEvent(eventId) {
+  const next = structuredClone(state);
+  const item = next.settings.reserve.events.find((entry) => entry.id === eventId);
+  if (!item) return;
+  item.active = true;
+  item.archived = false;
+  state = normalizeState(next);
+  saveState();
+  openManageProjectionEvents();
+}
+
+function saveProjectionEventsManager(event) {
+  event.preventDefault();
+  const next = structuredClone(state);
+  const formData = new FormData(event.currentTarget);
+  next.settings.reserve.events.forEach((item) => {
+    const raw = formData.get(`event-order:${item.id}`);
+    if (raw != null) item.displayOrder = Number(raw) || item.displayOrder;
+  });
+  state = normalizeState(next);
+  saveState();
+  openManageProjectionEvents();
+  showToast("Projection event order saved.");
+}
+
+function addProjectionEvent(event) {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  const label = String(formData.get("label") || "").trim();
+  if (!label) return;
+  const next = structuredClone(state);
+  const type = String(formData.get("type") || "monthly") === "oneTime" ? "oneTime" : "monthly";
+  next.settings.reserve.events.push({
+    id: uniqueReserveEventId(label, next.settings.reserve.events),
+    label,
+    type,
+    amount: Number(formData.get("amount")) || 0,
+    startMonth: normalizeMonthValue(formData.get("startMonth")) || state.ui.selectedMonth,
+    endMonth: normalizeMonthValue(formData.get("endMonth")),
+    month: normalizeMonthValue(formData.get("month")),
+    active: formData.has("active"),
+    archived: false,
+    affectsProjection: formData.has("affectsProjection"),
+    displayOrder: next.settings.reserve.events.length + 1
+  });
+  state = normalizeState(next);
+  saveState();
+  openManageProjectionEvents();
+  showToast("Projection event added.");
+}
+
 function recalcReserveFromLedger() {
-  state.settings.systemCore.reserveBalanceNow = calculateReserveFromLedger(state.settings.reserveSchedule);
+  const ledgerTotal = calculateReserveFromLedger(state.settings.reserveSchedule);
+  const next = structuredClone(state);
+  const account = next.settings.reserve.accounts.find((entry) => entry.id === "cash-reserve") || next.settings.reserve.accounts[0];
+  if (account) account.balance = ledgerTotal;
+  next.settings.systemCore.reserveBalanceNow = ledgerTotal;
+  state = normalizeState(next);
   saveState();
   showToast("Reserve recalculated from ledger.");
   render();
 }
 
 function exportJSON() {
+  state.monthReviews ||= {};
+  state.monthReviews[state.ui.selectedMonth] = {
+    ...(state.monthReviews[state.ui.selectedMonth] || {}),
+    backupDone: true,
+    backupDoneAtISO: new Date().toISOString()
+  };
+  saveState();
   downloadText(`finance-cashflow-os-v11-${state.ui.selectedMonth}.json`, JSON.stringify(state, null, 2), "application/json");
-  showToast("JSON exported.");
+  showToast("JSON exported. Backup marked done.");
+  render();
 }
 
 function importJSON(event) {
@@ -3000,12 +4089,12 @@ function calculateTotals() {
     investment: calculateInvestmentTotal(),
     fixed: calculateTotalByType("fixed"),
     debt: calculateTotalByType("debt"),
-    variableEssentials: sum(categories.filter((item) => item.includeInVariableTotal && getMonitorBehaviorType(item) === "essentials").map((item) => Number(item.monthlyBudget) || 0)),
-    discretionary: sum(categories.filter((item) => item.includeInVariableTotal && getMonitorBehaviorType(item) === "discretionary").map((item) => Number(item.monthlyBudget) || 0)),
-    variableTotal: sum(categories.filter((item) => item.includeInVariableTotal).map((item) => Number(item.monthlyBudget) || 0)),
-    reserveLedger: calculateReserveFromLedger(state.settings.reserveSchedule)
-    ,
-    reserveAccountsTotal: calculateReserveFromLedger(state.settings.reserveSchedule),
+    variableEssentials: sum(categories.filter((item) => isVariableTotalCategory(item) && getCategoryDisplayGroup(item) === "essentials").map((item) => Number(item.monthlyBudget) || 0)),
+    discretionary: sum(categories.filter((item) => isVariableTotalCategory(item) && getCategoryDisplayGroup(item) === "discretionary").map((item) => Number(item.monthlyBudget) || 0)),
+    customVariable: sum(categories.filter((item) => isVariableTotalCategory(item) && getCategoryDisplayGroup(item) === "custom").map((item) => Number(item.monthlyBudget) || 0)),
+    variableTotal: sum(categories.filter(isVariableTotalCategory).map((item) => Number(item.monthlyBudget) || 0)),
+    reserveLedger: calculateReserveFromLedger(state.settings.reserveSchedule),
+    reserveAccountsTotal: calculateReserveVaultTotal(),
     fixedDebtTotal: calculateFixedDebtTotal(),
     incomeTotal: calculateIncomeTotal()
   };
@@ -3089,6 +4178,11 @@ function defaultDateForMonth(monthKey) {
   return monthKey === currentMonthKey() ? currentDateISO() : `${monthKey}-01`;
 }
 
+function normalizeMonthValue(value) {
+  const text = String(value || "").trim();
+  return /^\d{4}-\d{2}$/.test(text) ? text : null;
+}
+
 function firstOfNextMonth(dateISO) {
   const [year, month] = dateISO.slice(0, 7).split("-").map(Number);
   const next = month === 12 ? [year + 1, 1] : [year, month + 1];
@@ -3162,6 +4256,20 @@ function formatDate(dateISO) {
   });
 }
 
+function formatMonthLabel(monthKey) {
+  return new Date(`${monthKey}-01T00:00:00`).toLocaleDateString("en-CA", {
+    month: "short",
+    year: "numeric"
+  });
+}
+
+function formatProjectionLabel(dateISO) {
+  return new Date(`${dateISO}T00:00:00`).toLocaleDateString("en-CA", {
+    month: "short",
+    year: "numeric"
+  });
+}
+
 function startCase(value) {
   return String(value)
     .replace(/([A-Z])/g, " $1")
@@ -3195,6 +4303,14 @@ function uniqueSectionId(label, existing) {
 }
 
 function uniqueBackgroundItemId(label, existing) {
+  return uniqueSlug(label, existing.map((item) => item.id));
+}
+
+function uniqueReserveAccountId(label, existing) {
+  return uniqueSlug(label, existing.map((item) => item.id));
+}
+
+function uniqueReserveEventId(label, existing) {
   return uniqueSlug(label, existing.map((item) => item.id));
 }
 

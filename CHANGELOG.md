@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-04-29 · v13.3 Workflow Simplification + Review Rituals
+
+- Reworked Weekly Impact into a scoped weekly close workflow with in-progress, ready, closed, reopen, and last-week reminder states.
+- Added Month Outlook for Month scope so monthly trend review no longer shows weekly close controls.
+- Added a lightweight Month Setup review ritual with reviewed/backup status, and moved legacy reserve ledger into Data / Compatibility.
+- Simplified Planning Summary into status navigation tiles and reduced Monitor card default detail density with expandable card details.
+- Renamed Recent to Recent Activity, clarified View / Edit transaction management, and updated service worker cache to `finance-tracker-cache-v13-3`.
+
+## 2026-04-29 · v13.2.1 Stability + True Dynamic Discipline
+
+- Converted weekly close carryover from hardcoded entertainment/misc fields to dynamic `categoryPenalties` maps for all penalty-rule categories.
+- Added compatibility migration for old `entertainmentPenalty` / `miscPenalty` adjustment and closure records.
+- Decoupled category display group from rule type, with dedicated track-only behavior that does not trigger warnings, freeze states, or penalties.
+- Split Reserve Vault total from Reserve Runway balance so `includeInRunway` now affects runway calculations correctly.
+- Added a reserve projection anchor month and year-aware Sep/Jan projection labels so reserve projections no longer shift when the spending month changes.
+- Updated service worker cache version to `finance-tracker-cache-v13-2-1`.
+
+## 2026-04-29 · v13.2 Flexible Reserve Engine
+
+- Added config-driven Reserve Vault accounts and projection events while preserving the existing storage key and legacy reserve fields.
+- Migrated reserve calculations so runway, vault total, and Sep/Jan projections now read from active reserve accounts and projection events by default.
+- Reworked Planning Reserve into account and event summaries with dedicated manage sheets, while downgrading the old reserve ledger into a legacy compatibility section.
+- Kept the legacy reserve ledger and recalculation path intact, with recalculation now updating the primary cash reserve account.
+- Updated service worker cache version to `finance-tracker-cache-v13-2`.
+
 ## 2026-04-29 · v13.1 Planning Edit Mode
 
 - Added Budget Planning manage flows with category gear sheets, add-category flow, archive/restore support, and simple display-order management.
