@@ -1,300 +1,31 @@
-const APP_VERSION = "v13.3 Workflow Simplification + Review Rituals";
-const SCHEMA_VERSION = 11;
-const STORAGE_KEY = "financeCashflowOS_v11";
-const LEGACY_KEYS = ["financePlanner_v2", "finance-box-budget-v3"];
-const BASE_PATH = "/finance-tracker/";
-
-const DEFAULT_MONITOR_CATEGORIES = [
-  {
-    id: "groceries",
-    label: "Groceries",
-    icon: "🧺",
-    group: "essentials",
-    monthlyBudget: 750,
-    monitor: true,
-    allowTransactions: true,
-    includeInVariableTotal: true,
-    includeInWeeklyDiscipline: true,
-    ruleType: "softCap",
-    softCapMultiplier: 1.1,
-    penaltyMultiplier: null,
-    minPenaltyUnit: null,
-    priority: "primary",
-    displayOrder: 1,
-    active: true,
-    archived: false
-  },
-  {
-    id: "charging",
-    label: "Charging/407",
-    icon: "⚡",
-    group: "essentials",
-    monthlyBudget: 150,
-    monitor: true,
-    allowTransactions: true,
-    includeInVariableTotal: true,
-    includeInWeeklyDiscipline: true,
-    ruleType: "softCap",
-    softCapMultiplier: 1.1,
-    penaltyMultiplier: null,
-    minPenaltyUnit: null,
-    priority: "primary",
-    displayOrder: 2,
-    active: true,
-    archived: false
-  },
-  {
-    id: "entertainment",
-    label: "Entertainment",
-    icon: "🎟",
-    group: "discretionary",
-    monthlyBudget: 300,
-    monitor: true,
-    allowTransactions: true,
-    includeInVariableTotal: true,
-    includeInWeeklyDiscipline: true,
-    ruleType: "penalty",
-    softCapMultiplier: null,
-    penaltyMultiplier: 1.5,
-    minPenaltyUnit: 5,
-    priority: "primary",
-    displayOrder: 3,
-    active: true,
-    archived: false
-  },
-  {
-    id: "misc",
-    label: "Misc",
-    icon: "◼",
-    group: "discretionary",
-    monthlyBudget: 150,
-    monitor: true,
-    allowTransactions: true,
-    includeInVariableTotal: true,
-    includeInWeeklyDiscipline: true,
-    ruleType: "penalty",
-    softCapMultiplier: null,
-    penaltyMultiplier: 1.5,
-    minPenaltyUnit: 5,
-    priority: "primary",
-    displayOrder: 4,
-    active: true,
-    archived: false
-  }
-];
-
-const DEFAULT_BACKGROUND_SECTIONS = [
-  {
-    id: "core-income",
-    label: "Core Income",
-    type: "income",
-    displayOrder: 1,
-    active: true,
-    archived: false,
-    items: [
-      { id: "pw-salary", label: "PW Salary", amount: 5897, frequency: "monthly", includeInGap: false, includeInProjection: false, includeInSummary: true, active: true, archived: false }
-    ]
-  },
-  {
-    id: "reserve-income",
-    label: "Reserve Income",
-    type: "income",
-    displayOrder: 2,
-    active: true,
-    archived: false,
-    items: [
-      { id: "mv-contrib", label: "MV Contrib", amount: 1500, frequency: "monthly", includeInGap: false, includeInProjection: true, includeInSummary: true, active: true, archived: false },
-      { id: "leo-debt", label: "Leo Debt", amount: 700, frequency: "monthly", includeInGap: false, includeInProjection: true, includeInSummary: true, active: true, archived: false }
-    ]
-  },
-  {
-    id: "investment",
-    label: "Investment",
-    type: "investment",
-    displayOrder: 3,
-    active: true,
-    archived: false,
-    items: [
-      { id: "investment", label: "Investment", amount: 217, frequency: "monthly", includeInGap: false, includeInProjection: false, includeInSummary: true, active: true, archived: false }
-    ]
-  },
-  {
-    id: "fixed",
-    label: "Fixed",
-    type: "fixed",
-    displayOrder: 4,
-    active: true,
-    archived: false,
-    items: [
-      { id: "insurance", label: "Insurance", amount: 558, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false },
-      { id: "condo-admin", label: "Condo Admin", amount: 564, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false },
-      { id: "property-tax", label: "Property Tax", amount: 267, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false },
-      { id: "internet", label: "Internet", amount: 49, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false },
-      { id: "pw-trust", label: "PW Trust", amount: 600, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false, systemNote: "Background only. Never appears in Quick Add or Monitor." }
-    ]
-  },
-  {
-    id: "debt",
-    label: "Debt",
-    type: "debt",
-    displayOrder: 5,
-    active: true,
-    archived: false,
-    items: [
-      { id: "mortgage", label: "Mortgage", amount: 2167, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false },
-      { id: "car-payment", label: "Car Payment", amount: 682, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false },
-      { id: "ikea-payment", label: "IKEA Payment", amount: 113, frequency: "monthly", includeInGap: true, includeInProjection: false, includeInSummary: true, active: true, archived: false }
-    ]
-  }
-];
-
-const DEFAULT_RESERVE = {
-  projectionAnchorMonth: currentMonthKey(),
-  accounts: [
-    {
-      id: "cash-reserve",
-      label: "Cash Reserve",
-      balance: 4231,
-      includeInRunway: true,
-      includeInVaultTotal: true,
-      active: true,
-      archived: false,
-      displayOrder: 1
-    }
-  ],
-  events: [
-    {
-      id: "stable-gap",
-      label: "Stable Base Gap",
-      type: "monthly",
-      amount: -669,
-      startMonth: "2026-05",
-      endMonth: null,
-      active: true,
-      archived: false,
-      affectsProjection: true,
-      displayOrder: 1
-    },
-    {
-      id: "mv-contrib-may-aug",
-      label: "MV Contrib",
-      type: "monthly",
-      amount: 1500,
-      startMonth: "2026-05",
-      endMonth: "2026-08",
-      active: true,
-      archived: false,
-      affectsProjection: true,
-      displayOrder: 2
-    },
-    {
-      id: "leo-debt-2026",
-      label: "Leo Debt",
-      type: "monthly",
-      amount: 700,
-      startMonth: "2026-05",
-      endMonth: "2026-12",
-      active: true,
-      archived: false,
-      affectsProjection: true,
-      displayOrder: 3
-    }
-  ]
-};
-
-const LEGACY_CATEGORY_ALIASES = {
-  groceries: ["groceries", "grocery", "food & groceries"],
-  charging: ["charging", "charging/407", "car407", "407", "car / charging / 407"],
-  entertainment: ["entertainment", "eat out", "dining", "food & rto", "eatout"],
-  misc: ["misc", "household misc", "personal spending"]
-};
-
-const TABS = [
-  { id: "monitor", label: "Monitor" },
-  { id: "planning", label: "Planning" }
-];
+const APP_VERSION = "V3.1.1 UX Polish";
+const SCHEMA_VERSION = 3;
+const STORAGE_KEY = "financeTracker_v3";
 
 const DEFAULT_STATE = {
-  schemaVersion: SCHEMA_VERSION,
   appVersion: APP_VERSION,
+  schemaVersion: SCHEMA_VERSION,
   ui: {
     activeTab: "monitor",
     selectedMonth: currentMonthKey(),
+    monitorScope: "week",
     txFilter: "month",
     editingTransactionId: null,
-    monitorScope: "week",
-    planningOpenSections: {
-      summary: true,
-      review: false,
-      budget: false,
-      reserve: false,
-      ledger: false,
-      background: false,
-      data: false
-    },
+    monitorExpandedCards: {},
     lastTransactionTemplate: null,
-    monitorExpandedCards: {}
+    weeklyCloseExpanded: false,
+    returnToQuickAddAfterCategoryCreate: false
   },
   settings: {
-    systemCore: {
-      reserveBalanceNow: 4231,
-      stableBaseGapMonthly: 669
-    },
-    budgetsMonthly: {
-      groceries: 750,
-      charging: 150,
-      entertainment: 300,
-      misc: 150
-    },
     weeklyRules: {
       weekStart: "MON",
       penaltyMultiplier: 1.5,
       minPenaltyUnit: 5,
-      defaultSoftCapMultiplier: 1.1,
-      grocerySoftCapMultiplier: 1.1,
-      chargingSoftCapMultiplier: 1.1
+      defaultSoftCapMultiplier: 1.1
     },
-    monitorCategories: structuredClone(DEFAULT_MONITOR_CATEGORIES),
-    reserveSchedule: {
-      preMay: 2700,
-      may: 1531,
-      june: null,
-      july: null,
-      august: null,
-      september: null,
-      october: null,
-      november: null,
-      december: null,
-      mayToAugMonthlyNet: 1531,
-      sepToDecMonthlyNet: 31,
-      janPlusMonthlyNet: -669
-    },
-    reserve: structuredClone(DEFAULT_RESERVE),
-    background: {
-      coreIncome: {
-        pwSalary: 5897
-      },
-      reserveIncome: {
-        mvContrib: 1500,
-        leoDebt: 700
-      },
-      investment: {
-        investment: 217
-      },
-      fixed: {
-        insurance: 558,
-        condoAdmin: 564,
-        propertyTax: 267,
-        internet: 49,
-        pwTrust: 600
-      },
-      debt: {
-        mortgage: 2167,
-        carPayment: 682,
-        ikeaPayment: 113
-      }
-    },
-    backgroundSections: structuredClone(DEFAULT_BACKGROUND_SECTIONS)
+    monitorCategories: [],
+    reserveVaults: [],
+    backgroundSections: []
   },
   transactions: [],
   weeklyBudgetAdjustments: {},
@@ -302,7 +33,19 @@ const DEFAULT_STATE = {
   monthReviews: {}
 };
 
+const TABS = [
+  { id: "monitor", label: "Monitor" },
+  { id: "planning", label: "Planning" }
+];
+
+const CATEGORY_GROUPS = ["essentials", "discretionary", "custom"];
+const RULE_TYPES = ["softCap", "penalty", "trackOnly"];
+const VAULT_COLORS = ["gold", "green", "slate", "red", "neutral"];
+const REVIEW_KEYS = ["reviewSpendingDone", "adjustBudgetsDone", "updateVaultsDone", "backupDone"];
+
 let state = loadState();
+let toastTimer = null;
+let pendingCsvImport = null;
 
 const app = document.querySelector("#app");
 const monthInput = document.querySelector("#monthInput");
@@ -310,14 +53,30 @@ const bottomNav = document.querySelector("#bottomNav");
 const pageTitle = document.querySelector("#pageTitle");
 const headerStatus = document.querySelector("#headerStatus");
 const modalRoot = document.querySelector("#modalRoot");
-let toastTimer = null;
 
 init();
 
 function init() {
+  lockMobileZoom();
   monthInput.value = state.ui.selectedMonth;
   bindShellEvents();
   render();
+}
+
+function lockMobileZoom() {
+  const prevent = (event) => event.preventDefault();
+  ["gesturestart", "gesturechange", "gestureend"].forEach((name) => {
+    document.addEventListener(name, prevent, { passive: false });
+  });
+
+  let lastTouchEnd = 0;
+  document.addEventListener("touchend", (event) => {
+    const target = event.target;
+    if (target?.closest?.("input, textarea, select, [contenteditable='true']")) return;
+    const now = Date.now();
+    if (now - lastTouchEnd < 300) event.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
 }
 
 function bindShellEvents() {
@@ -342,825 +101,201 @@ function bindShellEvents() {
 }
 
 function loadState() {
-  const primary = parseStored(STORAGE_KEY);
-  if (primary) return normalizeState(primary);
-
-  for (const key of LEGACY_KEYS) {
-    const legacy = parseStored(key);
-    if (legacy) {
-      const migrated = normalizeState(migrateLegacyState(legacy, key));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
-      return migrated;
-    }
-  }
-
-  return structuredClone(DEFAULT_STATE);
+  const stored = parseStored(STORAGE_KEY);
+  if (!stored) return structuredClone(DEFAULT_STATE);
+  return normalizeState(stored);
 }
 
 function parseStored(key) {
   try {
     const text = localStorage.getItem(key);
-    if (!text) return null;
-    return JSON.parse(text);
+    return text ? JSON.parse(text) : null;
   } catch {
     return null;
   }
 }
 
 function normalizeState(raw) {
-  const merged = deepMerge(structuredClone(DEFAULT_STATE), raw || {});
-  merged.schemaVersion = SCHEMA_VERSION;
-  merged.appVersion = APP_VERSION;
-  merged.ui ||= {};
-  if (["home", "transactions"].includes(merged.ui.activeTab)) merged.ui.activeTab = "monitor";
-  if (merged.ui.activeTab === "settings") merged.ui.activeTab = "planning";
-  merged.ui.activeTab = TABS.some((tab) => tab.id === merged.ui.activeTab) ? merged.ui.activeTab : "monitor";
-  merged.ui.selectedMonth ||= currentMonthKey();
-  merged.ui.txFilter ||= "month";
-  merged.ui.editingTransactionId ||= null;
-  merged.ui.monitorScope = merged.ui.monitorScope === "month" ? "month" : "week";
-  merged.ui.planningOpenSections = deepMerge(
-    structuredClone(DEFAULT_STATE.ui.planningOpenSections),
-    merged.ui.planningOpenSections || {}
-  );
-  merged.ui.lastTransactionTemplate = normalizeTemplate(merged.ui.lastTransactionTemplate);
-  merged.ui.monitorExpandedCards = isObject(merged.ui.monitorExpandedCards) ? merged.ui.monitorExpandedCards : {};
-  merged.settings ||= structuredClone(DEFAULT_STATE.settings);
-  merged.settings.weeklyRules ||= structuredClone(DEFAULT_STATE.settings.weeklyRules);
-  merged.settings.weeklyRules.defaultSoftCapMultiplier ||= 1.1;
-  merged.settings.monitorCategories = normalizeMonitorCategories(
-    Array.isArray(raw?.settings?.monitorCategories) && raw.settings.monitorCategories.length
-      ? raw.settings.monitorCategories
-      : buildMonitorCategoriesFromLegacy(merged.settings)
-  );
-  merged.settings.backgroundSections = normalizeBackgroundSections(
-    Array.isArray(raw?.settings?.backgroundSections) && raw.settings.backgroundSections.length
-      ? raw.settings.backgroundSections
-      : buildBackgroundSectionsFromLegacy(merged.settings.background)
-  );
-  merged.settings.reserve = normalizeReserve(
-    isObject(raw?.settings?.reserve) ? raw.settings.reserve : buildReserveFromLegacy(merged.settings, merged.ui.selectedMonth)
-  );
-  merged.settings.systemCore.reserveBalanceNow = calculateReserveVaultTotalFromSettings(merged.settings);
-  merged.settings.systemCore.stableBaseGapMonthly = getStableGapFromSettings(merged.settings);
-  merged.settings.budgetsMonthly = buildLegacyBudgetsMonthly(merged.settings.monitorCategories);
-  merged.settings.background = buildLegacyBackgroundFromSections(merged.settings.backgroundSections, merged.settings.background);
-  merged.transactions = Array.isArray(merged.transactions) ? merged.transactions.map(normalizeTransaction).filter(Boolean) : [];
-  merged.weeklyBudgetAdjustments = normalizeAdjustments(merged.weeklyBudgetAdjustments);
-  merged.weeklyClosures = normalizeClosures(merged.weeklyClosures);
-  merged.monthReviews = isObject(merged.monthReviews) ? merged.monthReviews : {};
-  return merged;
+  const next = structuredClone(DEFAULT_STATE);
+  const input = isObject(raw) ? raw : {};
+
+  next.appVersion = APP_VERSION;
+  next.schemaVersion = SCHEMA_VERSION;
+  next.ui = {
+    ...next.ui,
+    ...(isObject(input.ui) ? input.ui : {})
+  };
+  next.ui.activeTab = TABS.some((tab) => tab.id === next.ui.activeTab) ? next.ui.activeTab : "monitor";
+  next.ui.selectedMonth = normalizeMonthValue(next.ui.selectedMonth) || currentMonthKey();
+  next.ui.monitorScope = next.ui.monitorScope === "month" ? "month" : "week";
+  next.ui.txFilter ||= next.ui.monitorScope === "month" ? "month" : "week";
+  next.ui.editingTransactionId ||= null;
+  next.ui.monitorExpandedCards = isObject(input.ui?.monitorExpandedCards) ? input.ui.monitorExpandedCards : {};
+  next.ui.lastTransactionTemplate = normalizeTemplate(input.ui?.lastTransactionTemplate);
+  next.ui.weeklyCloseExpanded = Boolean(input.ui?.weeklyCloseExpanded);
+  next.ui.returnToQuickAddAfterCategoryCreate = Boolean(input.ui?.returnToQuickAddAfterCategoryCreate);
+
+  const settings = isObject(input.settings) ? input.settings : {};
+  next.settings.weeklyRules = normalizeWeeklyRules(settings.weeklyRules);
+  next.settings.monitorCategories = Array.isArray(settings.monitorCategories)
+    ? settings.monitorCategories.map(normalizeCategory).filter(Boolean).sort(byDisplayOrder)
+    : [];
+  next.settings.reserveVaults = Array.isArray(settings.reserveVaults)
+    ? settings.reserveVaults.map(normalizeVault).filter(Boolean).sort(byDisplayOrder)
+    : [];
+  next.settings.backgroundSections = Array.isArray(settings.backgroundSections)
+    ? settings.backgroundSections.map(normalizeBackgroundSection).filter(Boolean).sort(byDisplayOrder)
+    : [];
+
+  next.transactions = Array.isArray(input.transactions)
+    ? input.transactions.map(normalizeTransaction).filter(Boolean)
+    : [];
+  next.weeklyBudgetAdjustments = normalizeWeekMap(input.weeklyBudgetAdjustments);
+  next.weeklyClosures = normalizeWeekMap(input.weeklyClosures);
+  next.monthReviews = normalizeMonthReviews(input.monthReviews);
+  return next;
 }
 
-function normalizeTemplate(raw) {
-  if (!isObject(raw)) return null;
-  const category = normalizeCategory(raw.category);
+function normalizeWeeklyRules(raw) {
+  const defaults = DEFAULT_STATE.settings.weeklyRules;
   return {
+    weekStart: "MON",
+    penaltyMultiplier: Number(raw?.penaltyMultiplier ?? defaults.penaltyMultiplier) || defaults.penaltyMultiplier,
+    minPenaltyUnit: Number(raw?.minPenaltyUnit ?? defaults.minPenaltyUnit) || defaults.minPenaltyUnit,
+    defaultSoftCapMultiplier: Number(raw?.defaultSoftCapMultiplier ?? defaults.defaultSoftCapMultiplier) || defaults.defaultSoftCapMultiplier
+  };
+}
+
+function normalizeCategory(raw) {
+  if (!isObject(raw)) return null;
+  const label = String(raw.label || raw.name || "").trim();
+  const id = String(raw.id || slugify(label)).trim();
+  if (!id && !label) return null;
+  return {
+    id: id || uid("cat"),
+    label: label || startCase(id),
+    icon: String(raw.icon || "◼").trim() || "◼",
+    group: CATEGORY_GROUPS.includes(raw.group) ? raw.group : "custom",
+    monthlyBudget: Number(raw.monthlyBudget) || 0,
+    monitor: raw.monitor !== false,
+    allowTransactions: raw.allowTransactions !== false,
+    includeInVariableTotal: raw.includeInVariableTotal !== false,
+    includeInWeeklyDiscipline: raw.includeInWeeklyDiscipline !== false,
+    ruleType: RULE_TYPES.includes(raw.ruleType) ? raw.ruleType : "trackOnly",
+    softCapMultiplier: raw.softCapMultiplier === null || raw.softCapMultiplier === "" ? null : Number(raw.softCapMultiplier ?? state?.settings?.weeklyRules?.defaultSoftCapMultiplier ?? 1.1),
+    penaltyMultiplier: raw.penaltyMultiplier === null || raw.penaltyMultiplier === "" ? null : Number(raw.penaltyMultiplier ?? state?.settings?.weeklyRules?.penaltyMultiplier ?? 1.5),
+    minPenaltyUnit: raw.minPenaltyUnit === null || raw.minPenaltyUnit === "" ? null : Number(raw.minPenaltyUnit ?? state?.settings?.weeklyRules?.minPenaltyUnit ?? 5),
+    priority: ["primary", "secondary", "hidden"].includes(raw.priority) ? raw.priority : "primary",
+    displayOrder: Number(raw.displayOrder) || 1,
+    active: raw.active !== false,
+    archived: Boolean(raw.archived)
+  };
+}
+
+function normalizeVault(raw) {
+  if (!isObject(raw)) return null;
+  const name = String(raw.name || raw.label || "").trim();
+  const id = String(raw.id || slugify(name)).trim();
+  if (!id && !name) return null;
+  return {
+    id: id || uid("vault"),
+    name: name || startCase(id),
+    currentAmount: Number(raw.currentAmount ?? raw.balance) || 0,
+    targetAmount: raw.targetAmount === "" || raw.targetAmount == null ? null : Number(raw.targetAmount) || null,
+    note: String(raw.note || "").trim(),
+    includeInMonitor: raw.includeInMonitor !== false,
+    colorToken: VAULT_COLORS.includes(raw.colorToken) ? raw.colorToken : "gold",
+    displayOrder: Number(raw.displayOrder) || 1,
+    active: raw.active !== false,
+    archived: Boolean(raw.archived)
+  };
+}
+
+function normalizeBackgroundSection(raw) {
+  if (!isObject(raw)) return null;
+  const label = String(raw.label || raw.name || "").trim();
+  const id = String(raw.id || slugify(label)).trim();
+  if (!id && !label) return null;
+  return {
+    id: id || uid("section"),
+    label: label || startCase(id),
+    type: ["income", "fixed", "debt", "investment", "other"].includes(raw.type) ? raw.type : "other",
+    displayOrder: Number(raw.displayOrder) || 1,
+    active: raw.active !== false,
+    archived: Boolean(raw.archived),
+    items: Array.isArray(raw.items) ? raw.items.map(normalizeBackgroundItem).filter(Boolean) : []
+  };
+}
+
+function normalizeBackgroundItem(raw) {
+  if (!isObject(raw)) return null;
+  const label = String(raw.label || raw.name || "").trim();
+  const id = String(raw.id || slugify(label)).trim();
+  if (!id && !label) return null;
+  return {
+    id: id || uid("item"),
+    label: label || startCase(id),
     amount: Number(raw.amount) || 0,
-    category: category || getActiveTransactionCategoriesFromState(DEFAULT_STATE).at(0)?.id || "groceries",
+    frequency: ["monthly", "annual", "oneTime"].includes(raw.frequency) ? raw.frequency : "monthly",
+    active: raw.active !== false,
+    archived: Boolean(raw.archived)
+  };
+}
+
+function normalizeTransaction(raw) {
+  if (!isObject(raw)) return null;
+  const amount = Number(raw.amount) || 0;
+  const category = String(raw.category || "").trim();
+  const dateISO = normalizeDateValue(raw.dateISO || raw.date);
+  if (!amount || !category || !dateISO) return null;
+  return {
+    id: String(raw.id || uid("txn")),
+    dateISO,
+    amount,
+    category,
     note: String(raw.note || "").trim()
   };
 }
 
-function normalizeMonitorCategories(items) {
-  const source = Array.isArray(items) && items.length ? items : DEFAULT_MONITOR_CATEGORIES;
-  return source
-    .map((item, index) => ({
-      id: String(item?.id || slugify(item?.label || `category-${index + 1}`)),
-      label: String(item?.label || startCase(item?.id || `Category ${index + 1}`)),
-      icon: String(item?.icon || "•"),
-      group: item?.group === "essentials" ? "essentials" : item?.group === "custom" ? "custom" : "discretionary",
-      monthlyBudget: Number(item?.monthlyBudget) || 0,
-      monitor: item?.monitor !== false,
-      allowTransactions: item?.allowTransactions !== false,
-      includeInVariableTotal: item?.includeInVariableTotal !== false,
-      includeInWeeklyDiscipline: item?.includeInWeeklyDiscipline !== false,
-      ruleType: item?.ruleType === "trackOnly" ? "trackOnly" : item?.ruleType === "softCap" ? "softCap" : "penalty",
-      softCapMultiplier: item?.softCapMultiplier == null ? null : Number(item.softCapMultiplier) || null,
-      penaltyMultiplier: item?.penaltyMultiplier == null ? null : Number(item.penaltyMultiplier) || null,
-      minPenaltyUnit: item?.minPenaltyUnit == null ? null : Number(item.minPenaltyUnit) || null,
-      priority: item?.priority === "secondary" ? "secondary" : item?.priority === "hidden" ? "hidden" : "primary",
-      displayOrder: Number(item?.displayOrder ?? index + 1) || index + 1,
-      active: item?.active !== false,
-      archived: Boolean(item?.archived)
-    }))
-    .sort((a, b) => a.displayOrder - b.displayOrder);
-}
-
-function normalizeBackgroundSections(sections) {
-  const source = Array.isArray(sections) && sections.length ? sections : DEFAULT_BACKGROUND_SECTIONS;
-  return source
-    .map((section, sectionIndex) => ({
-      id: String(section?.id || slugify(section?.label || `section-${sectionIndex + 1}`)),
-      label: String(section?.label || startCase(section?.id || `Section ${sectionIndex + 1}`)),
-      type: String(section?.type || "other"),
-      displayOrder: Number(section?.displayOrder ?? sectionIndex + 1) || sectionIndex + 1,
-      active: section?.active !== false,
-      archived: Boolean(section?.archived),
-      items: Array.isArray(section?.items)
-        ? section.items.map((item, itemIndex) => ({
-            id: String(item?.id || slugify(item?.label || `item-${itemIndex + 1}`)),
-            label: String(item?.label || startCase(item?.id || `Item ${itemIndex + 1}`)),
-            amount: Number(item?.amount) || 0,
-            frequency: item?.frequency === "annual" ? "annual" : item?.frequency === "oneTime" ? "oneTime" : "monthly",
-            type: String(item?.type || section?.type || "other"),
-            includeInGap: Boolean(item?.includeInGap),
-            includeInProjection: Boolean(item?.includeInProjection),
-            includeInSummary: item?.includeInSummary !== false,
-            active: item?.active !== false,
-            archived: Boolean(item?.archived),
-            systemNote: item?.systemNote || ""
-          }))
-        : []
-    }))
-    .sort((a, b) => a.displayOrder - b.displayOrder);
-}
-
-function normalizeReserve(reserve) {
-  const source = isObject(reserve) ? reserve : DEFAULT_RESERVE;
-  const accounts = Array.isArray(source.accounts) && source.accounts.length ? source.accounts : DEFAULT_RESERVE.accounts;
-  const events = Array.isArray(source.events) && source.events.length ? source.events : DEFAULT_RESERVE.events;
+function normalizeTemplate(raw) {
+  if (!isObject(raw)) return null;
   return {
-    projectionAnchorMonth: normalizeMonthValue(source.projectionAnchorMonth || source.anchorMonth) || currentMonthKey(),
-    accounts: accounts
-      .map((account, index) => ({
-        id: String(account?.id || slugify(account?.label || `reserve-account-${index + 1}`)),
-        label: String(account?.label || `Reserve Account ${index + 1}`),
-        balance: Number(account?.balance) || 0,
-        includeInRunway: account?.includeInRunway !== false,
-        includeInVaultTotal: account?.includeInVaultTotal !== false,
-        active: account?.active !== false,
-        archived: Boolean(account?.archived),
-        displayOrder: Number(account?.displayOrder ?? index + 1) || index + 1
-      }))
-      .sort((a, b) => a.displayOrder - b.displayOrder),
-    events: events
-      .map((event, index) => ({
-        id: String(event?.id || slugify(event?.label || `reserve-event-${index + 1}`)),
-        label: String(event?.label || `Reserve Event ${index + 1}`),
-        type: event?.type === "oneTime" ? "oneTime" : "monthly",
-        amount: Number(event?.amount) || 0,
-        startMonth: normalizeMonthValue(event?.startMonth) || currentMonthKey(),
-        endMonth: normalizeMonthValue(event?.endMonth),
-        month: normalizeMonthValue(event?.month),
-        active: event?.active !== false,
-        archived: Boolean(event?.archived),
-        affectsProjection: event?.affectsProjection !== false,
-        displayOrder: Number(event?.displayOrder ?? index + 1) || index + 1
-      }))
-      .sort((a, b) => a.displayOrder - b.displayOrder)
+    amount: Number(raw.amount) || 0,
+    category: String(raw.category || ""),
+    note: String(raw.note || "").trim()
   };
 }
 
-function buildReserveFromLegacy(settings = {}, selectedMonth = currentMonthKey()) {
-  const background = settings?.background || {};
-  const reserveIncome = background.reserveIncome || {};
+function normalizeWeekMap(raw) {
+  if (!isObject(raw)) return {};
+  const out = {};
+  Object.entries(raw).forEach(([key, value]) => {
+    if (isObject(value)) out[key] = value;
+  });
+  return out;
+}
+
+function normalizeMonthReviews(raw) {
+  if (!isObject(raw)) return {};
+  const out = {};
+  Object.entries(raw).forEach(([month, review]) => {
+    if (!normalizeMonthValue(month)) return;
+    out[month] = normalizeMonthReview(review);
+  });
+  return out;
+}
+
+function normalizeMonthReview(raw = {}) {
   return {
-    projectionAnchorMonth: currentMonthKey(),
-    accounts: [
-      {
-        id: "cash-reserve",
-        label: "Cash Reserve",
-        balance: Number(settings?.systemCore?.reserveBalanceNow) || 4231,
-        includeInRunway: true,
-        includeInVaultTotal: true,
-        active: true,
-        archived: false,
-        displayOrder: 1
-      }
-    ],
-    events: [
-      {
-        id: "stable-gap",
-        label: "Stable Base Gap",
-        type: "monthly",
-        amount: -(Number(settings?.systemCore?.stableBaseGapMonthly) || 669),
-        startMonth: selectedMonth || currentMonthKey(),
-        endMonth: null,
-        active: true,
-        archived: false,
-        affectsProjection: true,
-        displayOrder: 1
-      },
-      {
-        id: "mv-contrib-may-aug",
-        label: "MV Contrib",
-        type: "monthly",
-        amount: Number(reserveIncome.mvContrib) || 1500,
-        startMonth: "2026-05",
-        endMonth: "2026-08",
-        active: true,
-        archived: false,
-        affectsProjection: true,
-        displayOrder: 2
-      },
-      {
-        id: "leo-debt-2026",
-        label: "Leo Debt",
-        type: "monthly",
-        amount: Number(reserveIncome.leoDebt) || 700,
-        startMonth: "2026-05",
-        endMonth: "2026-12",
-        active: true,
-        archived: false,
-        affectsProjection: true,
-        displayOrder: 3
-      }
-    ]
+    reviewSpendingDone: Boolean(raw.reviewSpendingDone || raw.reviewed),
+    reviewSpendingDoneAtISO: raw.reviewSpendingDoneAtISO || raw.reviewedAtISO || null,
+    adjustBudgetsDone: Boolean(raw.adjustBudgetsDone),
+    adjustBudgetsDoneAtISO: raw.adjustBudgetsDoneAtISO || null,
+    updateVaultsDone: Boolean(raw.updateVaultsDone),
+    updateVaultsDoneAtISO: raw.updateVaultsDoneAtISO || null,
+    backupDone: Boolean(raw.backupDone),
+    backupDoneAtISO: raw.backupDoneAtISO || null
   };
-}
-
-function normalizeAdjustments(raw) {
-  const result = {};
-  if (!isObject(raw)) return result;
-  Object.entries(raw).forEach(([weekStartISO, item]) => {
-    const categoryPenalties = normalizeCategoryPenalties(item);
-    const legacy = {
-      entertainmentPenalty: Number(item?.entertainmentPenalty ?? item?.entertainment ?? 0) || 0,
-      miscPenalty: Number(item?.miscPenalty ?? item?.misc ?? 0) || 0
-    };
-    result[weekStartISO] = {
-      weekStartISO,
-      sourceWeekStartISO: item?.sourceWeekStartISO || item?.sourceWeekKey || weekStartISO,
-      categoryPenalties,
-      totalPenalty: Number(item?.totalPenalty ?? item?.total) || sum(Object.values(categoryPenalties)),
-      legacy
-    };
-  });
-  return result;
-}
-
-function normalizeClosures(raw) {
-  const result = {};
-  if (!isObject(raw)) return result;
-  Object.entries(raw).forEach(([weekStartISO, item]) => {
-    const categoryPenalties = normalizeCategoryPenalties(item);
-    const legacy = {
-      entertainmentPenalty: Number(item?.entertainmentPenalty ?? 0) || 0,
-      miscPenalty: Number(item?.miscPenalty ?? 0) || 0
-    };
-    result[weekStartISO] = {
-      weekStartISO,
-      closedAtISO: item?.closedAtISO || item?.closedAt || new Date().toISOString(),
-      categoryPenalties,
-      totalPenalty: Number(item?.totalPenalty) || sum(Object.values(categoryPenalties)),
-      legacy
-    };
-  });
-  return result;
-}
-
-function normalizeCategoryPenalties(item) {
-  const penalties = {};
-  if (isObject(item?.categoryPenalties)) {
-    Object.entries(item.categoryPenalties).forEach(([categoryId, amount]) => {
-      const value = Number(amount) || 0;
-      if (value > 0) penalties[categoryId] = value;
-    });
-  }
-  const entertainmentPenalty = Number(item?.entertainmentPenalty ?? item?.entertainment ?? 0) || 0;
-  const miscPenalty = Number(item?.miscPenalty ?? item?.misc ?? 0) || 0;
-  if (entertainmentPenalty > 0 && penalties.entertainment == null) penalties.entertainment = entertainmentPenalty;
-  if (miscPenalty > 0 && penalties.misc == null) penalties.misc = miscPenalty;
-  return penalties;
-}
-
-function buildMonitorCategoriesFromLegacy(settings = {}) {
-  const budgets = settings?.budgetsMonthly || {};
-  const weeklyRules = settings?.weeklyRules || {};
-  return DEFAULT_MONITOR_CATEGORIES.map((item) => {
-    const next = structuredClone(item);
-    if (budgets[item.id] != null) next.monthlyBudget = Number(budgets[item.id]) || 0;
-    if (item.id === "groceries") next.softCapMultiplier = Number(weeklyRules.grocerySoftCapMultiplier ?? weeklyRules.defaultSoftCapMultiplier ?? item.softCapMultiplier) || 1.1;
-    if (item.id === "charging") next.softCapMultiplier = Number(weeklyRules.chargingSoftCapMultiplier ?? weeklyRules.defaultSoftCapMultiplier ?? item.softCapMultiplier) || 1.1;
-    if (item.ruleType === "penalty") {
-      next.penaltyMultiplier = Number(weeklyRules.penaltyMultiplier ?? item.penaltyMultiplier) || 1.5;
-      next.minPenaltyUnit = Number(weeklyRules.minPenaltyUnit ?? item.minPenaltyUnit) || 5;
-    }
-    return next;
-  });
-}
-
-function buildBackgroundSectionsFromLegacy(background = {}) {
-  const sections = structuredClone(DEFAULT_BACKGROUND_SECTIONS);
-  const legacyMap = {
-    "core-income": background?.coreIncome || {},
-    "reserve-income": background?.reserveIncome || {},
-    investment: background?.investment || {},
-    fixed: background?.fixed || {},
-    debt: background?.debt || {}
-  };
-  return sections.map((section) => ({
-    ...section,
-    items: section.items.map((item) => {
-      const legacySection = legacyMap[section.id] || {};
-      const legacyKey = item.id
-        .replaceAll("-", "")
-        .replace("pwsalary", "pwSalary")
-        .replace("mvcontrib", "mvContrib")
-        .replace("leodebt", "leoDebt")
-        .replace("condoadmin", "condoAdmin")
-        .replace("propertytax", "propertyTax")
-        .replace("pwtrust", "pwTrust")
-        .replace("carpayment", "carPayment")
-        .replace("ikeapayment", "ikeaPayment");
-      const legacyAmount = legacySection[legacyKey];
-      return {
-        ...item,
-        amount: legacyAmount == null ? item.amount : Number(legacyAmount) || 0
-      };
-    })
-  }));
-}
-
-function buildLegacyBudgetsMonthly(categories) {
-  const result = { groceries: 0, charging: 0, entertainment: 0, misc: 0 };
-  normalizeMonitorCategories(categories).forEach((item) => {
-    if (Object.hasOwn(result, item.id)) result[item.id] = Number(item.monthlyBudget) || 0;
-  });
-  return result;
-}
-
-function buildLegacyBackgroundFromSections(sections, fallback = {}) {
-  const result = {
-    coreIncome: { ...(fallback?.coreIncome || {}) },
-    reserveIncome: { ...(fallback?.reserveIncome || {}) },
-    investment: { ...(fallback?.investment || {}) },
-    fixed: { ...(fallback?.fixed || {}) },
-    debt: { ...(fallback?.debt || {}) }
-  };
-  normalizeBackgroundSections(sections).forEach((section) => {
-    const bucket = section.id === "core-income"
-      ? result.coreIncome
-      : section.id === "reserve-income"
-        ? result.reserveIncome
-        : section.id === "investment"
-          ? result.investment
-          : section.id === "fixed"
-            ? result.fixed
-            : section.id === "debt"
-              ? result.debt
-              : null;
-    if (!bucket) return;
-    section.items.forEach((item) => {
-      bucket[toLegacyBackgroundKey(item.id)] = Number(item.amount) || 0;
-    });
-  });
-  return result;
-}
-
-function toLegacyBackgroundKey(id) {
-  const slug = String(id || "");
-  if (slug === "pw-salary") return "pwSalary";
-  if (slug === "mv-contrib") return "mvContrib";
-  if (slug === "leo-debt") return "leoDebt";
-  if (slug === "condo-admin") return "condoAdmin";
-  if (slug === "property-tax") return "propertyTax";
-  if (slug === "pw-trust") return "pwTrust";
-  if (slug === "car-payment") return "carPayment";
-  if (slug === "ikea-payment") return "ikeaPayment";
-  return camelCaseFromSlug(slug);
-}
-
-function migrateLegacyState(raw, sourceKey) {
-  if (sourceKey === "financePlanner_v2") return migrateFromPlannerV2(raw);
-  if (sourceKey === "finance-box-budget-v3") return migrateFromBoxBudgetV3(raw);
-  return raw;
-}
-
-function migrateFromPlannerV2(raw) {
-  const settings = raw?.settings || {};
-  const month = raw?.ui?.selectedMonth || currentMonthKey();
-  return {
-    schemaVersion: SCHEMA_VERSION,
-    appVersion: APP_VERSION,
-    ui: {
-      activeTab: "monitor",
-      selectedMonth: month,
-      txFilter: "month",
-      editingTransactionId: null
-    },
-    settings: {
-      systemCore: {
-        reserveBalanceNow: Number(settings.reserveBalanceNow ?? settings.systemCore?.reserveBalanceNow ?? calculateReserveFromLedger(settings.reserveLedger || DEFAULT_STATE.settings.reserveSchedule)) || 4231,
-        stableBaseGapMonthly: Number(settings.stableBaseGapMonthly ?? settings.systemCore?.stableBaseGapMonthly) || 669
-      },
-      budgetsMonthly: {
-        groceries: Number(settings.budgetsMonthly?.groceries ?? 750) || 0,
-        charging: Number(settings.budgetsMonthly?.charging ?? 150) || 0,
-        entertainment: Number(settings.budgetsMonthly?.entertainment ?? 300) || 0,
-        misc: Number(settings.budgetsMonthly?.misc ?? 150) || 0
-      },
-      weeklyRules: {
-        weekStart: "MON",
-        penaltyMultiplier: Number(settings.penaltyMultiplier ?? settings.weeklyRules?.penaltyMultiplier) || 1.5,
-        minPenaltyUnit: Number(settings.minPenaltyUnit ?? settings.weeklyRules?.minPenaltyUnit) || 5,
-        defaultSoftCapMultiplier: Number(settings.weeklyRules?.defaultSoftCapMultiplier ?? settings.grocerySoftCapMultiplier ?? settings.chargingSoftCapMultiplier) || 1.1,
-        grocerySoftCapMultiplier: Number(settings.grocerySoftCapMultiplier ?? settings.weeklyRules?.grocerySoftCapMultiplier) || 1.1,
-        chargingSoftCapMultiplier: Number(settings.chargingSoftCapMultiplier ?? settings.weeklyRules?.chargingSoftCapMultiplier) || 1.1
-      },
-      reserveSchedule: {
-        ...structuredClone(DEFAULT_STATE.settings.reserveSchedule),
-        ...pickReserveSchedule(settings.reserveLedger)
-      },
-      background: {
-        coreIncome: {
-          pwSalary: Number(settings.coreIncome?.pwSalary ?? settings.income?.pwMonthlyEq) || 5897
-        },
-        reserveIncome: {
-          mvContrib: Number(settings.reserveIncome?.mvContrib ?? settings.income?.mvContribMonthly) || 1500,
-          leoDebt: Number(settings.reserveIncome?.leoDebt ?? settings.income?.leoInterestMonthly) || 700
-        },
-        investment: {
-          investment: Number(settings.investment?.investment ?? settings.investment?.monthlyEq) || 217
-        },
-        fixed: {
-          insurance: Number(settings.fixed?.insurance) || 558,
-          condoAdmin: Number(settings.fixed?.condoAdmin) || 564,
-          propertyTax: Number(settings.fixed?.propertyTax) || 267,
-          internet: Number(settings.fixed?.internet) || 49,
-          pwTrust: Number(settings.fixed?.pwTrust) || 600
-        },
-        debt: {
-          mortgage: Number(settings.debt?.mortgage ?? settings.debt?.mortgageMonthlyEq) || 2167,
-          carPayment: Number(settings.debt?.carPayment) || 682,
-          ikeaPayment: Number(settings.debt?.ikeaPayment) || 113
-        }
-      }
-    },
-    transactions: migrateTransactions(raw?.transactions),
-    weeklyBudgetAdjustments: normalizeAdjustments(raw?.weeklyBudgetAdjustments),
-    weeklyClosures: normalizeClosures(raw?.weeklyClosures)
-  };
-}
-
-function migrateFromBoxBudgetV3(raw) {
-  const currentMonth = raw?.currentMonth || currentMonthKey();
-  const latestPlan = Array.isArray(raw?.yearPlanVersions) ? raw.yearPlanVersions[raw.yearPlanVersions.length - 1] : null;
-  const vewuPlan = latestPlan?.plan?.vewu || {};
-  const pwPlan = latestPlan?.plan?.pw || {};
-  const incomeDefaults = vewuPlan.incomeDefaults || [];
-  const fixedItems = vewuPlan.autoFixedItems || [];
-  const baselineSavingItems = vewuPlan.baselineSavingItems || [];
-  const background = {
-    coreIncome: {
-      pwSalary: findAmount(incomeDefaults, ["pwSalary", "PW Salary"], 5897)
-    },
-    reserveIncome: {
-      mvContrib: findAmount(incomeDefaults, ["mvContribution", "MV Contribution"], 1500),
-      leoDebt: findAmount(incomeDefaults, ["leoDebt", "Leo"], 700)
-    },
-    investment: {
-      investment: findAmount(baselineSavingItems, ["investment", "Baseline Investment / Saving"], 217)
-    },
-    fixed: {
-      insurance: findAmount(fixedItems, ["insurance", "Insurance"], 558),
-      condoAdmin: findAmount(fixedItems, ["condo", "Condo"], 564),
-      propertyTax: findAmount(fixedItems, ["propertyTax", "Property Tax"], 267),
-      internet: findAmount(fixedItems, ["internet", "Internet"], 49),
-      pwTrust: findAmount(fixedItems, ["pwAllowance", "PW Allowance"], 600)
-    },
-    debt: {
-      mortgage: findAmount(raw?.debtPlans, ["mortgage", "Mortgage"], 2167),
-      carPayment: findAmount(raw?.debtPlans, ["car-loan", "Car"], 682),
-      ikeaPayment: findAmount(raw?.debtPlans, ["ikea", "Ikea"], 113)
-    }
-  };
-
-  return {
-    schemaVersion: SCHEMA_VERSION,
-    appVersion: APP_VERSION,
-    ui: {
-      activeTab: "monitor",
-      selectedMonth: currentMonth,
-      txFilter: "month",
-      editingTransactionId: null
-    },
-    settings: {
-      systemCore: {
-        reserveBalanceNow: deriveReserveFromBoxBudget(raw),
-        stableBaseGapMonthly: 669
-      },
-      budgetsMonthly: {
-        groceries: Number(vewuPlan.boxes?.groceries?.budget) || 750,
-        charging: Number(vewuPlan.boxes?.car407?.budget) || 150,
-        entertainment: Number(pwPlan.boxes?.eatOut?.budget) || 300,
-        misc: Number(vewuPlan.boxes?.misc?.budget) || 150
-      },
-      weeklyRules: structuredClone(DEFAULT_STATE.settings.weeklyRules),
-      reserveSchedule: structuredClone(DEFAULT_STATE.settings.reserveSchedule),
-      background
-    },
-    transactions: migrateTransactions(raw?.transactions),
-    weeklyBudgetAdjustments: {},
-    weeklyClosures: {}
-  };
-}
-
-function migrateTransactions(items) {
-  if (!Array.isArray(items)) return [];
-  return items
-    .map((item) => {
-      const category = normalizeCategory(item?.category ?? item?.box);
-      if (!category) return null;
-      return {
-        id: item.id || item.transactionId || uid("txn"),
-        dateISO: item.dateISO || item.date,
-        amount: Number(item.amount) || 0,
-        category,
-        note: item.note || ""
-      };
-    })
-    .filter((item) => item && item.dateISO && item.amount >= 0);
-}
-
-function normalizeTransaction(item) {
-  const category = normalizeCategory(item?.category);
-  const dateISO = item?.dateISO || item?.date;
-  if (!category || !dateISO) return null;
-  return {
-    id: item.id || uid("txn"),
-    dateISO,
-    amount: Number(item.amount) || 0,
-    category,
-    note: item.note || ""
-  };
-}
-
-function normalizeCategory(value, categoriesSource = null) {
-  const text = String(value || "").trim();
-  if (!text) return null;
-  const normalized = slugify(text).replace(/-/g, "");
-  const categories = normalizeMonitorCategories(categoriesSource || getCurrentMonitorCategoriesSource());
-  const exact = categories.find((item) => item.id === text || item.id === text.toLowerCase());
-  if (exact) return exact.id;
-  const bySlug = categories.find((item) => slugify(item.id).replace(/-/g, "") === normalized);
-  if (bySlug) return bySlug.id;
-  for (const [id, aliases] of Object.entries(LEGACY_CATEGORY_ALIASES)) {
-    if (aliases.map((alias) => slugify(alias).replace(/-/g, "")).includes(normalized)) return id;
-  }
-  return text.toLowerCase().replace(/\s+/g, "-");
-}
-
-function getCategories() {
-  return normalizeMonitorCategories(getCurrentMonitorCategoriesSource());
-}
-
-function getCategoriesFromStateLike(stateLike) {
-  return normalizeMonitorCategories(stateLike?.settings?.monitorCategories || DEFAULT_MONITOR_CATEGORIES);
-}
-
-function getCurrentMonitorCategoriesSource() {
-  try {
-    return state?.settings?.monitorCategories || DEFAULT_MONITOR_CATEGORIES;
-  } catch {
-    return DEFAULT_MONITOR_CATEGORIES;
-  }
-}
-
-function getCategoryById(categoryId) {
-  const id = String(categoryId || "");
-  const found = getCategories().find((item) => item.id === id);
-  if (found) return found;
-  return {
-    id,
-    label: startCase(id || "Unknown"),
-    icon: "•",
-    group: "custom",
-    monthlyBudget: 0,
-    monitor: false,
-    allowTransactions: false,
-    includeInVariableTotal: false,
-    includeInWeeklyDiscipline: false,
-    ruleType: "trackOnly",
-    softCapMultiplier: null,
-    penaltyMultiplier: null,
-    minPenaltyUnit: null,
-    priority: "hidden",
-    displayOrder: 999,
-    active: false,
-    archived: true,
-    unknown: true
-  };
-}
-
-function getActiveTransactionCategories() {
-  return getActiveTransactionCategoriesFromState(state);
-}
-
-function getActiveTransactionCategoriesFromState(stateLike) {
-  return getCategoriesFromStateLike(stateLike)
-    .filter((item) => item.active && !item.archived && item.allowTransactions)
-    .sort(compareCategoryOrder);
-}
-
-function getMonitorCategories() {
-  return getCategories()
-    .filter((item) => item.active && !item.archived && item.monitor)
-    .sort(compareCategoryOrder);
-}
-
-function getPrimaryMonitorCategories() {
-  const primary = getMonitorCategories().filter((item) => item.priority === "primary");
-  if (primary.length) return primary.slice(0, 6);
-  return getMonitorCategories().slice(0, 4);
-}
-
-function getCategoryLabel(categoryId) {
-  return getCategoryById(categoryId).label;
-}
-
-function getCategoryIcon(categoryId) {
-  return getCategoryById(categoryId).icon || "•";
-}
-
-function getCategoryGroup(categoryId) {
-  return getCategoryById(categoryId).group;
-}
-
-function isCategoryAllowedForTransaction(categoryId) {
-  const item = getCategoryById(categoryId);
-  return item.active && !item.archived && item.allowTransactions;
-}
-
-function isCategoryArchived(categoryId) {
-  return Boolean(getCategoryById(categoryId).archived);
-}
-
-function compareCategoryOrder(a, b) {
-  const priorityRank = { primary: 0, secondary: 1, hidden: 2 };
-  return (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9)
-    || (a.displayOrder ?? 999) - (b.displayOrder ?? 999)
-    || a.label.localeCompare(b.label);
-}
-
-function getMonitorBehaviorType(category) {
-  return getCategoryDisplayGroup(category);
-}
-
-function getCategoryDisplayGroup(category) {
-  const group = category?.group || "custom";
-  return ["essentials", "discretionary", "custom"].includes(group) ? group : "custom";
-}
-
-function getCategoryRuleType(category) {
-  const ruleType = category?.ruleType || "trackOnly";
-  return ["softCap", "penalty", "trackOnly"].includes(ruleType) ? ruleType : "trackOnly";
-}
-
-function isPenaltyCategory(category) {
-  return getCategoryRuleType(category) === "penalty";
-}
-
-function isSoftCapCategory(category) {
-  return getCategoryRuleType(category) === "softCap";
-}
-
-function isTrackOnlyCategory(category) {
-  return getCategoryRuleType(category) === "trackOnly";
-}
-
-function isWeeklyDisciplineCategory(category) {
-  return category?.active !== false && !category?.archived && category?.includeInWeeklyDiscipline === true;
-}
-
-function isVariableTotalCategory(category) {
-  return category?.active !== false && !category?.archived && category?.includeInVariableTotal === true;
-}
-
-function getBackgroundSections() {
-  return normalizeBackgroundSections(state?.settings?.backgroundSections || DEFAULT_BACKGROUND_SECTIONS);
-}
-
-function getBackgroundSectionById(sectionId) {
-  return getBackgroundSections().find((section) => section.id === sectionId) || null;
-}
-
-function getBackgroundItems(sectionId) {
-  return getBackgroundSectionById(sectionId)?.items || [];
-}
-
-function calculateSectionTotal(sectionId) {
-  return sum(getBackgroundItems(sectionId).filter(isActiveBackgroundItem).map(monthlyEquivalentAmount));
-}
-
-function calculateBackgroundTotals() {
-  const sections = getBackgroundSections().filter((section) => section.active && !section.archived);
-  const totals = {};
-  sections.forEach((section) => {
-    totals[section.id] = sum(section.items.filter(isActiveBackgroundItem).map(monthlyEquivalentAmount));
-  });
-  return totals;
-}
-
-function calculateTotalByType(type) {
-  return sum(
-    getBackgroundSections()
-      .filter((section) => section.active && !section.archived)
-      .flatMap((section) => section.items.map((item) => ({ ...item, __sectionType: section.type })))
-      .filter((item) => (item.type || item.__sectionType) === type)
-      .filter(isActiveBackgroundItem)
-      .map(monthlyEquivalentAmount)
-  );
-}
-
-function calculateFixedDebtTotal() {
-  return calculateTotalByType("fixed") + calculateTotalByType("debt");
-}
-
-function calculateIncomeTotal() {
-  return calculateTotalByType("income");
-}
-
-function calculateInvestmentTotal() {
-  return calculateTotalByType("investment");
-}
-
-function getReserveAccounts() {
-  return normalizeReserve(state?.settings?.reserve || DEFAULT_RESERVE).accounts;
-}
-
-function getReserveAccountById(accountId) {
-  return getReserveAccounts().find((account) => account.id === accountId) || null;
-}
-
-function getActiveReserveAccounts() {
-  return getReserveAccounts().filter((account) => account.active && !account.archived);
-}
-
-function getProjectionEvents() {
-  return normalizeReserve(state?.settings?.reserve || DEFAULT_RESERVE).events;
-}
-
-function getProjectionEventById(eventId) {
-  return getProjectionEvents().find((event) => event.id === eventId) || null;
-}
-
-function getActiveProjectionEvents() {
-  return getProjectionEvents().filter((event) => event.active && !event.archived);
-}
-
-function calculateReserveVaultTotal() {
-  return calculateReserveVaultTotalFromSettings(state.settings);
-}
-
-function calculateReserveVaultTotalFromSettings(settings) {
-  return sum(
-    normalizeReserve(settings?.reserve || DEFAULT_RESERVE).accounts
-      .filter((account) => account.active && !account.archived && account.includeInVaultTotal)
-      .map((account) => Number(account.balance) || 0)
-  );
-}
-
-function calculateReserveRunwayBalance() {
-  return calculateReserveRunwayBalanceFromSettings(state.settings);
-}
-
-function calculateReserveRunwayBalanceFromSettings(settings) {
-  return sum(
-    normalizeReserve(settings?.reserve || DEFAULT_RESERVE).accounts
-      .filter((account) => account.active && !account.archived && account.includeInRunway)
-      .map((account) => Number(account.balance) || 0)
-  );
-}
-
-function getStableGapFromSettings(settings) {
-  const stableGapEvent = normalizeReserve(settings?.reserve || DEFAULT_RESERVE).events.find(
-    (event) => event.active && !event.archived && event.id === "stable-gap"
-  );
-  if (stableGapEvent) return Math.abs(Number(stableGapEvent.amount) || 0) || Number(settings?.systemCore?.stableBaseGapMonthly) || 669;
-  return Number(settings?.systemCore?.stableBaseGapMonthly) || 669;
-}
-
-function calculateActiveProjectionMonthlyNet(monthKey) {
-  return calculateProjectionMonthlyNet(monthKey, state.settings);
-}
-
-function calculateProjectionMonthlyNet(monthKey, settings) {
-  return sum(
-    normalizeReserve(settings?.reserve || DEFAULT_RESERVE).events
-      .filter((event) => event.active && !event.archived && event.affectsProjection)
-      .filter((event) => reserveEventAppliesToMonth(event, monthKey))
-      .map((event) => Number(event.amount) || 0)
-  );
-}
-
-function reserveEventAppliesToMonth(event, monthKey) {
-  if (event.type === "oneTime") return event.month === monthKey;
-  if (!event.startMonth || monthKey < event.startMonth) return false;
-  if (event.endMonth && monthKey > event.endMonth) return false;
-  return true;
-}
-
-function isActiveBackgroundItem(item) {
-  return item?.active !== false && !item?.archived;
-}
-
-function monthlyEquivalentAmount(item) {
-  const amount = Number(item?.amount) || 0;
-  if (item?.frequency === "annual") return amount / 12;
-  if (item?.frequency === "oneTime") return 0;
-  return amount;
 }
 
 function saveState() {
@@ -1169,31 +304,46 @@ function saveState() {
 
 function render() {
   monthInput.value = state.ui.selectedMonth;
-  pageTitle.textContent = TABS.find((tab) => tab.id === state.ui.activeTab)?.label || "Monitor";
+  pageTitle.textContent = state.ui.activeTab === "planning" ? "Planning" : "Monitor";
   renderHeaderControls();
   renderHeaderStatus();
   renderNav();
-  const activeTab = state.ui.activeTab || "monitor";
-  if (activeTab === "monitor") app.innerHTML = renderMonitorPage();
-  if (activeTab === "planning") app.innerHTML = renderPlanningPage();
+  app.innerHTML = state.ui.activeTab === "planning" ? renderPlanningPage() : renderMonitorPage();
   bindPageEvents();
 }
 
 function renderHeaderControls() {
-  document.querySelectorAll("[data-scope]").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.scope === state.ui.monitorScope);
+  const controls = document.querySelector(".topbar-controls");
+  if (!controls) return;
+  controls.classList.remove("is-hidden");
+  controls.innerHTML = `
+    <label class="month-field month-chip">
+      <span>Month</span>
+      <input id="monthInputLive" type="month" value="${state.ui.selectedMonth}" />
+    </label>
+    ${state.ui.activeTab === "monitor" ? renderScopeSwitch() : ""}
+  `;
+  const liveMonth = controls.querySelector("#monthInputLive");
+  liveMonth?.addEventListener("change", () => {
+    state.ui.selectedMonth = normalizeMonthValue(liveMonth.value) || currentMonthKey();
+    saveState();
+    render();
   });
-  document.querySelector(".topbar-controls")?.classList.toggle("is-hidden", state.ui.activeTab !== "monitor");
 }
 
 function renderHeaderStatus() {
-  if (!headerStatus) return;
-  if (state.ui.activeTab !== "monitor") {
+  if (state.ui.activeTab === "planning") {
     headerStatus.className = "header-status-pill neutral";
     headerStatus.textContent = "Plan";
     return;
   }
-  const status = getDashboard().overallStatus;
+  const cards = getMonitorCards();
+  if (!cards.length) {
+    headerStatus.className = "header-status-pill neutral";
+    headerStatus.textContent = "Setup";
+    return;
+  }
+  const status = calculateOverallMonitorStatus(cards, state.ui.monitorScope);
   headerStatus.className = `header-status-pill ${status.key}`;
   headerStatus.textContent = status.label;
 }
@@ -1205,15 +355,6 @@ function renderScopeSwitch() {
       <button class="scope-button ${state.ui.monitorScope === "month" ? "is-active" : ""}" type="button" data-scope="month">Month</button>
     </div>
   `;
-}
-
-function setMonitorScope(scope) {
-  const nextScope = scope === "month" ? "month" : "week";
-  if (state.ui.monitorScope === nextScope) return;
-  state.ui.monitorScope = nextScope;
-  state.ui.txFilter = nextScope === "month" ? "month" : "week";
-  saveState();
-  render();
 }
 
 function renderNav() {
@@ -1228,27 +369,8 @@ function bindPageEvents() {
   document.querySelectorAll("[data-scope]").forEach((button) => {
     button.addEventListener("click", () => setMonitorScope(button.dataset.scope));
   });
-  document.querySelector("#transactionForm")?.addEventListener("submit", saveTransaction);
-  document.querySelectorAll("[data-filter]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.ui.txFilter = button.dataset.filter;
-      saveState();
-      render();
-    });
-  });
-  document.querySelectorAll("[data-edit-transaction]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.ui.activeTab = "monitor";
-      state.ui.editingTransactionId = button.dataset.editTransaction;
-      saveState();
-      openQuickAdd();
-    });
-  });
-  document.querySelectorAll("[data-delete-transaction]").forEach((button) => {
-    button.addEventListener("click", () => deleteTransaction(button.dataset.deleteTransaction));
-  });
-  document.querySelectorAll("[data-manage-transactions]").forEach((button) => {
-    button.addEventListener("click", openTransactionsManager);
+  document.querySelectorAll("[data-open-planning-section]").forEach((button) => {
+    button.addEventListener("click", () => openPlanningSheet(button.dataset.openPlanningSection));
   });
   document.querySelectorAll("[data-monitor-card]").forEach((card) => {
     card.addEventListener("click", () => toggleMonitorCardDetails(card.dataset.monitorCard));
@@ -1259,90 +381,173 @@ function bindPageEvents() {
       }
     });
   });
-  document.querySelector("#cancelEditButton")?.addEventListener("click", cancelEditingTransaction);
-  document.querySelectorAll("[data-close-sheet]").forEach((button) => {
-    button.addEventListener("click", closeQuickAdd);
+  document.querySelectorAll("[data-toggle-monitor-details]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleMonitorCardDetails(button.dataset.toggleMonitorDetails);
+    });
   });
-  document.querySelector(".sheet-backdrop")?.addEventListener("click", (event) => {
-    if (event.target.classList.contains("sheet-backdrop")) closeQuickAdd();
+  document.querySelectorAll("[data-manage-categories]").forEach((button) => button.addEventListener("click", openManageBudgetCategories));
+  document.querySelectorAll("[data-add-category]").forEach((button) => button.addEventListener("click", openAddCategorySheet));
+  document.querySelectorAll("[data-edit-category]").forEach((button) => button.addEventListener("click", () => openEditCategory(button.dataset.editCategory)));
+  document.querySelectorAll("[data-manage-vaults]").forEach((button) => button.addEventListener("click", openManageVaults));
+  document.querySelectorAll("[data-add-vault]").forEach((button) => button.addEventListener("click", openAddVaultSheet));
+  document.querySelectorAll("[data-edit-vault]").forEach((button) => button.addEventListener("click", () => openEditVault(button.dataset.editVault)));
+  document.querySelectorAll("[data-manage-background]").forEach((button) => button.addEventListener("click", openManageBackground));
+  document.querySelectorAll("[data-edit-background-item]").forEach((button) => button.addEventListener("click", () => openEditBackgroundItem(button.dataset.sectionId, button.dataset.editBackgroundItem)));
+  document.querySelectorAll("[data-manage-transactions]").forEach((button) => button.addEventListener("click", openTransactionsManager));
+  document.querySelectorAll("[data-review-toggle]").forEach((input) => {
+    input.addEventListener("change", () => toggleMonthReviewItem(state.ui.selectedMonth, input.dataset.reviewToggle));
+  });
+  document.querySelectorAll("[data-review-action]").forEach((button) => {
+    button.addEventListener("click", () => runReviewAction(button.dataset.reviewAction));
   });
   document.querySelector("#closeWeekButton")?.addEventListener("click", closeWeek);
   document.querySelector("#reopenWeekButton")?.addEventListener("click", reopenWeek);
+  document.querySelector("[data-toggle-weekly-close]")?.addEventListener("click", toggleWeeklyCloseDetails);
   document.querySelector("#reviewLastWeekButton")?.addEventListener("click", reviewLastWeek);
-  document.querySelector("#markMonthReviewedButton")?.addEventListener("click", () => markMonthReviewed(state.ui.selectedMonth));
-  document.querySelector("#markBackupDoneButton")?.addEventListener("click", () => markMonthBackupDone(state.ui.selectedMonth));
-  document.querySelector("#settingsForm")?.addEventListener("submit", saveSettings);
-  document.querySelector("#recalcReserveButton")?.addEventListener("click", recalcReserveFromLedger);
-  document.querySelector("#exportJsonButton")?.addEventListener("click", exportJSON);
-  document.querySelector("#importJsonInput")?.addEventListener("change", importJSON);
+  document.querySelector("#exportCsvButton")?.addEventListener("click", exportCSV);
+  document.querySelector("#importCsvInput")?.addEventListener("change", importCSV);
+  document.querySelector("#sampleCsvButton")?.addEventListener("click", downloadSampleCSV);
   document.querySelector("#resetButton")?.addEventListener("click", resetData);
-  document.querySelectorAll("[data-planning-section]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      if (event.target.closest("input, button, label, summary, textarea, select")) return;
-      togglePlanningSection(button.dataset.planningSection);
+  document.querySelectorAll("[data-edit-transaction]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.ui.editingTransactionId = button.dataset.editTransaction;
+      saveState();
+      openQuickAdd();
     });
   });
-  document.querySelectorAll("[data-toggle-planning]").forEach((button) => {
-    button.addEventListener("click", () => togglePlanningSection(button.dataset.togglePlanning));
-  });
-  document.querySelectorAll("[data-open-planning-section]").forEach((button) => {
-    button.addEventListener("click", () => openPlanningSection(button.dataset.openPlanningSection));
-  });
-  document.querySelectorAll("[data-manage-budget-categories]").forEach((button) => {
-    button.addEventListener("click", openManageBudgetCategories);
-  });
-  document.querySelectorAll("[data-edit-category]").forEach((button) => {
-    button.addEventListener("click", () => openManageCategory(button.dataset.editCategory));
-  });
-  document.querySelectorAll("[data-manage-background]").forEach((button) => {
-    button.addEventListener("click", openManageBackgroundSections);
-  });
-  document.querySelectorAll("[data-edit-background-item]").forEach((button) => {
-    button.addEventListener("click", () => openManageBackgroundItem(button.dataset.sectionId, button.dataset.editBackgroundItem));
-  });
-  document.querySelectorAll("[data-manage-reserve-accounts]").forEach((button) => {
-    button.addEventListener("click", openManageReserveAccounts);
-  });
-  document.querySelectorAll("[data-manage-projection-events]").forEach((button) => {
-    button.addEventListener("click", openManageProjectionEvents);
-  });
-  document.querySelectorAll("[data-edit-reserve-account]").forEach((button) => {
-    button.addEventListener("click", () => openManageReserveAccount(button.dataset.editReserveAccount));
-  });
-  document.querySelectorAll("[data-edit-projection-event]").forEach((button) => {
-    button.addEventListener("click", () => openManageProjectionEvent(button.dataset.editProjectionEvent));
+  document.querySelectorAll("[data-delete-transaction]").forEach((button) => {
+    button.addEventListener("click", () => deleteTransaction(button.dataset.deleteTransaction));
   });
 }
 
+function setMonitorScope(scope) {
+  state.ui.monitorScope = scope === "month" ? "month" : "week";
+  state.ui.txFilter = state.ui.monitorScope === "month" ? "month" : "week";
+  saveState();
+  render();
+}
+
 function renderMonitorPage() {
-  const dashboard = getDashboard();
-  const cards = dashboard.monitorCards;
+  const cards = getMonitorCards();
   return `
     <section class="page monitor-page">
-      ${renderCompactReserveHero(dashboard.reserve, dashboard.projections)}
-      ${renderOverallMonitorStatus(dashboard.overallStatus)}
+      ${renderReserveVaultHero()}
+      ${cards.length ? renderOverallMonitorStatus(calculateOverallMonitorStatus(cards, state.ui.monitorScope)) : ""}
       <section class="monitor-grid" aria-label="Variable monitors">
-        ${cards.length ? cards.map(renderMonitorBox).join("") : `<article class="monitor-box empty"><div class="empty-state">No monitor categories configured. Add one in Planning.</div></article>`}
+        ${cards.length ? cards.map(renderMonitorBox).join("") : renderMonitorCategoryEmptyState()}
       </section>
-      ${dashboard.scope === "month" ? renderMonthOutlook(dashboard.monthOutlook) : renderWeeklyDiscipline(dashboard.discipline)}
-      ${renderRecentTransactionsPreview(dashboard.scope)}
+      ${cards.length ? (state.ui.monitorScope === "month" ? renderMonthOutlook(calculateMonthOutlook()) : renderWeeklyDiscipline(calculateWeeklyDiscipline())) : ""}
+      ${renderRecentActivity()}
     </section>
   `;
 }
 
-function renderMonitorBox(card) {
-  const isExpanded = Boolean(state.ui.monitorExpandedCards?.[card.category]);
+function renderReserveVaultHero() {
+  const vaults = getMonitorReserveVaults();
+  const activeVaults = getActiveReserveVaults();
+  const extra = Math.max(0, vaults.length - 2);
+  const shown = vaults.slice(0, 2);
+  if (!activeVaults.length) {
+    return `
+      <section class="compact-reserve-hero vault-hero empty-vault">
+        <div class="empty-state">
+          <strong>No reserve vaults yet.</strong>
+          <span>Create a vault for travel, renovation, emergency buffer, or any savings goal.</span>
+          <button class="action-button" type="button" data-add-vault>Create reserve vault</button>
+        </div>
+      </section>
+    `;
+  }
+  if (!vaults.length) {
+    return `
+      <section class="compact-reserve-hero vault-hero empty-vault">
+        <div class="empty-state">
+          <strong>No vaults pinned to Monitor.</strong>
+          <span>Pin up to 2 vaults from Reserve Setup.</span>
+          <button class="action-button" type="button" data-open-planning-section="reserve">Open Reserve Setup</button>
+        </div>
+      </section>
+    `;
+  }
   return `
-    <article class="monitor-box ${card.status.key}" data-monitor-card="${escapeHtml(card.category)}" tabindex="0" aria-expanded="${isExpanded ? "true" : "false"}">
+    <section class="compact-reserve-hero vault-hero">
+      <div class="compact-reserve-top">
+        <span><i class="plain-icon diamond"></i>Reserve Vaults</span>
+        <em class="reserve-pill gold">Saved ${money(calculateVaultTotal())}</em>
+      </div>
+      <div class="vault-preview-grid">
+        ${shown.map(renderReserveVaultPreview).join("")}
+      </div>
+      ${extra > 0 ? `<p class="settings-note">+${extra} more vaults in Planning</p>` : ""}
+    </section>
+  `;
+}
+
+function renderReserveVaultPreview(vault) {
+  const progress = calculateVaultProgress(vault);
+  return `
+    <article class="vault-preview ${escapeHtml(vault.colorToken)}">
+      <div class="vault-preview-head">
+        <strong>${escapeHtml(vault.name)}</strong>
+        <span>${escapeHtml(progress.status)}</span>
+      </div>
+      <div class="vault-amount">${money(vault.currentAmount)}${vault.targetAmount ? ` / ${money(vault.targetAmount)}` : ""}</div>
+      <div class="budget-bar trackOnly neutral">
+        <div class="budget-fill gold-fill" style="width:${clampPercent(progress.percent)}%"></div>
+      </div>
+      <p class="vault-remaining">${escapeHtml(getVaultRemainingText(vault))}</p>
+      ${vault.note ? `<p>${escapeHtml(vault.note)}</p>` : `<p>No note yet.</p>`}
+    </article>
+  `;
+}
+
+function renderMonitorCategoryEmptyState() {
+  return `
+    <article class="monitor-box empty span-grid">
+      <div class="empty-state">
+        <strong>No monitor categories yet.</strong>
+        <span>Create categories you want to watch, such as groceries, pets, shopping, or charging.</span>
+        <button class="action-button" type="button" data-add-category>Create monitor category</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderMonitorBox(card) {
+  const expanded = Boolean(state.ui.monitorExpandedCards?.[card.category]);
+  return `
+    <article class="monitor-box ${card.status.key}" data-monitor-card="${escapeHtml(card.category)}" tabindex="0" aria-expanded="${expanded ? "true" : "false"}">
       <div class="monitor-box-head">
-        <h2><span class="category-icon" aria-hidden="true">${escapeHtml(card.icon)}</span>${escapeHtml(card.label)}</h2>
+        <h2><span class="category-icon text-icon" aria-hidden="true">${escapeHtml(card.icon)}</span>${escapeHtml(card.label)}</h2>
         <span class="monitor-status">${escapeHtml(card.status.label)}</span>
       </div>
       <div class="monitor-spend">${money(card.primarySpent)} / ${money(card.primaryBudget)}</div>
       ${renderProgressBar(card)}
       <p class="monitor-warning">${escapeHtml(getMonitorShortLine(card))}</p>
-      ${isExpanded ? renderMonitorCardDetails(card) : ""}
+      ${expanded ? renderMonitorCardDetails(card) : ""}
+      <button class="details-affordance" type="button" data-toggle-monitor-details="${escapeHtml(card.category)}">${expanded ? "Hide ˄" : "Details ˅"}</button>
     </article>
+  `;
+}
+
+function renderProgressBar(card) {
+  const maxValue = Math.max(card.primaryBudget * 1.3, card.projectedAmount, card.actualAmount, 1);
+  const actualFill = card.actualAmount / maxValue * 100;
+  const projectedFill = Math.max(0, card.projectedAmount - card.actualAmount) / maxValue * 100;
+  const marker = card.primaryBudget / maxValue * 100;
+  const penaltyWidth = card.ruleType === "penalty" && card.projectedOvershoot > 0
+    ? Math.min(100 - marker, card.projectedOvershoot / maxValue * 100)
+    : 0;
+  return `
+    <div class="budget-bar ${card.ruleType} ${card.status.tone} ${card.scope}">
+      ${card.ruleType === "softCap" ? `<div class="budget-zone" style="left:${clampPercent(marker)}%; width:${clampPercent(100 - marker)}%"></div>` : ""}
+      ${card.ruleType === "penalty" ? `<div class="penalty-zone" style="left:${clampPercent(marker)}%; width:${clampPercent(penaltyWidth)}%"></div>` : ""}
+      <div class="budget-fill" style="width:${clampPercent(actualFill)}%"></div>
+      <div class="projected-fill" style="left:${clampPercent(actualFill)}%; width:${clampPercent(projectedFill)}%"></div>
+      <i class="budget-marker" style="left:${clampPercent(marker)}%"></i>
+    </div>
   `;
 }
 
@@ -1366,34 +571,6 @@ function renderMonitorCardDetails(card) {
   `;
 }
 
-function renderCompactReserveHero(reserve, projections) {
-  const filled = Math.max(0, Math.min(12, reserve.runwayMonths));
-  const pill = reserve.status.tone === "green"
-    ? "Healthy"
-    : reserve.status.tone === "yellow"
-      ? "Below target"
-      : "Critical";
-  return `
-    <section class="compact-reserve-hero">
-      <div class="compact-reserve-top">
-        <span>Reserve Vault</span>
-        <em class="reserve-pill ${reserve.status.tone}">${pill}</em>
-      </div>
-      <strong class="reserve-balance">${money(reserve.balance)}</strong>
-      <div class="compact-runway-row">
-        <span>Runway ${reserve.runwayMonths}/12</span>
-        <div class="mini-runway gold" aria-hidden="true">
-          ${Array.from({ length: 12 }, (_, index) => `<i class="${index < filled ? "is-filled" : ""}"></i>`).join("")}
-        </div>
-      </div>
-      <div class="compact-projection-line">
-        <span>Gap -${money(reserve.gap)}/mo</span>
-        <span>${escapeHtml(projections.sep.label)} ${money(projections.sep.value)} · ${escapeHtml(projections.jan.label)} ${money(projections.jan.value)}</span>
-      </div>
-    </section>
-  `;
-}
-
 function renderOverallMonitorStatus(status) {
   return `
     <section class="overall-status-strip ${status.key}">
@@ -1406,411 +583,66 @@ function renderOverallMonitorStatus(status) {
   `;
 }
 
-function renderReserveMiniStrip(reserve, projections) {
-  const filled = Math.max(0, Math.min(12, reserve.runwayMonths));
+function renderWeeklyDiscipline(discipline) {
+  const closeStatus = getWeeklyCloseStatus(discipline.weekKey);
+  const expanded = Boolean(state.ui.weeklyCloseExpanded);
   return `
-    <section class="reserve-mini-strip">
-      <span>Runway ${reserve.runwayMonths}/12</span>
-      <div class="mini-runway gold" aria-hidden="true">
-        ${Array.from({ length: 12 }, (_, index) => `<i class="${index < filled ? "is-filled" : ""}"></i>`).join("")}
+    <article class="weekly-close-strip tone-${closeStatus.tone}">
+      <button class="weekly-close-main" type="button" data-toggle-weekly-close aria-expanded="${expanded ? "true" : "false"}">
+        <span>
+          <strong>Weekly Close</strong>
+          <em>${escapeHtml(closeStatus.label)} · ${escapeHtml(closeStatus.message)}</em>
+        </span>
+        <b>-${money(discipline.nextWeekReduction)}</b>
+      </button>
+      <div class="weekly-close-actions">
+        <button class="mini-button" type="button" data-toggle-weekly-close>${expanded ? "Hide details" : "Details"}</button>
+        ${closeStatus.key === "last-week-open" ? `<button id="reviewLastWeekButton" class="ghost-button" type="button">Review Last Week</button>` : ""}
+        ${closeStatus.key === "ready" ? `<button id="closeWeekButton" class="action-button" type="button">Close Week</button>` : ""}
+        ${closeStatus.key === "closed" ? `<button id="reopenWeekButton" class="ghost-button" type="button">Reopen Week</button>` : ""}
       </div>
-      <span>${escapeHtml(projections.sep.label)} ${money(projections.sep.value)} · ${escapeHtml(projections.jan.label)} ${money(projections.jan.value)}</span>
-    </section>
-  `;
-}
-
-function renderRunwayMeter(reserve) {
-  const filled = Math.max(0, Math.min(12, reserve.runwayMonths));
-  const blocks = Array.from({ length: 12 }, (_, index) => `
-    <i class="runway-block ${index < filled ? "is-filled" : ""}"></i>
-  `).join("");
-  return `
-    <section class="runway-meter tone-${reserve.status.tone}" aria-label="Reserve runway">
-      <div class="visual-head">
-        <h2>Reserve Runway</h2>
-        <span>${reserve.runwayMonths} / 12 months</span>
-      </div>
-      <div class="runway-blocks" aria-hidden="true">${blocks}</div>
-      <div class="runway-lines">
-        <strong>${money(reserve.balance)}</strong>
-        <span>-${money(reserve.gap)} / month gap</span>
-      </div>
-      <p class="visual-note">${escapeHtml(reserve.conclusion)} ${escapeHtml(reserve.nextAction)}</p>
-    </section>
-  `;
-}
-
-function renderProjectionTimeline(reserve, projections) {
-  const nodes = [
-    { label: "Now", value: reserve.balance },
-    { label: projections.sep.label, value: projections.sep.value },
-    { label: projections.jan.label, value: projections.jan.value }
-  ];
-  return `
-    <section class="projection-timeline" aria-label="Reserve projection timeline">
-      <div class="timeline-line" aria-hidden="true"></div>
-      ${nodes.map((node) => `
-        <div class="timeline-node ${projectionTone(node.value)}">
-          <i></i>
-          <strong>${money(node.value)}</strong>
-          <span>${escapeHtml(node.label)}</span>
-        </div>
-      `).join("")}
-    </section>
-  `;
-}
-
-function renderVariablePaceBoard(dashboard) {
-  return `
-    <section class="stack">
-      <div class="visual-section-title">Variable Control Grid</div>
-      <section class="pace-board">
-        <div class="pace-group">
-          <h3>Essentials Variable</h3>
-          ${renderCategoryCard(dashboard.categories.groceries)}
-          ${renderCategoryCard(dashboard.categories.charging)}
-        </div>
-        <div class="pace-group">
-          <h3>Discretionary Variable</h3>
-          ${renderCategoryCard(dashboard.categories.entertainment)}
-          ${renderCategoryCard(dashboard.categories.misc)}
-        </div>
-      </section>
-    </section>
-  `;
-}
-
-function renderCategoryCard(card) {
-  return `
-    <article class="pace-card visual-category ${card.status.tone}">
-      <div class="pace-card-head">
-        <h3>${escapeHtml(card.label)}</h3>
-        <span class="status-dot ${card.status.tone}"><i></i></span>
-      </div>
-      <div class="pace-money">${money(card.thisWeekSpent)} / ${money(card.thisWeekBudget)}</div>
-      ${renderProgressBar(card)}
-      <div class="remaining-line">Remaining: ${money(card.remainingThisMonth)}</div>
-      <p class="visual-note">${escapeHtml(card.conclusion)}</p>
+      ${expanded ? renderWeeklyCloseDetails(discipline) : ""}
     </article>
   `;
 }
 
-function renderProgressBar(card) {
-  const isSoft = card.ruleType === "softCap";
-  const isPenalty = card.ruleType === "penalty";
-  const maxValue = isSoft
-    ? Math.max(card.zoneSoftCap, card.markerBudget, card.projectedAmount, card.actualAmount, 1)
-    : Math.max(card.markerBudget * 1.35, card.projectedAmount, card.actualAmount, 1);
-  const actualFill = card.actualAmount / maxValue * 100;
-  const projectedFill = Math.max(0, card.projectedAmount - card.actualAmount) / maxValue * 100;
-  const budgetMarker = card.markerBudget / maxValue * 100;
-  const softMarker = isSoft ? card.zoneSoftCap / maxValue * 100 : budgetMarker;
-  const zoneEnd = isSoft ? softMarker : 100;
-  const penaltyWidth = isPenalty && card.projectedOvershoot > 0
-    ? Math.min(100 - budgetMarker, card.projectedOvershoot / maxValue * 100)
-    : 0;
-
+function renderWeeklyCloseDetails(discipline) {
   return `
-    <div class="budget-bar ${card.ruleType} ${card.status.tone} ${card.scope}">
-      ${card.ruleType !== "trackOnly" ? `<div class="budget-zone" style="left:${clampPercent(budgetMarker)}%; width:${clampPercent(zoneEnd - budgetMarker)}%"></div>` : ""}
-      ${isPenalty ? `<div class="penalty-zone" style="left:${clampPercent(budgetMarker)}%; width:${clampPercent(penaltyWidth)}%"></div>` : ""}
-      <div class="budget-fill" style="width:${clampPercent(actualFill)}%"></div>
-      <div class="projected-fill" style="left:${clampPercent(actualFill)}%; width:${clampPercent(projectedFill)}%"></div>
-      <i class="budget-marker" style="left:${clampPercent(budgetMarker)}%"></i>
-      ${isSoft && card.scope === "week" ? `<i class="soft-marker" style="left:${clampPercent(softMarker)}%"></i>` : ""}
+    <div class="weekly-close-details">
+      <div><span>Overshoot</span><strong>${money(discipline.discretionaryOvershoot)}</strong></div>
+      <div><span>Penalty</span><strong>${money(discipline.nextWeekReduction)}</strong></div>
+      <div><span>Projected by Sunday</span><strong>${money(discipline.projectedDiscretionaryOvershoot)}</strong></div>
+      ${discipline.penaltyRows.length ? `<p>${discipline.penaltyRows.map((row) => `${escapeHtml(row.label)} ${money(row.penalty)}`).join(" · ")}</p>` : `<p>No penalty rows yet.</p>`}
     </div>
   `;
 }
 
-function renderWeeklyDiscipline(discipline) {
-  const closeStatus = discipline.closeStatus || getWeeklyCloseStatus(discipline.weekKey);
-  const weakClose = closeStatus.key === "in-progress" || closeStatus.key === "last-week-open";
-  return `
-    <article class="discipline-card impact-card tone-${closeStatus.tone}">
-      <div class="visual-head">
-        <h2>Weekly Close</h2>
-        <span>${escapeHtml(closeStatus.label)}</span>
-      </div>
-      <div class="impact-main">${discipline.nextWeekReduction > 0 ? "-" : ""}${money(discipline.nextWeekReduction)} if closed now</div>
-      <div class="impact-flow">
-        <span>${money(discipline.discretionaryOvershoot)} overshoot</span>
-        <i></i>
-        <span>${money(discipline.nextWeekReduction)} penalty</span>
-        <i></i>
-        <span>next week reduced</span>
-      </div>
-      ${discipline.penaltyRows?.length ? `<p class="visual-note">${discipline.penaltyRows.map((row) => `${escapeHtml(row.label)} ${money(row.penalty)}`).join(" · ")}</p>` : ""}
-      <p class="visual-note">Projected discretionary overshoot by Sunday: ${money(discipline.projectedDiscretionaryOvershoot)}</p>
-      <div class="button-row">
-        ${closeStatus.key === "last-week-open" ? `<button id="reviewLastWeekButton" class="ghost-button" type="button">Review Last Week</button>` : ""}
-        <button id="closeWeekButton" class="${weakClose ? "ghost-button" : "action-button"}" type="button" ${closeStatus.key === "closed" ? "disabled" : ""}>Close Week</button>
-        ${closeStatus.key === "closed" ? `<button id="reopenWeekButton" class="ghost-button" type="button">Reopen Week</button>` : ""}
-      </div>
-      <p class="visual-note">${escapeHtml(closeStatus.message)}</p>
-    </article>
-  `;
-}
-
 function renderMonthOutlook(outlook) {
-  const diffLabel = outlook.projectedDiff >= 0 ? `${money(outlook.projectedDiff)} over` : `${money(Math.abs(outlook.projectedDiff))} under`;
   const tone = outlook.status.key === "safe" ? "green" : outlook.status.key === "watch" ? "yellow" : "red";
+  const diffLabel = outlook.projectedDiff >= 0 ? `${money(outlook.projectedDiff)} over` : `${money(Math.abs(outlook.projectedDiff))} under`;
   return `
-    <article class="discipline-card impact-card month-outlook-card tone-${tone}">
+    <article class="month-outlook-card weekly-close-strip tone-${tone}">
       <div class="visual-head">
         <h2>Month Outlook</h2>
         <span>${escapeHtml(outlook.status.label)}</span>
       </div>
-      <div class="impact-main">${money(outlook.projectedMonthEndVariableSpend)} projected</div>
-      <div class="impact-flow">
-        <span>${money(outlook.monthlyVariableBudget)} budget</span>
-        <i></i>
-        <span>${diffLabel}</span>
-        <i></i>
-        <span>${escapeHtml(outlook.status.action)}</span>
+      <div class="weekly-close-details is-static">
+        <div><span>Projected</span><strong>${money(outlook.projectedMonthEndVariableSpend)}</strong></div>
+        <div><span>Budget</span><strong>${money(outlook.monthlyVariableBudget)}</strong></div>
+        <div><span>Result</span><strong>${diffLabel}</strong></div>
+        <p>${escapeHtml(outlook.status.action)} ${outlook.atRisk.length ? outlook.atRisk.map((item) => `${escapeHtml(item.label)} ${money(item.projectedOvershoot)} over`).join(" · ") : "No categories at risk."}</p>
       </div>
-      <p class="visual-note">${outlook.atRisk.length ? outlook.atRisk.map((item) => `${escapeHtml(item.label)} ${money(item.projectedOvershoot)} over`).join(" · ") : "No categories at risk."}</p>
     </article>
   `;
 }
 
-function openQuickAdd() {
-  modalRoot.innerHTML = renderQuickAddSheet();
-  bindQuickAddEvents();
-  requestAnimationFrame(() => modalRoot.querySelector("input[name='amount']")?.focus());
-}
-
-function bindQuickAddEvents() {
-  modalRoot.querySelector("#transactionForm")?.addEventListener("submit", saveTransaction);
-  modalRoot.querySelectorAll("[data-quick-amount]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const input = modalRoot.querySelector("input[name='amount']");
-      if (input) input.value = button.dataset.quickAmount;
-    });
-  });
-  modalRoot.querySelectorAll("[data-pick-category]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const input = modalRoot.querySelector("#quickCategoryInput");
-      if (!input) return;
-      input.value = button.dataset.pickCategory;
-      modalRoot.querySelectorAll("[data-pick-category]").forEach((chip) => chip.classList.remove("is-active"));
-      button.classList.add("is-active");
-    });
-  });
-  modalRoot.querySelector("[data-repeat-last]")?.addEventListener("click", () => {
-    const template = state.ui.lastTransactionTemplate;
-    if (!template) return;
-    const amountInput = modalRoot.querySelector("input[name='amount']");
-    const noteInput = modalRoot.querySelector("input[name='note']");
-    const categoryInput = modalRoot.querySelector("#quickCategoryInput");
-    if (amountInput) amountInput.value = template.amount || "";
-    if (noteInput) noteInput.value = template.note || "";
-    if (categoryInput) categoryInput.value = template.category || "groceries";
-    modalRoot.querySelectorAll("[data-pick-category]").forEach((chip) => {
-      chip.classList.toggle("is-active", chip.dataset.pickCategory === (template.category || "groceries"));
-    });
-  });
-  modalRoot.querySelectorAll("[data-close-sheet]").forEach((button) => {
-    button.addEventListener("click", closeQuickAdd);
-  });
-  modalRoot.querySelector(".sheet-backdrop")?.addEventListener("click", (event) => {
-    if (event.target.classList.contains("sheet-backdrop")) closeQuickAdd();
-  });
-}
-
-function closeQuickAdd() {
-  modalRoot.innerHTML = "";
-  if (state.ui.editingTransactionId) {
-    state.ui.editingTransactionId = null;
-    saveState();
-  }
-}
-
-function openTransactionsManager() {
-  state.ui.txFilter = state.ui.monitorScope === "month" ? "month" : "week";
-  saveState();
-  modalRoot.innerHTML = renderTransactionsManagerSheet();
-  bindTransactionManagerEvents();
-}
-
-function openManageCategory(categoryId) {
-  const category = getCategoryById(categoryId);
-  modalRoot.innerHTML = renderCategoryEditorSheet(category);
-  bindManageCategoryEvents(categoryId);
-}
-
-function bindManageCategoryEvents(categoryId) {
-  modalRoot.querySelector("#categoryEditorForm")?.addEventListener("submit", (event) => saveCategoryEdits(event, categoryId));
-  modalRoot.querySelector("[data-archive-category]")?.addEventListener("click", () => archiveCategory(categoryId));
-  modalRoot.querySelector("[data-delete-category]")?.addEventListener("click", () => deleteCategory(categoryId));
-  bindSheetCloseOnly();
-}
-
-function openManageBudgetCategories() {
-  modalRoot.innerHTML = renderBudgetCategoriesManagerSheet();
-  bindManageBudgetCategoriesEvents();
-}
-
-function bindManageBudgetCategoriesEvents() {
-  modalRoot.querySelector("#budgetCategoriesManagerForm")?.addEventListener("submit", saveBudgetCategoriesManager);
-  modalRoot.querySelector("#addCategoryForm")?.addEventListener("submit", addMonitorCategory);
-  modalRoot.querySelectorAll("[data-restore-category]").forEach((button) => {
-    button.addEventListener("click", () => restoreCategory(button.dataset.restoreCategory));
-  });
-  modalRoot.querySelectorAll("[data-edit-category]").forEach((button) => {
-    button.addEventListener("click", () => openManageCategory(button.dataset.editCategory));
-  });
-  bindSheetCloseOnly();
-}
-
-function openManageBackgroundItem(sectionId, itemId) {
-  const section = getBackgroundSectionById(sectionId);
-  const item = section?.items?.find((entry) => entry.id === itemId);
-  if (!section || !item) return;
-  modalRoot.innerHTML = renderBackgroundItemEditorSheet(section, item);
-  bindManageBackgroundItemEvents(sectionId, itemId);
-}
-
-function bindManageBackgroundItemEvents(sectionId, itemId) {
-  modalRoot.querySelector("#backgroundItemEditorForm")?.addEventListener("submit", (event) => saveBackgroundItemEdits(event, sectionId, itemId));
-  modalRoot.querySelector("[data-archive-background-item]")?.addEventListener("click", () => archiveBackgroundItem(sectionId, itemId));
-  bindSheetCloseOnly();
-}
-
-function openManageBackgroundSections() {
-  modalRoot.innerHTML = renderBackgroundSectionsManagerSheet();
-  bindManageBackgroundSectionsEvents();
-}
-
-function bindManageBackgroundSectionsEvents() {
-  modalRoot.querySelector("#backgroundSectionsManagerForm")?.addEventListener("submit", saveBackgroundSectionsManager);
-  modalRoot.querySelector("#addBackgroundSectionForm")?.addEventListener("submit", addBackgroundSection);
-  modalRoot.querySelector("#addBackgroundItemForm")?.addEventListener("submit", addBackgroundItem);
-  modalRoot.querySelectorAll("[data-restore-section]").forEach((button) => {
-    button.addEventListener("click", () => restoreBackgroundSection(button.dataset.restoreSection));
-  });
-  modalRoot.querySelectorAll("[data-archive-section]").forEach((button) => {
-    button.addEventListener("click", () => archiveBackgroundSection(button.dataset.archiveSection));
-  });
-  modalRoot.querySelectorAll("[data-edit-background-item]").forEach((button) => {
-    button.addEventListener("click", () => openManageBackgroundItem(button.dataset.sectionId, button.dataset.editBackgroundItem));
-  });
-  bindSheetCloseOnly();
-}
-
-function openManageReserveAccount(accountId) {
-  const account = getReserveAccountById(accountId);
-  if (!account) return;
-  modalRoot.innerHTML = renderReserveAccountEditorSheet(account);
-  bindManageReserveAccountEvents(accountId);
-}
-
-function bindManageReserveAccountEvents(accountId) {
-  modalRoot.querySelector("#reserveAccountEditorForm")?.addEventListener("submit", (event) => saveReserveAccountEdits(event, accountId));
-  modalRoot.querySelector("[data-archive-reserve-account]")?.addEventListener("click", () => archiveReserveAccount(accountId));
-  bindSheetCloseOnly();
-}
-
-function openManageReserveAccounts() {
-  modalRoot.innerHTML = renderReserveAccountsManagerSheet();
-  bindManageReserveAccountsEvents();
-}
-
-function bindManageReserveAccountsEvents() {
-  modalRoot.querySelector("#reserveAccountsManagerForm")?.addEventListener("submit", saveReserveAccountsManager);
-  modalRoot.querySelector("#addReserveAccountForm")?.addEventListener("submit", addReserveAccount);
-  modalRoot.querySelectorAll("[data-edit-reserve-account]").forEach((button) => {
-    button.addEventListener("click", () => openManageReserveAccount(button.dataset.editReserveAccount));
-  });
-  modalRoot.querySelectorAll("[data-restore-reserve-account]").forEach((button) => {
-    button.addEventListener("click", () => restoreReserveAccount(button.dataset.restoreReserveAccount));
-  });
-  bindSheetCloseOnly();
-}
-
-function openManageProjectionEvent(eventId) {
-  const item = getProjectionEventById(eventId);
-  if (!item) return;
-  modalRoot.innerHTML = renderProjectionEventEditorSheet(item);
-  bindManageProjectionEventEvents(eventId);
-}
-
-function bindManageProjectionEventEvents(eventId) {
-  modalRoot.querySelector("#projectionEventEditorForm")?.addEventListener("submit", (event) => saveProjectionEventEdits(event, eventId));
-  modalRoot.querySelector("[data-archive-projection-event]")?.addEventListener("click", () => archiveProjectionEvent(eventId));
-  bindSheetCloseOnly();
-}
-
-function openManageProjectionEvents() {
-  modalRoot.innerHTML = renderProjectionEventsManagerSheet();
-  bindManageProjectionEventsEvents();
-}
-
-function bindManageProjectionEventsEvents() {
-  modalRoot.querySelector("#projectionEventsManagerForm")?.addEventListener("submit", saveProjectionEventsManager);
-  modalRoot.querySelector("#addProjectionEventForm")?.addEventListener("submit", addProjectionEvent);
-  modalRoot.querySelectorAll("[data-edit-projection-event]").forEach((button) => {
-    button.addEventListener("click", () => openManageProjectionEvent(button.dataset.editProjectionEvent));
-  });
-  modalRoot.querySelectorAll("[data-restore-projection-event]").forEach((button) => {
-    button.addEventListener("click", () => restoreProjectionEvent(button.dataset.restoreProjectionEvent));
-  });
-  bindSheetCloseOnly();
-}
-
-function bindSheetCloseOnly() {
-  modalRoot.querySelectorAll("[data-close-sheet]").forEach((button) => {
-    button.addEventListener("click", closeQuickAdd);
-  });
-  modalRoot.querySelector(".sheet-backdrop")?.addEventListener("click", (event) => {
-    if (event.target.classList.contains("sheet-backdrop")) closeQuickAdd();
-  });
-}
-
-function bindTransactionManagerEvents() {
-  modalRoot.querySelectorAll("[data-sheet-filter]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.ui.txFilter = button.dataset.sheetFilter;
-      saveState();
-      openTransactionsManager();
-    });
-  });
-  modalRoot.querySelectorAll("[data-edit-transaction]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.ui.editingTransactionId = button.dataset.editTransaction;
-      saveState();
-      openQuickAdd();
-    });
-  });
-  modalRoot.querySelectorAll("[data-delete-transaction]").forEach((button) => {
-    button.addEventListener("click", () => {
-      deleteTransaction(button.dataset.deleteTransaction);
-      openTransactionsManager();
-    });
-  });
-  modalRoot.querySelectorAll("[data-close-sheet]").forEach((button) => {
-    button.addEventListener("click", closeQuickAdd);
-  });
-  modalRoot.querySelector(".sheet-backdrop")?.addEventListener("click", (event) => {
-    if (event.target.classList.contains("sheet-backdrop")) closeQuickAdd();
-  });
-}
-
-function renderRecentTransactionsPreview(scope = state.ui.monitorScope || "week") {
-  const monthKey = state.ui.selectedMonth;
-  const weekKey = getWeekKey(getReferenceDateISO(monthKey));
-  const weekEnd = getWeekEnd(weekKey);
-  const recent = state.transactions
-    .filter((item) => {
-      if (scope === "month") return item.dateISO.slice(0, 7) === monthKey;
-      return item.dateISO.slice(0, 7) === monthKey && item.dateISO >= weekKey && item.dateISO <= weekEnd;
-    })
-    .sort((a, b) => `${b.dateISO}-${b.id}`.localeCompare(`${a.dateISO}-${a.id}`))
-    .slice(0, 5);
+function renderRecentActivity() {
+  const recent = getScopedTransactions().slice(0, 5);
   return `
     <section class="recent-preview">
       <div class="recent-head">
         <h2>Recent Activity</h2>
-        <button class="mini-button" type="button" data-manage-transactions>View / Edit</button>
+        <button class="mini-button" type="button" data-manage-transactions>View / Edit Activity</button>
       </div>
       <div class="recent-feed">
         ${recent.length ? recent.map(renderRecentTransaction).join("") : `<div class="empty-state">No activity yet. Add your first entry with +.</div>`}
@@ -1821,7 +653,7 @@ function renderRecentTransactionsPreview(scope = state.ui.monitorScope || "week"
 
 function renderRecentTransaction(transaction) {
   return `
-    <div class="recent-item ${transaction.category}">
+    <div class="recent-item">
       <span>${escapeHtml(getCategoryLabel(transaction.category))}</span>
       <strong>${money(transaction.amount)}</strong>
       <em>${formatDate(transaction.dateISO)}</em>
@@ -1829,441 +661,331 @@ function renderRecentTransaction(transaction) {
   `;
 }
 
-function renderTransactionsManagerSheet() {
-  const transactions = getFilteredTransactions();
+function renderPlanningPage() {
+  const reviewStatus = getMonthReviewStatus(state.ui.selectedMonth);
   return `
-    <div class="sheet-backdrop" role="presentation">
-      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Manage transactions">
-        <div class="sheet-handle"></div>
-        <div class="sheet-head">
-          <h2>Transactions</h2>
-          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
-        </div>
-        <div class="tx-filter">
-          ${renderSheetFilter("week", "This Week")}
-          ${renderSheetFilter("month", "This Month")}
-          ${renderSheetFilter("essentials", "Essentials")}
-          ${renderSheetFilter("discretionary", "Discretionary")}
-          ${renderSheetFilter("all", "All")}
-        </div>
-        <div class="tx-list">
-          ${transactions.length ? transactions.map(renderManagedTransaction).join("") : `<div class="empty-state">No transactions recorded yet.</div>`}
-        </div>
+    <section class="page planning-page">
+      <section class="stack">
+        <article class="planning-card">
+          <div class="planning-accordion-head">
+            <div>
+              <p class="section-kicker">Status</p>
+              <h2>Planning Summary</h2>
+            </div>
+          </div>
+          ${renderPlanningSummary()}
+        </article>
+        ${reviewStatus.doneCount < 4 ? renderMonthSetupReminder(reviewStatus) : ""}
+        <article class="planning-card is-weak data-center-card">
+          <div class="planning-accordion-head">
+            <div>
+              <p class="section-kicker">CSV Backup</p>
+              <h2>Data Center</h2>
+            </div>
+            <button class="mini-button" type="button" data-open-planning-section="data">Open</button>
+          </div>
+          <div class="accordion-inline-summary"><strong>CSV import / export</strong><span>Reset and app details live here.</span></div>
+        </article>
       </section>
+    </section>
+  `;
+}
+
+function renderPlanningSummary() {
+  const review = getMonthReviewStatus(state.ui.selectedMonth);
+  return `
+    <div class="planning-summary-grid status-nav-grid">
+      ${renderPlanningStatusTile("◼", "Budget", `${getActiveCategories().length} active categories`, getActiveCategories().length ? "Ready" : "Empty", "budget", "Setup")}
+      ${renderPlanningStatusTile("◆", "Reserve", `${getActiveReserveVaults().length} vaults · ${money(calculateVaultTotal())} saved`, getActiveReserveVaults().length ? "Ready" : "Empty", "reserve", "Setup")}
+      ${renderPlanningStatusTile("◇", "Background", `${getActiveBackgroundSections().length} sections · ${getActiveBackgroundItems().length} items`, getActiveBackgroundSections().length ? "Ready" : "Empty", "background", "Setup")}
+      ${renderPlanningStatusTile("□", "Month Setup", `${review.doneCount}/4 done`, review.doneCount === 4 ? "Done" : review.doneCount ? "In progress" : "Not started", "monthSetup", "Review")}
     </div>
   `;
 }
 
-function renderCategoryEditorSheet(category) {
-  const used = categoryHasTransactions(category.id);
-  const canDelete = !used;
+function renderPlanningStatusTile(icon, title, summary, status, sectionKey, action = "Open") {
   return `
-    <div class="sheet-backdrop" role="presentation">
-      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Edit Monitor Category">
-        <div class="sheet-handle"></div>
-        <div class="sheet-head">
-          <h2>Edit Monitor Category</h2>
-          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
-        </div>
-        <form id="categoryEditorForm" class="quick-form">
-          <label class="field"><span>Name</span><input name="label" type="text" value="${escapeHtml(category.label)}" required /></label>
-          <label class="field"><span>Icon</span><input name="icon" type="text" value="${escapeHtml(category.icon || "")}" /></label>
-          <label class="field"><span>Group</span><select name="group"><option value="essentials" ${category.group === "essentials" ? "selected" : ""}>Essentials</option><option value="discretionary" ${category.group === "discretionary" ? "selected" : ""}>Discretionary</option><option value="custom" ${category.group === "custom" ? "selected" : ""}>Custom</option></select></label>
-          <label class="field"><span>Monthly Budget</span><input name="monthlyBudget" type="number" step="0.01" value="${category.monthlyBudget}" /></label>
-          <label class="field"><span>Rule Type</span><select name="ruleType"><option value="softCap" ${category.ruleType === "softCap" ? "selected" : ""}>Soft Cap</option><option value="penalty" ${category.ruleType === "penalty" ? "selected" : ""}>Penalty</option><option value="trackOnly" ${category.ruleType === "trackOnly" ? "selected" : ""}>Track Only</option></select></label>
-          <label class="field"><span>Soft Cap Multiplier</span><input name="softCapMultiplier" type="number" step="0.01" value="${category.softCapMultiplier ?? ""}" /></label>
-          <label class="field"><span>Penalty Multiplier</span><input name="penaltyMultiplier" type="number" step="0.01" value="${category.penaltyMultiplier ?? ""}" /></label>
-          <label class="field"><span>Minimum Penalty Unit</span><input name="minPenaltyUnit" type="number" step="0.01" value="${category.minPenaltyUnit ?? ""}" /></label>
-          <label class="field"><span>Priority</span><select name="priority"><option value="primary" ${category.priority === "primary" ? "selected" : ""}>Primary</option><option value="secondary" ${category.priority === "secondary" ? "selected" : ""}>Secondary</option><option value="hidden" ${category.priority === "hidden" ? "selected" : ""}>Hidden</option></select></label>
-          <label class="field"><span>Display Order</span><input name="displayOrder" type="number" step="1" value="${category.displayOrder}" /></label>
-          <div class="boolean-grid">
-            ${renderCheckbox("monitor", "Monitor visibility", category.monitor)}
-            ${renderCheckbox("allowTransactions", "Allow transactions", category.allowTransactions)}
-            ${renderCheckbox("includeInVariableTotal", "Include in variable total", category.includeInVariableTotal)}
-            ${renderCheckbox("includeInWeeklyDiscipline", "Include in weekly discipline", category.includeInWeeklyDiscipline)}
-            ${renderCheckbox("active", "Active", category.active)}
-          </div>
-          <div class="button-row">
-            <button class="action-button" type="submit">Save Category</button>
-            <button class="ghost-button" type="button" data-archive-category>${used ? "Archive Category" : "Archive"}</button>
-            ${canDelete ? `<button class="danger-button" type="button" data-delete-category>Delete</button>` : ""}
-          </div>
-          ${used ? `<p class="settings-note">This category already has transactions, so it can be archived but not hard-deleted.</p>` : ""}
-        </form>
-      </section>
+    <div class="planning-status-tile">
+      <span><i class="text-icon">${escapeHtml(icon)}</i>${escapeHtml(title)}</span>
+      <strong>${escapeHtml(summary)}</strong>
+      <em>${escapeHtml(status)}</em>
+      <button class="mini-button" type="button" data-open-planning-section="${sectionKey}">${escapeHtml(action)}</button>
     </div>
   `;
 }
 
-function renderBudgetCategoriesManagerSheet() {
-  const active = getCategories().filter((item) => !item.archived);
-  const archived = getCategories().filter((item) => item.archived);
+function renderMonthSetupReminder(status) {
   return `
-    <div class="sheet-backdrop" role="presentation">
-      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Manage Budget Categories">
-        <div class="sheet-handle"></div>
-        <div class="sheet-head">
-          <h2>Manage Budget Categories</h2>
-          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
-        </div>
-        <form id="budgetCategoriesManagerForm" class="quick-form">
-          <div class="manager-list">
-            ${active.map((category) => `
-              <div class="manager-row">
-                <div><strong>${escapeHtml(category.icon || "•")} ${escapeHtml(category.label)}</strong><div class="settings-note">${escapeHtml(category.priority)} · ${escapeHtml(category.group)}</div></div>
-                <div class="manager-actions">
-                  <input class="order-input" name="order:${category.id}" type="number" step="1" value="${category.displayOrder}" />
-                  <button class="mini-button" type="button" data-edit-category="${category.id}">Edit</button>
-                </div>
-              </div>
-            `).join("")}
-          </div>
-          <button class="action-button" type="submit">Save Order</button>
-        </form>
-        <form id="addCategoryForm" class="quick-form add-form">
-          <h3>Add Category</h3>
-          <label class="field"><span>Name</span><input name="label" type="text" required /></label>
-          <label class="field"><span>Icon</span><input name="icon" type="text" value="•" /></label>
-          <label class="field"><span>Group</span><select name="group"><option value="discretionary">Discretionary</option><option value="essentials">Essentials</option><option value="custom">Custom</option></select></label>
-          <label class="field"><span>Monthly Budget</span><input name="monthlyBudget" type="number" step="0.01" value="0" /></label>
-          <label class="field"><span>Rule preset</span><select name="rulePreset"><option value="penalty">Penalty Discipline</option><option value="softCap">Soft Cap Only</option><option value="trackOnly">Track Only</option></select></label>
-          <label class="field"><span>Priority</span><select name="priority"><option value="secondary">Secondary</option><option value="primary">Primary</option><option value="hidden">Hidden</option></select></label>
-          <div class="boolean-grid">
-            ${renderCheckbox("monitor", "Monitor visibility", true)}
-            ${renderCheckbox("allowTransactions", "Allow transactions", true)}
-          </div>
-          <button class="action-button" type="submit">Add Category</button>
-        </form>
-        ${archived.length ? `
-          <section class="manager-archived">
-            <h3>Archived</h3>
-            ${archived.map((category) => `
-              <div class="manager-row">
-                <div><strong>${escapeHtml(category.icon || "•")} ${escapeHtml(category.label)}</strong></div>
-                <button class="mini-button" type="button" data-restore-category="${category.id}">Restore</button>
-              </div>
-            `).join("")}
-          </section>
-        ` : ""}
-      </section>
-    </div>
-  `;
-}
-
-function renderBackgroundItemEditorSheet(section, item) {
-  return `
-    <div class="sheet-backdrop" role="presentation">
-      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Edit Background Item">
-        <div class="sheet-handle"></div>
-        <div class="sheet-head">
-          <h2>Edit Background Item</h2>
-          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
-        </div>
-        <form id="backgroundItemEditorForm" class="quick-form">
-          <label class="field"><span>Name</span><input name="label" type="text" value="${escapeHtml(item.label)}" required /></label>
-          <label class="field"><span>Amount</span><input name="amount" type="number" step="0.01" value="${item.amount}" /></label>
-          <label class="field"><span>Frequency</span><select name="frequency"><option value="monthly" ${item.frequency === "monthly" ? "selected" : ""}>Monthly</option><option value="annual" ${item.frequency === "annual" ? "selected" : ""}>Annual</option><option value="oneTime" ${item.frequency === "oneTime" ? "selected" : ""}>One Time</option></select></label>
-          <label class="field"><span>Type</span><select name="type"><option value="income" ${item.type === "income" ? "selected" : ""}>Income</option><option value="fixed" ${item.type === "fixed" ? "selected" : ""}>Fixed</option><option value="debt" ${item.type === "debt" ? "selected" : ""}>Debt</option><option value="investment" ${item.type === "investment" ? "selected" : ""}>Investment</option><option value="other" ${item.type === "other" ? "selected" : ""}>Other</option></select></label>
-          <div class="boolean-grid">
-            ${renderCheckbox("includeInGap", "Include in gap", item.includeInGap)}
-            ${renderCheckbox("includeInProjection", "Include in projection", item.includeInProjection)}
-            ${renderCheckbox("includeInSummary", "Include in summary", item.includeInSummary)}
-            ${renderCheckbox("active", "Active", item.active)}
-          </div>
-          <div class="button-row">
-            <button class="action-button" type="submit">Save Item</button>
-            <button class="ghost-button" type="button" data-archive-background-item>Archive</button>
-          </div>
-          <p class="settings-note">Annual values are monthly-equivalent in summaries.</p>
-        </form>
-      </section>
-    </div>
-  `;
-}
-
-function renderBackgroundSectionsManagerSheet() {
-  const activeSections = getBackgroundSections().filter((section) => !section.archived);
-  const archivedSections = getBackgroundSections().filter((section) => section.archived);
-  return `
-    <div class="sheet-backdrop" role="presentation">
-      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Manage Background Sections">
-        <div class="sheet-handle"></div>
-        <div class="sheet-head">
-          <h2>Manage Background Sections</h2>
-          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
-        </div>
-        <form id="backgroundSectionsManagerForm" class="quick-form">
-          <div class="manager-list">
-            ${activeSections.map((section) => `
-              <div class="manager-row">
-                <div class="manager-stack">
-                  <label class="field">
-                    <span>Section name</span>
-                    <input name="section-label:${section.id}" type="text" value="${escapeHtml(section.label)}" />
-                  </label>
-                  <div class="manager-inline-fields">
-                    <label class="field">
-                      <span>Type</span>
-                      <select name="section-type:${section.id}">
-                        ${renderBackgroundTypeOptions(section.type)}
-                      </select>
-                    </label>
-                    <label class="field">
-                      <span>Order</span>
-                      <input class="order-input" name="section-order:${section.id}" type="number" step="1" value="${section.displayOrder}" />
-                    </label>
-                  </div>
-                  <div class="settings-note">${money(calculateSectionTotal(section.id))} monthly-equivalent</div>
-                </div>
-                <div class="manager-actions">
-                  <button class="mini-button" type="button" data-archive-section="${section.id}">Archive</button>
-                </div>
-              </div>
-            `).join("")}
-          </div>
-          <button class="action-button" type="submit">Save Sections</button>
-        </form>
-        <form id="addBackgroundSectionForm" class="quick-form add-form">
-          <h3>Add Section</h3>
-          <label class="field"><span>Section Name</span><input name="label" type="text" required /></label>
-          <label class="field"><span>Section Type</span><select name="type"><option value="income">Income</option><option value="fixed">Fixed</option><option value="debt">Debt</option><option value="investment">Investment</option><option value="other">Other</option></select></label>
-          <label class="field"><span>Display Order</span><input name="displayOrder" type="number" step="1" value="${activeSections.length + 1}" /></label>
-          <button class="action-button" type="submit">Add Section</button>
-        </form>
-        <form id="addBackgroundItemForm" class="quick-form add-form">
-          <h3>Add Item</h3>
-          <label class="field"><span>Section</span><select name="sectionId">${activeSections.map((section) => `<option value="${section.id}">${escapeHtml(section.label)}</option>`).join("")}</select></label>
-          <label class="field"><span>Name</span><input name="label" type="text" required /></label>
-          <label class="field"><span>Amount</span><input name="amount" type="number" step="0.01" value="0" /></label>
-          <label class="field"><span>Frequency</span><select name="frequency"><option value="monthly">Monthly</option><option value="annual">Annual</option><option value="oneTime">One Time</option></select></label>
-          <label class="field"><span>Type</span><select name="type"><option value="income">Income</option><option value="fixed">Fixed</option><option value="debt">Debt</option><option value="investment">Investment</option><option value="other">Other</option></select></label>
-          <div class="boolean-grid">
-            ${renderCheckbox("includeInGap", "Include in gap", false)}
-            ${renderCheckbox("includeInProjection", "Include in projection", false)}
-            ${renderCheckbox("includeInSummary", "Include in summary", true)}
-            ${renderCheckbox("active", "Active", true)}
-          </div>
-          <button class="action-button" type="submit">Add Item</button>
-        </form>
-        ${archivedSections.length ? `
-          <section class="manager-archived">
-            <h3>Archived Sections</h3>
-            ${archivedSections.map((section) => `
-              <div class="manager-row">
-                <div><strong>${escapeHtml(section.label)}</strong></div>
-                <button class="mini-button" type="button" data-restore-section="${section.id}">Restore</button>
-              </div>
-            `).join("")}
-          </section>
-        ` : ""}
-      </section>
-    </div>
-  `;
-}
-
-function renderReserveAccountEditorSheet(account) {
-  return `
-    <div class="sheet-backdrop" role="presentation">
-      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Edit Reserve Account">
-        <div class="sheet-handle"></div>
-        <div class="sheet-head">
-          <h2>Edit Reserve Account</h2>
-          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
-        </div>
-        <form id="reserveAccountEditorForm" class="quick-form">
-          <label class="field"><span>Name</span><input name="label" type="text" value="${escapeHtml(account.label)}" required /></label>
-          <label class="field"><span>Balance</span><input name="balance" type="number" step="0.01" value="${account.balance}" /></label>
-          <label class="field"><span>Display Order</span><input name="displayOrder" type="number" step="1" value="${account.displayOrder}" /></label>
-          <div class="boolean-grid">
-            ${renderCheckbox("includeInRunway", "Include in runway", account.includeInRunway)}
-            ${renderCheckbox("includeInVaultTotal", "Include in vault total", account.includeInVaultTotal)}
-            ${renderCheckbox("active", "Active", account.active)}
-          </div>
-          <div class="button-row">
-            <button class="action-button" type="submit">Save Account</button>
-            <button class="ghost-button" type="button" data-archive-reserve-account>Archive</button>
-          </div>
-        </form>
-      </section>
-    </div>
-  `;
-}
-
-function renderReserveAccountsManagerSheet() {
-  const active = getReserveAccounts().filter((account) => !account.archived);
-  const archived = getReserveAccounts().filter((account) => account.archived);
-  return `
-    <div class="sheet-backdrop" role="presentation">
-      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Manage Reserve Accounts">
-        <div class="sheet-handle"></div>
-        <div class="sheet-head">
-          <h2>Manage Reserve Accounts</h2>
-          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
-        </div>
-        <form id="reserveAccountsManagerForm" class="quick-form">
-          <div class="manager-list">
-            ${active.map((account) => `
-              <div class="manager-row">
-                <div class="manager-stack">
-                  <strong>${escapeHtml(account.label)}</strong>
-                  <div class="settings-note">${money(account.balance)} · ${account.includeInVaultTotal ? "in vault" : "excluded"} · ${account.includeInRunway ? "in runway" : "excluded"}</div>
-                </div>
-                <div class="manager-actions">
-                  <input class="order-input" name="account-order:${account.id}" type="number" step="1" value="${account.displayOrder}" />
-                  <button class="mini-button" type="button" data-edit-reserve-account="${account.id}">Edit</button>
-                </div>
-              </div>
-            `).join("")}
-          </div>
-          <button class="action-button" type="submit">Save Account Order</button>
-        </form>
-        <form id="addReserveAccountForm" class="quick-form add-form">
-          <h3>Add Account</h3>
-          <label class="field"><span>Name</span><input name="label" type="text" required /></label>
-          <label class="field"><span>Balance</span><input name="balance" type="number" step="0.01" value="0" /></label>
-          <div class="boolean-grid">
-            ${renderCheckbox("includeInRunway", "Include in runway", true)}
-            ${renderCheckbox("includeInVaultTotal", "Include in vault total", true)}
-            ${renderCheckbox("active", "Active", true)}
-          </div>
-          <button class="action-button" type="submit">Add Account</button>
-        </form>
-        ${archived.length ? `
-          <section class="manager-archived">
-            <h3>Archived Accounts</h3>
-            ${archived.map((account) => `
-              <div class="manager-row">
-                <div><strong>${escapeHtml(account.label)}</strong></div>
-                <button class="mini-button" type="button" data-restore-reserve-account="${account.id}">Restore</button>
-              </div>
-            `).join("")}
-          </section>
-        ` : ""}
-      </section>
-    </div>
-  `;
-}
-
-function renderProjectionEventEditorSheet(event) {
-  return `
-    <div class="sheet-backdrop" role="presentation">
-      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Edit Projection Event">
-        <div class="sheet-handle"></div>
-        <div class="sheet-head">
-          <h2>Edit Projection Event</h2>
-          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
-        </div>
-        <form id="projectionEventEditorForm" class="quick-form">
-          <label class="field"><span>Name</span><input name="label" type="text" value="${escapeHtml(event.label)}" required /></label>
-          <label class="field"><span>Type</span><select name="type"><option value="monthly" ${event.type === "monthly" ? "selected" : ""}>Monthly</option><option value="oneTime" ${event.type === "oneTime" ? "selected" : ""}>One Time</option></select></label>
-          <label class="field"><span>Amount</span><input name="amount" type="number" step="0.01" value="${event.amount}" /></label>
-          <label class="field"><span>Start Month</span><input name="startMonth" type="month" value="${event.startMonth || ""}" /></label>
-          <label class="field"><span>End Month</span><input name="endMonth" type="month" value="${event.endMonth || ""}" /></label>
-          <label class="field"><span>One-time Month</span><input name="month" type="month" value="${event.month || ""}" /></label>
-          <label class="field"><span>Display Order</span><input name="displayOrder" type="number" step="1" value="${event.displayOrder}" /></label>
-          <div class="boolean-grid">
-            ${renderCheckbox("affectsProjection", "Affects projection", event.affectsProjection)}
-            ${renderCheckbox("active", "Active", event.active)}
-          </div>
-          <div class="button-row">
-            <button class="action-button" type="submit">Save Event</button>
-            <button class="ghost-button" type="button" data-archive-projection-event>Archive</button>
-          </div>
-        </form>
-      </section>
-    </div>
-  `;
-}
-
-function renderProjectionEventsManagerSheet() {
-  const active = getProjectionEvents().filter((event) => !event.archived);
-  const archived = getProjectionEvents().filter((event) => event.archived);
-  return `
-    <div class="sheet-backdrop" role="presentation">
-      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Manage Projection Events">
-        <div class="sheet-handle"></div>
-        <div class="sheet-head">
-          <h2>Manage Projection Events</h2>
-          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
-        </div>
-        <form id="projectionEventsManagerForm" class="quick-form">
-          <div class="manager-list">
-            ${active.map((event) => `
-              <div class="manager-row">
-                <div class="manager-stack">
-                  <strong>${escapeHtml(event.label)}</strong>
-                  <div class="settings-note">${money(event.amount)} · ${event.type} · ${escapeHtml(event.startMonth || "—")}${event.endMonth ? ` to ${escapeHtml(event.endMonth)}` : ""}${event.type === "oneTime" && event.month ? ` · ${escapeHtml(event.month)}` : ""}</div>
-                </div>
-                <div class="manager-actions">
-                  <input class="order-input" name="event-order:${event.id}" type="number" step="1" value="${event.displayOrder}" />
-                  <button class="mini-button" type="button" data-edit-projection-event="${event.id}">Edit</button>
-                </div>
-              </div>
-            `).join("")}
-          </div>
-          <button class="action-button" type="submit">Save Event Order</button>
-        </form>
-        <form id="addProjectionEventForm" class="quick-form add-form">
-          <h3>Add Event</h3>
-          <label class="field"><span>Name</span><input name="label" type="text" required /></label>
-          <label class="field"><span>Type</span><select name="type"><option value="monthly">Monthly</option><option value="oneTime">One Time</option></select></label>
-          <label class="field"><span>Amount</span><input name="amount" type="number" step="0.01" value="0" /></label>
-          <label class="field"><span>Start Month</span><input name="startMonth" type="month" value="${state.ui.selectedMonth}" /></label>
-          <label class="field"><span>End Month</span><input name="endMonth" type="month" value="" /></label>
-          <label class="field"><span>One-time Month</span><input name="month" type="month" value="" /></label>
-          <div class="boolean-grid">
-            ${renderCheckbox("affectsProjection", "Affects projection", true)}
-            ${renderCheckbox("active", "Active", true)}
-          </div>
-          <button class="action-button" type="submit">Add Event</button>
-        </form>
-        ${archived.length ? `
-          <section class="manager-archived">
-            <h3>Archived Events</h3>
-            ${archived.map((event) => `
-              <div class="manager-row">
-                <div><strong>${escapeHtml(event.label)}</strong></div>
-                <button class="mini-button" type="button" data-restore-projection-event="${event.id}">Restore</button>
-              </div>
-            `).join("")}
-          </section>
-        ` : ""}
-      </section>
-    </div>
-  `;
-}
-
-function renderSheetFilter(key, label) {
-  return `<button class="filter-chip ${state.ui.txFilter === key ? "is-active" : ""}" type="button" data-sheet-filter="${key}">${escapeHtml(label)}</button>`;
-}
-
-function renderManagedTransaction(transaction) {
-  return `
-    <div class="tx-item ${transaction.category}">
+    <article class="month-setup-reminder">
       <div>
-        <strong>${escapeHtml(getCategoryLabel(transaction.category))}</strong>
-        <div class="settings-note">${formatDate(transaction.dateISO)} · ${escapeHtml(transaction.note || "No note")}</div>
+        <strong>Month Setup: ${status.doneCount}/4 done</strong>
+        <span>${escapeHtml(formatMonthLabel(state.ui.selectedMonth))} · ${escapeHtml(status.label)}</span>
       </div>
-      <div>
-        <div class="pace-money">${money(transaction.amount)}</div>
-        <div class="tx-actions">
-          <button class="mini-button" type="button" data-edit-transaction="${transaction.id}">Edit</button>
-          <button class="mini-button" type="button" data-delete-transaction="${transaction.id}">Delete</button>
-        </div>
-      </div>
+      <button class="mini-button" type="button" data-open-planning-section="monthSetup">Review</button>
+    </article>
+  `;
+}
+
+function renderReviewChecklistItem(key, title, description, action) {
+  const review = getMonthReview(state.ui.selectedMonth);
+  return `
+    <div class="checklist-item">
+      <label>
+        <input type="checkbox" data-review-toggle="${key}" ${review[key] ? "checked" : ""} />
+        <span>${escapeHtml(title)}</span>
+      </label>
+      <p>${escapeHtml(description)}</p>
+      <button class="mini-button" type="button" data-review-action="${key}">${escapeHtml(action)}</button>
     </div>
   `;
+}
+
+function renderBudgetSummary() {
+  const categories = getActiveCategories();
+  if (!categories.length) {
+    return `<div class="accordion-inline-summary"><strong>No categories yet.</strong><span>Add category.</span></div>`;
+  }
+  const total = sum(categories.filter(isVariableTotalCategory).map((item) => item.monthlyBudget));
+  return `<div class="accordion-inline-summary"><strong>${categories.length} active categories</strong><span>Monthly budget ${money(total)}</span></div>`;
+}
+
+function renderBudgetPlanningBody() {
+  const categories = getCategories().filter((item) => !item.archived);
+  if (!categories.length) {
+    return `<div class="empty-state"><strong>No budget categories yet.</strong><span>Add category.</span><button class="action-button" type="button" data-add-category>Add category</button></div>`;
+  }
+  return `
+    <div class="planning-metrics">
+      ${categories.map(renderBudgetCard).join("")}
+    </div>
+    <p class="settings-note">Weekly discipline uses active categories that are included in weekly discipline.</p>
+  `;
+}
+
+function renderBudgetCard(category) {
+  const weekly = getCurrentWeekBudget(category.id, getWeekKey(getReferenceDateISO(state.ui.selectedMonth)));
+  return `
+    <div class="budget-input-card">
+      <div class="budget-card-head">
+        <strong><span class="text-icon">${escapeHtml(category.icon)}</span>${escapeHtml(category.label)}</strong>
+        <button class="mini-button" type="button" data-edit-category="${category.id}" aria-label="Edit category settings">⚙</button>
+      </div>
+      <small>${money(category.monthlyBudget)} monthly · ${money(weekly)} estimated weekly</small>
+    </div>
+  `;
+}
+
+function renderReserveSummary() {
+  const vaults = getActiveReserveVaults();
+  const pinned = getMonitorReserveVaults().length;
+  const first = vaults[0];
+  if (!vaults.length) {
+    return `<div class="accordion-inline-summary"><strong>No vaults yet.</strong><span>Add vault.</span></div>`;
+  }
+  return `
+    <div class="accordion-inline-summary">
+      <strong>${vaults.length} active vaults · ${pinned} pinned to Monitor</strong>
+      <span>Total saved ${money(calculateVaultTotal())}</span>
+      <span>${first ? `${escapeHtml(first.name)} ${money(first.currentAmount)}` : "No priority vault"}</span>
+    </div>
+  `;
+}
+
+function renderReservePlanningBody() {
+  const vaults = getReserveVaults().filter((vault) => !vault.archived);
+  if (!vaults.length) {
+    return `<div class="empty-state"><strong>No reserve vaults yet.</strong><span>Create a vault for a savings goal.</span><button class="action-button" type="button" data-add-vault>Add vault</button></div>`;
+  }
+  return `
+    <div class="settings-grid">
+      ${vaults.map(renderVaultPlanningCard).join("")}
+    </div>
+    <p class="settings-note">Only the first 2 pinned vaults appear on Monitor.</p>
+  `;
+}
+
+function renderVaultPlanningCard(vault) {
+  const progress = calculateVaultProgress(vault);
+  return `
+    <article class="vault-planning-card ${escapeHtml(vault.colorToken)}">
+      <div class="budget-card-head">
+        <strong>◆ ${escapeHtml(vault.name)}</strong>
+        <button class="mini-button" type="button" data-edit-vault="${vault.id}" aria-label="Edit reserve vault">⚙</button>
+      </div>
+      <span>${money(vault.currentAmount)}${vault.targetAmount ? ` / ${money(vault.targetAmount)}` : ""} · ${escapeHtml(progress.status)}</span>
+      <span class="settings-note">${escapeHtml(getVaultRemainingText(vault))}</span>
+      ${vault.note ? `<p>${escapeHtml(vault.note)}</p>` : `<p>No note yet.</p>`}
+      <small>${vault.includeInMonitor ? "Pinned to Monitor" : "Planning only"}</small>
+    </article>
+  `;
+}
+
+function renderBackgroundSummary() {
+  const sections = getActiveBackgroundSections();
+  const items = getActiveBackgroundItems();
+  return `<div class="accordion-inline-summary"><strong>${sections.length ? `${sections.length} sections · ${items.length} items` : "No background sections yet."}</strong><span>${sections.length ? "Ready" : "Add section."}</span></div>`;
+}
+
+function renderBackgroundBody() {
+  const sections = getActiveBackgroundSections();
+  if (!sections.length) {
+    return `<div class="empty-state"><strong>No background sections yet.</strong><span>Add section.</span><button class="action-button" type="button" data-manage-background>Add background section</button></div>`;
+  }
+  return `
+    <div class="stack">
+      ${sections.map(renderBackgroundSection).join("")}
+    </div>
+  `;
+}
+
+function renderBackgroundSection(section) {
+  const items = section.items.filter((item) => item.active && !item.archived);
+  return `
+    <section class="readonly-card">
+      <div class="section-head">
+        <h3>${escapeHtml(section.label)}</h3>
+        <span class="tiny-label">${escapeHtml(section.type)}</span>
+      </div>
+      <div class="settings-grid" style="margin-top:10px;">
+        ${items.length ? items.map((item) => `
+          <div class="background-item-card">
+            <div class="field"><span>${escapeHtml(item.label)}</span><input type="text" value="${money(monthlyEquivalent(item))}" readonly /></div>
+            <button class="mini-button" type="button" data-section-id="${section.id}" data-edit-background-item="${item.id}" aria-label="Edit background item">⚙</button>
+          </div>
+        `).join("") : `<div class="empty-state">No items in this section.</div>`}
+      </div>
+    </section>
+  `;
+}
+
+function renderDataBody() {
+  return `
+    <section class="readonly-card weak-card">
+      <div class="section-head">
+        <h3>CSV Backup</h3>
+        <span class="tiny-label">Portable</span>
+      </div>
+      <div class="button-row">
+        <button id="exportCsvButton" class="action-button" type="button">Export CSV</button>
+        <label class="ghost-button">Import CSV<input id="importCsvInput" class="hidden" type="file" accept=".csv,text/csv" /></label>
+        <button id="sampleCsvButton" class="ghost-button" type="button">Download sample CSV</button>
+      </div>
+      <p class="settings-note">CSV is the primary backup format for V3.</p>
+    </section>
+    <section class="readonly-card weak-card danger-zone">
+      <div class="section-head"><h3>Reset</h3><span class="tiny-label">Danger</span></div>
+      <button id="resetButton" class="danger-button" type="button">Reset local data</button>
+    </section>
+    <details class="about-details">
+      <summary>About</summary>
+      <div class="about-body">
+        <p class="settings-note">${escapeHtml(APP_VERSION)}</p>
+        <p class="settings-note">Storage key: ${escapeHtml(STORAGE_KEY)}</p>
+      </div>
+    </details>
+  `;
+}
+
+function renderSetupSheet(title, body, label = "Setup") {
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet setup-sheet" role="dialog" aria-label="${escapeHtml(title)}">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <div>
+            <p class="section-kicker">${escapeHtml(label)}</p>
+            <h2>${escapeHtml(title)}</h2>
+          </div>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        ${body}
+      </section>
+    </div>
+  `;
+}
+
+function renderBudgetSetupSheet() {
+  return renderSetupSheet("Budget Setup", `
+    ${renderBudgetPlanningBody()}
+    <div class="button-row">
+      <button class="action-button" type="button" data-add-category>Add Category</button>
+      <button class="action-button" type="button" data-manage-categories>Manage Categories</button>
+    </div>
+    <p class="settings-note">Use Add Category for a guided preset. Use Manage Categories for order, restore, and structure.</p>
+  `);
+}
+
+function renderReserveSetupSheet() {
+  const pinnedCount = getMonitorReserveVaults().length;
+  return renderSetupSheet("Reserve Vaults", `
+    ${renderReservePlanningBody()}
+    ${pinnedCount > 2 ? `<div class="notice-strip warning">Only the first 2 pinned vaults appear on Monitor. Reorder vaults to change priority.</div>` : ""}
+    <div class="button-row">
+      <button class="action-button" type="button" data-add-vault>Add Vault</button>
+      <button class="action-button" type="button" data-manage-vaults>Manage Vaults</button>
+    </div>
+  `);
+}
+
+function renderBackgroundSetupSheet() {
+  return renderSetupSheet("Background Setup", `
+    ${renderBackgroundBody()}
+    <div class="button-row">
+      <button class="action-button" type="button" data-manage-background>Manage Background</button>
+    </div>
+  `);
+}
+
+function renderMonthSetupSheet() {
+  const status = getMonthReviewStatus(state.ui.selectedMonth);
+  return renderSetupSheet("Month Setup", `
+    <div class="accordion-inline-summary">
+      <strong>${escapeHtml(formatMonthLabel(state.ui.selectedMonth))} · ${status.doneCount}/4 done</strong>
+      <span>${escapeHtml(status.label)}</span>
+    </div>
+    <div class="review-checklist">
+      ${renderReviewChecklistItem("reviewSpendingDone", "Review previous month spending", "Check where spending ran over or under.", "Review month")}
+      ${renderReviewChecklistItem("adjustBudgetsDone", "Adjust current month budgets", "Update category budgets if needed.", "Adjust budgets")}
+      ${renderReviewChecklistItem("updateVaultsDone", "Update reserve vault balances", "Refresh vault balances and notes.", "Update vaults")}
+      ${renderReviewChecklistItem("backupDone", "Export CSV backup", "Save a local CSV backup for this month.", "Export CSV backup")}
+    </div>
+  `, "Checklist");
+}
+
+function renderDataCenterSheet() {
+  return renderSetupSheet("Data Center", renderDataBody(), "CSV Backup");
+}
+
+function openQuickAdd() {
+  modalRoot.innerHTML = renderQuickAddSheet();
+  bindSheetEvents();
+  requestAnimationFrame(() => modalRoot.querySelector("input[name='amount']")?.focus());
 }
 
 function renderQuickAddSheet() {
+  const categories = getActiveTransactionCategories();
   const editing = getEditingTransaction();
+  if (!categories.length && !editing) {
+    return `
+      <div class="sheet-backdrop" role="presentation">
+        <section class="quick-sheet" role="dialog" aria-label="Quick Add">
+          <div class="sheet-handle"></div>
+          <div class="sheet-head">
+            <h2>Quick Add</h2>
+            <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+          </div>
+          <div class="empty-state">
+            <strong>Create a category first.</strong>
+            <span>Transactions need a monitor category before they can be recorded.</span>
+            <button class="action-button" type="button" data-create-category-from-quick-add>Create category</button>
+          </div>
+        </section>
+      </div>
+    `;
+  }
+
   const template = state.ui.lastTransactionTemplate;
-  const availableCategories = getActiveTransactionCategories();
-  const fallbackCategory = availableCategories.at(0)?.id || "groceries";
-  const templateCategory = template?.category && isCategoryAllowedForTransaction(template.category) ? template.category : fallbackCategory;
-  const selectedCategory = editing?.category || templateCategory || fallbackCategory;
-  const selectedAmount = editing ? editing.amount : "";
-  const selectedNote = editing?.note || "";
+  const selectedCategory = editing?.category || (template && isCategoryAllowedForTransaction(template.category) ? template.category : categories[0]?.id);
   return `
     <div class="sheet-backdrop" role="presentation">
       <section class="quick-sheet" role="dialog" aria-label="Quick Add">
@@ -2273,31 +995,21 @@ function renderQuickAddSheet() {
           <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
         </div>
         <form id="transactionForm" class="quick-form">
-          <input type="hidden" name="id" value="${editing?.id || ""}" />
-          <label class="field amount-field">
+          <input name="id" type="hidden" value="${escapeHtml(editing?.id || "")}" />
+          <label class="amount-field">
             <span>Amount</span>
-            <input name="amount" type="number" step="0.01" min="0" value="${selectedAmount}" required />
+            <input name="amount" type="number" inputmode="decimal" step="0.01" min="0" value="${editing?.amount || ""}" placeholder="$0" required />
           </label>
-          ${!editing && template ? `<div class="repeat-last-row"><button class="ghost-button" type="button" data-repeat-last>Repeat Last</button></div>` : ""}
-          <div class="quick-amount-row">
+          <div class="quick-amounts">
             ${[10, 20, 50, 100].map((amount) => `<button class="amount-chip" type="button" data-quick-amount="${amount}">${money(amount)}</button>`).join("")}
+            ${template && !editing ? `<button class="amount-chip" type="button" data-repeat-last>Repeat Last</button>` : ""}
           </div>
-          <input id="quickCategoryInput" type="hidden" name="category" value="${selectedCategory}" />
-          <div class="category-chip-row">
-            ${availableCategories.map((meta) => `
-              <button class="category-chip ${selectedCategory === meta.id ? "is-active" : ""}" type="button" data-pick-category="${meta.id}">
-                ${escapeHtml(meta.label === "Charging/407" ? "Charging" : meta.label)}
-              </button>
-            `).join("")}
+          <input name="category" type="hidden" value="${escapeHtml(selectedCategory)}" />
+          <div class="category-chip-grid" aria-label="Category">
+            ${categories.map((category) => `<button class="category-chip ${category.id === selectedCategory ? "is-active" : ""}" type="button" data-category-chip="${category.id}"><span class="text-icon">${escapeHtml(category.icon)}</span>${escapeHtml(category.label)}</button>`).join("")}
           </div>
-          <label class="field">
-            <span>Date</span>
-            <input name="dateISO" type="date" value="${escapeHtml(editing?.dateISO || defaultDateForMonth(state.ui.selectedMonth))}" required />
-          </label>
-          <label class="field">
-            <span>Note</span>
-            <input name="note" type="text" value="${escapeHtml(selectedNote)}" placeholder="Optional note" />
-          </label>
+          <label class="field"><span>Date</span><input name="dateISO" type="date" value="${escapeHtml(editing?.dateISO || defaultDateForMonth(state.ui.selectedMonth))}" required /></label>
+          <label class="field"><span>Note</span><input name="note" type="text" value="${escapeHtml(editing?.note || "")}" placeholder="Optional note" /></label>
           <button class="action-button sheet-save" type="submit">${editing ? "Save Entry" : "Add Entry"}</button>
         </form>
       </section>
@@ -2305,386 +1017,444 @@ function renderQuickAddSheet() {
   `;
 }
 
-function renderPlanningPage() {
-  const core = getReservePlanningCore();
-  const runway = calculateReserveRunway(core.runwayBalance, core.stableBaseGapMonthly);
-  const projections = buildProjectionData();
-  const totals = calculateTotals();
-  const reserveAccounts = getActiveReserveAccounts();
-  const projectionEvents = getActiveProjectionEvents();
-  return `
-    <section class="page planning-page">
-      <form id="settingsForm" class="stack">
-        ${renderPlanningAccordionCard({
-          sectionKey: "summary",
-          title: "Planning Summary",
-          eyebrow: "Planning Summary",
-          summary: renderPlanningSectionSummary("summary", { core, totals }),
-          expanded: ``
-        })}
-
-        ${renderMonthlyReviewCard()}
-
-        ${renderPlanningAccordionCard({
-          sectionKey: "budget",
-          title: "Budget Planning",
-          eyebrow: "Budget Planning",
-          summary: renderPlanningSectionSummary("budget", { totals }),
-          accentClass: "budget-planning-card",
-          manageAction: `<button class="mini-button" type="button" data-manage-budget-categories aria-label="Manage Budget Categories">Manage</button>`,
-          expanded: `
-            <div class="planning-metrics">
-              ${getCategories().filter((category) => category.active && !category.archived).map((category) => {
-                const actualIndex = state.settings.monitorCategories.findIndex((item) => item.id === category.id);
-                return renderBudgetField(category, actualIndex);
-              }).join("")}
-              <label class="field"><span>Penalty Multiplier</span><input name="settings.weeklyRules.penaltyMultiplier" type="number" step="0.01" value="${state.settings.weeklyRules.penaltyMultiplier}" /></label>
-              <label class="field"><span>Minimum Penalty Unit</span><input name="settings.weeklyRules.minPenaltyUnit" type="number" step="0.01" value="${state.settings.weeklyRules.minPenaltyUnit}" /></label>
-              <label class="field"><span>Default Soft Cap Multiplier</span><input name="settings.weeklyRules.defaultSoftCapMultiplier" type="number" step="0.01" value="${state.settings.weeklyRules.defaultSoftCapMultiplier}" /></label>
-            </div>
-            <p class="settings-note">Current week uses monthly budget divided by weeks overlapping this month; future weeks use remaining monthly budget after this week and apply closed-week penalties.</p>
-          `
-        })}
-
-        ${renderPlanningAccordionCard({
-          sectionKey: "reserve",
-          title: "Reserve Planning",
-          eyebrow: "Reserve Planning",
-          summary: renderPlanningSectionSummary("reserve", { core, runway, projections }),
-          accentClass: "reserve-planning-card",
-          manageAction: `
-            <button class="mini-button" type="button" data-manage-reserve-accounts aria-label="Manage Reserve Accounts">Accounts</button>
-            <button class="mini-button" type="button" data-manage-projection-events aria-label="Manage Projection Events">Events</button>
-          `,
-          expanded: `
-            <div class="planning-metrics">
-              <div class="readonly-card"><span class="tiny-label">Reserve Vault Total</span><strong>${money(core.reserveBalanceNow)}</strong></div>
-              <div class="readonly-card"><span class="tiny-label">Runway Balance</span><strong>${money(core.runwayBalance)}</strong></div>
-              <div class="readonly-card"><span class="tiny-label">Stable Gap Source</span><strong>${money(core.stableBaseGapMonthly)}/mo</strong></div>
-              <label class="field"><span>Projection Anchor Month</span><input name="settings.reserve.projectionAnchorMonth" type="month" value="${state.settings.reserve.projectionAnchorMonth}" /></label>
-              <div class="readonly-card"><span class="tiny-label">Runway Months</span><strong>${runway.months}</strong></div>
-              <div class="readonly-card"><span class="tiny-label">${escapeHtml(projections.sep.label)} Projection</span><strong>${money(projections.sep.value)}</strong></div>
-              <div class="readonly-card"><span class="tiny-label">${escapeHtml(projections.jan.label)} Projection</span><strong>${money(projections.jan.value)}</strong></div>
-            </div>
-            <p class="settings-note">Vault total includes accounts marked “Include in vault total.” Runway only uses accounts marked “Include in runway.”</p>
-            <div class="stack">
-              <section class="readonly-card">
-                <div class="section-head">
-                  <h3>Reserve Accounts</h3>
-                  <span class="tiny-label">${reserveAccounts.length} active</span>
-                </div>
-                <div class="settings-grid" style="margin-top:10px;">
-                  ${reserveAccounts.map((account) => `
-                    <div class="background-item-card">
-                      <div class="field">
-                        <span>${escapeHtml(account.label)}</span>
-                        <input type="text" value="${money(account.balance)}" readonly />
-                      </div>
-                      <button class="mini-button" type="button" data-edit-reserve-account="${account.id}" aria-label="Edit reserve account: ${escapeHtml(account.label)}">⚙</button>
-                    </div>
-                  `).join("") || `<div class="empty-state">No reserve accounts yet.</div>`}
-                </div>
-              </section>
-              <section class="readonly-card">
-                <div class="section-head">
-                  <h3>Projection Events</h3>
-                  <span class="tiny-label">${projectionEvents.length} active</span>
-                </div>
-                <div class="settings-grid" style="margin-top:10px;">
-                  ${projectionEvents.map((event) => `
-                    <div class="background-item-card">
-                      <div class="field">
-                        <span>${escapeHtml(event.label)}</span>
-                        <input type="text" value="${money(event.amount)} · ${escapeHtml(event.type)}" readonly />
-                      </div>
-                      <button class="mini-button" type="button" data-edit-projection-event="${event.id}" aria-label="Edit projection event: ${escapeHtml(event.label)}">⚙</button>
-                    </div>
-                  `).join("") || `<div class="empty-state">No projection events yet.</div>`}
-                </div>
-              </section>
-              <p class="settings-note">Background income is descriptive. Reserve projection is controlled by Reserve Events.</p>
-            </div>
-          `
-        })}
-
-        ${renderPlanningAccordionCard({
-          sectionKey: "background",
-          title: "Background Data",
-          eyebrow: "Background Data",
-          summary: renderPlanningSectionSummary("background", { totals }),
-          manageAction: `<button class="mini-button" type="button" data-manage-background aria-label="Manage Background Sections">Manage</button>`,
-          expanded: `
-            <div class="stack">
-              ${getBackgroundSections().filter((section) => section.active && !section.archived).map((section) => {
-                const actualIndex = state.settings.backgroundSections.findIndex((item) => item.id === section.id);
-                return renderBackgroundGroup(section, actualIndex, calculateSectionTotal(section.id));
-              }).join("")}
-            </div>
-            <div class="totals-grid">
-              ${renderTotalChip("Total Core Income", totals.coreIncome)}
-              ${renderTotalChip("Total Reserve Income", totals.reserveIncome)}
-              ${renderTotalChip("Total Fixed", totals.fixed)}
-              ${renderTotalChip("Total Debt", totals.debt)}
-              ${renderTotalChip("Total Investment", totals.investment)}
-              ${renderTotalChip("Total Variable Essentials", totals.variableEssentials)}
-              ${renderTotalChip("Total Discretionary", totals.discretionary)}
-              ${renderTotalChip("Total Custom Variable", totals.customVariable)}
-              ${renderTotalChip("Total Reserve Ledger", totals.reserveLedger)}
-            </div>
-          `
-        })}
-
-        ${renderPlanningAccordionCard({
-          sectionKey: "data",
-          title: "Data / Compatibility",
-          eyebrow: "Backup & Restore",
-          summary: renderPlanningSectionSummary("data"),
-          weak: true,
-          expanded: renderDataCompatibilityBody()
-        })}
-
-        <div class="button-row">
-          <button class="action-button" type="submit">Save Settings</button>
-        </div>
-      </form>
-    </section>
-  `;
-}
-
-function renderBudgetField(category, index) {
-  const weekly = getCurrentWeekBudget(category.id, getWeekKey(getReferenceDateISO(state.ui.selectedMonth)), state.ui.selectedMonth);
-  return `
-    <div class="budget-input-card">
-      <div class="budget-card-head">
-        <strong>${escapeHtml(category.label)}</strong>
-        <button class="mini-button" type="button" data-edit-category="${category.id}" aria-label="Edit category settings: ${escapeHtml(category.label)}">⚙</button>
-      </div>
-      <label class="field"><span>${escapeHtml(category.label)}</span><input name="settings.monitorCategories.${index}.monthlyBudget" type="number" step="0.01" value="${category.monthlyBudget}" /></label>
-      <small>Est. weekly ${money(weekly)}</small>
-    </div>
-  `;
-}
-
-function renderPlanningAccordionCard({ sectionKey, title, eyebrow, summary, expanded, accentClass = "", weak = false, manageAction = "" }) {
-  const isOpen = Boolean(state.ui.planningOpenSections?.[sectionKey]);
-  const expandedMarkup = String(expanded || "").trim();
-  return `
-    <article class="planning-card planning-accordion ${accentClass} ${isOpen ? "is-open" : ""} ${weak ? "is-weak" : ""}" data-planning-section="${sectionKey}">
-      <div class="planning-accordion-head">
-        <div>
-          <p class="eyebrow">${escapeHtml(eyebrow)}</p>
-          <h2>${escapeHtml(title)}</h2>
-        </div>
-        <div class="planning-card-actions">
-          ${manageAction}
-          <button class="mini-button" type="button" data-toggle-planning="${sectionKey}">${isOpen ? "Close" : "Open"}</button>
-        </div>
-      </div>
-      <div class="planning-accordion-summary">
-        ${summary}
-      </div>
-      ${isOpen && expandedMarkup ? `<div class="planning-accordion-body">${expandedMarkup}</div>` : ""}
-    </article>
-  `;
-}
-
-function renderMonthlyReviewCard() {
-  const status = getMonthReviewStatus(state.ui.selectedMonth);
-  return renderPlanningAccordionCard({
-    sectionKey: "review",
-    title: "Month Setup",
-    eyebrow: "Monthly Review",
-    summary: `
-      <div class="accordion-inline-summary">
-        <strong>${escapeHtml(formatMonthLabel(state.ui.selectedMonth))} · ${status.reviewed ? "Reviewed" : "Not reviewed"}</strong>
-        <span>Last month ${escapeHtml(status.lastMonthResult.label)} · Reserve ${escapeHtml(status.reserveUpdate)}</span>
-        <span>Backup ${status.backupDone ? "done" : "due"}</span>
-      </div>
-    `,
-    expanded: `
-      <div class="review-checklist">
-        <span>1. Review previous month spending</span>
-        <span>2. Adjust current month category budgets</span>
-        <span>3. Update reserve account balance</span>
-        <span>4. Export JSON backup</span>
-        <span>5. Mark month reviewed</span>
-      </div>
-      <div class="button-row">
-        <button id="markMonthReviewedButton" class="action-button" type="button">Mark Month Reviewed</button>
-        <button id="markBackupDoneButton" class="ghost-button" type="button">Mark Backup Done</button>
-        <button class="ghost-button" type="button" data-open-planning-section="budget">Open Budget Planning</button>
-        <button class="ghost-button" type="button" data-open-planning-section="reserve">Open Reserve Planning</button>
-      </div>
-    `
+function bindSheetEvents() {
+  modalRoot.querySelectorAll("[data-close-sheet]").forEach((button) => button.addEventListener("click", closeSheet));
+  modalRoot.querySelector(".sheet-backdrop")?.addEventListener("click", (event) => {
+    if (event.target.classList.contains("sheet-backdrop")) closeSheet();
+  });
+  modalRoot.querySelectorAll("[data-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.ui.txFilter = button.dataset.filter;
+      saveState();
+      modalRoot.innerHTML = renderTransactionsManagerSheet();
+      bindSheetEvents();
+    });
+  });
+  modalRoot.querySelector("#transactionForm")?.addEventListener("submit", saveTransaction);
+  modalRoot.querySelectorAll("[data-quick-amount]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const input = modalRoot.querySelector("input[name='amount']");
+      if (input) input.value = button.dataset.quickAmount;
+    });
+  });
+  modalRoot.querySelectorAll("[data-category-chip]").forEach((button) => {
+    button.addEventListener("click", () => {
+      modalRoot.querySelector("input[name='category']").value = button.dataset.categoryChip;
+      modalRoot.querySelectorAll("[data-category-chip]").forEach((item) => item.classList.toggle("is-active", item === button));
+    });
+  });
+  modalRoot.querySelector("[data-repeat-last]")?.addEventListener("click", () => {
+    const template = state.ui.lastTransactionTemplate;
+    if (!template) return;
+    const amount = modalRoot.querySelector("input[name='amount']");
+    const note = modalRoot.querySelector("input[name='note']");
+    const category = modalRoot.querySelector("input[name='category']");
+    if (amount) amount.value = template.amount || "";
+    if (note) note.value = template.note || "";
+    if (category && isCategoryAllowedForTransaction(template.category)) {
+      category.value = template.category;
+      modalRoot.querySelectorAll("[data-category-chip]").forEach((item) => item.classList.toggle("is-active", item.dataset.categoryChip === template.category));
+    }
+  });
+  modalRoot.querySelectorAll("[data-manage-categories]").forEach((button) => button.addEventListener("click", openManageBudgetCategories));
+  modalRoot.querySelectorAll("[data-add-category]").forEach((button) => button.addEventListener("click", openAddCategorySheet));
+  modalRoot.querySelectorAll("[data-edit-category]").forEach((button) => button.addEventListener("click", () => openEditCategory(button.dataset.editCategory)));
+  modalRoot.querySelectorAll("[data-manage-vaults]").forEach((button) => button.addEventListener("click", openManageVaults));
+  modalRoot.querySelectorAll("[data-add-vault]").forEach((button) => button.addEventListener("click", openAddVaultSheet));
+  modalRoot.querySelectorAll("[data-edit-vault]").forEach((button) => button.addEventListener("click", () => openEditVault(button.dataset.editVault)));
+  modalRoot.querySelectorAll("[data-manage-background]").forEach((button) => button.addEventListener("click", openManageBackground));
+  modalRoot.querySelectorAll("[data-edit-background-item]").forEach((button) => button.addEventListener("click", () => openEditBackgroundItem(button.dataset.sectionId, button.dataset.editBackgroundItem)));
+  modalRoot.querySelectorAll("[data-edit-transaction]").forEach((button) => button.addEventListener("click", () => {
+    state.ui.editingTransactionId = button.dataset.editTransaction;
+    saveState();
+    openQuickAdd();
+  }));
+  modalRoot.querySelectorAll("[data-delete-transaction]").forEach((button) => button.addEventListener("click", () => deleteTransaction(button.dataset.deleteTransaction)));
+  modalRoot.querySelector("#categoryEditorForm")?.addEventListener("submit", saveCategoryEditor);
+  modalRoot.querySelector("#categoryManagerForm")?.addEventListener("submit", saveCategoryManager);
+  modalRoot.querySelector("#addCategoryForm")?.addEventListener("submit", addCategory);
+  modalRoot.querySelector("[data-archive-category]")?.addEventListener("click", archiveCurrentCategory);
+  modalRoot.querySelector("[data-delete-category]")?.addEventListener("click", deleteCurrentCategory);
+  modalRoot.querySelectorAll("[data-restore-category]").forEach((button) => button.addEventListener("click", () => restoreCategory(button.dataset.restoreCategory)));
+  modalRoot.querySelector("#vaultEditorForm")?.addEventListener("submit", saveVaultEditor);
+  modalRoot.querySelector("#vaultManagerForm")?.addEventListener("submit", saveVaultManager);
+  modalRoot.querySelector("#addVaultForm")?.addEventListener("submit", addVault);
+  modalRoot.querySelector("[data-archive-vault]")?.addEventListener("click", archiveCurrentVault);
+  modalRoot.querySelector("[data-delete-vault]")?.addEventListener("click", deleteCurrentVault);
+  modalRoot.querySelectorAll("[data-restore-vault]").forEach((button) => button.addEventListener("click", () => restoreVault(button.dataset.restoreVault)));
+  modalRoot.querySelector("#backgroundManagerForm")?.addEventListener("submit", saveBackgroundManager);
+  modalRoot.querySelector("#addBackgroundSectionForm")?.addEventListener("submit", addBackgroundSection);
+  modalRoot.querySelector("#addBackgroundItemForm")?.addEventListener("submit", addBackgroundItem);
+  modalRoot.querySelector("#backgroundItemEditorForm")?.addEventListener("submit", saveBackgroundItemEditor);
+  modalRoot.querySelector("[data-archive-background-item]")?.addEventListener("click", archiveCurrentBackgroundItem);
+  modalRoot.querySelector("#exportCsvButton")?.addEventListener("click", exportCSV);
+  modalRoot.querySelector("#importCsvInput")?.addEventListener("change", importCSV);
+  modalRoot.querySelector("#sampleCsvButton")?.addEventListener("click", downloadSampleCSV);
+  modalRoot.querySelector("#resetButton")?.addEventListener("click", resetData);
+  modalRoot.querySelector("#confirmCsvImportButton")?.addEventListener("click", confirmCsvImport);
+  modalRoot.querySelector("#cancelCsvImportButton")?.addEventListener("click", cancelCsvImport);
+  modalRoot.querySelectorAll("[data-open-planning-section]").forEach((button) => {
+    button.addEventListener("click", () => openPlanningSheet(button.dataset.openPlanningSection));
+  });
+  modalRoot.querySelector("[data-create-category-from-quick-add]")?.addEventListener("click", () => {
+    state.ui.returnToQuickAddAfterCategoryCreate = true;
+    saveState();
+    openAddCategorySheet();
+  });
+  modalRoot.querySelectorAll("[data-review-toggle]").forEach((input) => {
+    input.addEventListener("change", () => toggleMonthReviewItem(state.ui.selectedMonth, input.dataset.reviewToggle));
+  });
+  modalRoot.querySelectorAll("[data-review-action]").forEach((button) => {
+    button.addEventListener("click", () => runReviewAction(button.dataset.reviewAction));
   });
 }
 
-function renderDataCompatibilityBody() {
+function closeSheet() {
+  state.ui.editingTransactionId = null;
+  pendingCsvImport = null;
+  modalRoot.innerHTML = "";
+  saveState();
+  render();
+}
+
+function openManageBudgetCategories() {
+  modalRoot.innerHTML = renderCategoryManagerSheet();
+  bindSheetEvents();
+}
+
+function openAddCategorySheet() {
+  modalRoot.innerHTML = renderAddCategorySheet();
+  bindSheetEvents();
+}
+
+function openEditCategory(categoryId) {
+  const category = getCategoryById(categoryId);
+  if (!category) return;
+  modalRoot.innerHTML = renderCategoryEditorSheet(category);
+  bindSheetEvents();
+}
+
+function renderCategoryManagerSheet() {
+  const categories = getCategories();
+  const active = categories.filter((item) => !item.archived);
+  const archived = categories.filter((item) => item.archived);
   return `
-    <section class="readonly-card weak-card">
-      <div class="section-head">
-        <h3>Backup & Restore</h3>
-        <span class="tiny-label">Low frequency</span>
-      </div>
-      <div class="button-row">
-        <button id="exportJsonButton" class="action-button" type="button">Export JSON</button>
-        <label class="ghost-button">Import JSON<input id="importJsonInput" class="hidden" type="file" accept=".json,application/json" /></label>
-        <button id="resetButton" class="danger-button" type="button">Reset local data</button>
-      </div>
-    </section>
-    <details class="readonly-card weak-card legacy-details">
-      <summary>
-        <span>Legacy Reserve Ledger</span>
-        <em>Compatibility</em>
-      </summary>
-      <div class="settings-grid" style="margin-top:10px;">
-          ${renderReserveField("preMay", "Pre May reserve")}
-          ${renderReserveField("may", "May reserved")}
-          ${renderReserveField("june", "Jun reserved")}
-          ${renderReserveField("july", "Jul reserved")}
-          ${renderReserveField("august", "Aug reserved")}
-          ${renderReserveField("september", "Sep reserved")}
-          ${renderReserveField("october", "Oct reserved")}
-          ${renderReserveField("november", "Nov reserved")}
-          ${renderReserveField("december", "Dec reserved")}
-          <label class="field"><span>May to Aug monthly net</span><input name="settings.reserveSchedule.mayToAugMonthlyNet" type="number" step="0.01" value="${state.settings.reserveSchedule.mayToAugMonthlyNet}" /></label>
-          <label class="field"><span>Sep to Dec monthly net</span><input name="settings.reserveSchedule.sepToDecMonthlyNet" type="number" step="0.01" value="${state.settings.reserveSchedule.sepToDecMonthlyNet}" /></label>
-          <label class="field"><span>Jan+ monthly net</span><input name="settings.reserveSchedule.janPlusMonthlyNet" type="number" step="0.01" value="${state.settings.reserveSchedule.janPlusMonthlyNet}" /></label>
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Manage Categories">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Manage Categories</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
         </div>
-        <div class="button-row">
-          <button id="recalcReserveButton" class="ghost-button" type="button">Recalculate Reserve From Ledger</button>
-        </div>
-        <p class="settings-note">Legacy ledger is preserved for compatibility. Reserve Vault now uses accounts and projection events.</p>
-    </details>
-  `;
-}
-
-function renderPlanningStatusTile(title, summary, status, sectionKey) {
-  return `
-    <div class="planning-status-tile">
-      <span>${escapeHtml(title)}</span>
-      <strong>${escapeHtml(summary)}</strong>
-      <em>${escapeHtml(status)}</em>
-      <button class="mini-button" type="button" data-open-planning-section="${sectionKey}">Open</button>
-    </div>
-  `;
-}
-
-function renderPlanningSectionSummary(sectionKey, context = {}) {
-  const totals = context.totals || calculateTotals();
-  const core = context.core || getReservePlanningCore();
-  const projections = context.projections || buildProjectionData();
-  const runway = context.runway || calculateReserveRunway(core.runwayBalance, core.stableBaseGapMonthly);
-
-  if (sectionKey === "summary") {
-    return `
-      <div class="planning-summary-grid status-nav-grid">
-        ${renderPlanningStatusTile("Budget", `${getCategories().filter((item) => item.active && !item.archived).length} active categories`, totals.variableTotal > 0 ? "OK" : "Needs review", "budget")}
-        ${renderPlanningStatusTile("Reserve", `${getActiveReserveAccounts().length} vault accounts · ${getActiveProjectionEvents().length} projection events`, runway.months >= 12 ? "Healthy" : runway.months >= 6 ? "Below target" : "Critical", "reserve")}
-        ${renderPlanningStatusTile("Background", `${getBackgroundSections().filter((item) => item.active && !item.archived).length} active sections · ${getBackgroundSections().flatMap((section) => section.items || []).filter((item) => item.active && !item.archived).length} active items`, "Configured", "background")}
-        ${renderPlanningStatusTile("Data", getMonthReviewStatus(state.ui.selectedMonth).backupDone ? "Backup done" : "Backup due", "Backup", "data")}
-      </div>
-    `;
-  }
-  if (sectionKey === "budget") {
-    return `
-      <div class="accordion-inline-summary">
-        <strong>Monthly Variable Budget: ${money(totals.variableTotal)}</strong>
-        <span>Essentials ${money(totals.variableEssentials)} · Discretionary ${money(totals.discretionary)}</span>
-        <span>Rules: penalty ${state.settings.weeklyRules.penaltyMultiplier}x · soft cap ${state.settings.weeklyRules.defaultSoftCapMultiplier}x</span>
-      </div>
-    `;
-  }
-  if (sectionKey === "reserve") {
-    const net = calculateActiveProjectionMonthlyNet(state.settings.reserve.projectionAnchorMonth || currentMonthKey());
-    return `
-      <div class="accordion-inline-summary">
-        <strong>Reserve Vault ${money(core.reserveBalanceNow)} · Gap ${money(core.stableBaseGapMonthly)}/mo</strong>
-        <span>Runway ${runway.months} months</span>
-        <span>Active monthly net ${money(net)}</span>
-        <span>${escapeHtml(projections.sep.label)} ${money(projections.sep.value)} · ${escapeHtml(projections.jan.label)} ${money(projections.jan.value)}</span>
-      </div>
-    `;
-  }
-  if (sectionKey === "ledger") {
-    return `
-      <div class="accordion-inline-summary">
-        <strong>Ledger Total ${money(totals.reserveLedger)}</strong>
-        <span>Pre-May ${money(state.settings.reserveSchedule.preMay)} · May ${money(state.settings.reserveSchedule.may)}</span>
-        <span>Legacy compatibility only</span>
-      </div>
-    `;
-  }
-  if (sectionKey === "background") {
-    return `
-      <div class="accordion-inline-summary">
-        <strong>Income ${money(totals.coreIncome + totals.reserveIncome)} · Fixed+Debt ${money(totals.fixed + totals.debt)}</strong>
-        <span>Investment ${money(totals.investment)} · PW Trust background only</span>
-      </div>
-    `;
-  }
-  return `
-    <div class="accordion-inline-summary">
-      <strong>Backup & Restore</strong>
-      <span>Legacy ledger preserved for compatibility</span>
-    </div>
-  `;
-}
-
-function togglePlanningSection(sectionKey) {
-  const next = !Boolean(state.ui.planningOpenSections?.[sectionKey]);
-  state.ui.planningOpenSections[sectionKey] = next;
-  saveState();
-  render();
-}
-
-function openPlanningSection(sectionKey) {
-  state.ui.activeTab = "planning";
-  state.ui.planningOpenSections[sectionKey] = true;
-  saveState();
-  render();
-}
-
-function toggleMonitorCardDetails(categoryId) {
-  if (!categoryId) return;
-  state.ui.monitorExpandedCards[categoryId] = !Boolean(state.ui.monitorExpandedCards?.[categoryId]);
-  saveState();
-  render();
-}
-
-function renderReserveField(key, label) {
-  const value = state.settings.reserveSchedule[key];
-  return `<label class="field"><span>${escapeHtml(label)}</span><input name="settings.reserveSchedule.${key}" type="number" step="0.01" value="${value == null ? "" : value}" /></label>`;
-}
-
-function renderBackgroundGroup(section, sectionIndex, total) {
-  const items = section.items.filter((item) => item.active && !item.archived);
-  return `
-    <section class="readonly-card">
-      <div class="section-head">
-        <h3>${escapeHtml(section.label)}</h3>
-        <span class="tiny-label">Total ${money(total)}</span>
-      </div>
-      <div class="settings-grid" style="margin-top:10px;">
-        ${items.map((item) => {
-          const itemIndex = section.items.findIndex((candidate) => candidate.id === item.id);
-          return `
-          <div class="background-item-card">
-            <label class="field">
-              <span>${escapeHtml(item.label)}</span>
-              <input name="settings.backgroundSections.${sectionIndex}.items.${itemIndex}.amount" type="number" step="0.01" value="${item.amount}" />
-            </label>
-            <button class="mini-button" type="button" data-section-id="${section.id}" data-edit-background-item="${item.id}" aria-label="Edit background item: ${escapeHtml(item.label)}">⚙</button>
+        <form id="categoryManagerForm" class="quick-form">
+          <div class="manager-list">
+            ${active.length ? active.map((category, index) => `
+              <div class="manager-row">
+                <div><strong><span class="text-icon">${escapeHtml(category.icon)}</span>${escapeHtml(category.label)}</strong><div class="settings-note">${escapeHtml(category.group)} · ${escapeHtml(category.ruleType)}</div></div>
+                <input class="order-input" name="order.${category.id}" type="number" step="1" value="${category.displayOrder || index + 1}" />
+                <button class="mini-button" type="button" data-edit-category="${category.id}">Edit</button>
+              </div>
+            `).join("") : `<div class="empty-state">No active categories.</div>`}
           </div>
-        `;
-        }).join("")}
-      </div>
-    </section>
+          <button class="action-button" type="submit">Save Order</button>
+        </form>
+        <button class="action-button" type="button" data-add-category>Add Category</button>
+        ${archived.length ? `<div class="manager-archived"><h3>Archived</h3>${archived.map((category) => `<button class="ghost-button" type="button" data-restore-category="${category.id}">Restore ${escapeHtml(category.label)}</button>`).join("")}</div>` : ""}
+      </section>
+    </div>
   `;
 }
 
-function renderTotalChip(label, amount) {
-  return `<div class="total-chip"><span class="tiny-label">${escapeHtml(label)}</span><strong>${money(amount)}</strong></div>`;
+function renderAddCategorySheet() {
+  return renderSetupSheet("Add Category", `
+    ${renderAddCategoryForm()}
+    <p class="settings-note">Essential uses a soft cap. Discretionary uses weekly penalties. Track only records activity without warnings.</p>
+  `, "Budget");
+}
+
+function renderAddCategoryForm() {
+  return `
+    <form id="addCategoryForm" class="quick-form add-form">
+      <h3>Add Category</h3>
+      <label class="field"><span>Name</span><input name="label" type="text" required /></label>
+      <label class="field"><span>Monthly Budget</span><input name="monthlyBudget" type="number" step="0.01" value="0" /></label>
+      <label class="field"><span>Type Preset</span><select name="preset">
+        <option value="essential">Essential variable</option>
+        <option value="discretionary">Discretionary variable</option>
+        <option value="trackOnly">Track only</option>
+      </select></label>
+      <div class="boolean-grid">
+        ${renderCheckbox("monitor", "Show on Monitor", true)}
+        ${renderCheckbox("allowTransactions", "Allow transactions", true)}
+      </div>
+      <button class="action-button" type="submit">Add Category</button>
+    </form>
+  `;
+}
+
+function renderCategoryEditorSheet(category) {
+  const used = categoryHasTransactions(category.id);
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Edit category settings">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Edit Category</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        <form id="categoryEditorForm" class="quick-form" data-category-id="${category.id}">
+          <label class="field"><span>Name</span><input name="label" type="text" value="${escapeHtml(category.label)}" required /></label>
+          <label class="field"><span>Icon</span><input name="icon" type="text" value="${escapeHtml(category.icon)}" /></label>
+          <label class="field"><span>Group</span><select name="group">${CATEGORY_GROUPS.map((group) => `<option value="${group}" ${category.group === group ? "selected" : ""}>${startCase(group)}</option>`).join("")}</select></label>
+          <label class="field"><span>Monthly Budget</span><input name="monthlyBudget" type="number" step="0.01" value="${category.monthlyBudget}" /></label>
+          <label class="field"><span>Rule Type</span><select name="ruleType">${RULE_TYPES.map((rule) => `<option value="${rule}" ${category.ruleType === rule ? "selected" : ""}>${startCase(rule)}</option>`).join("")}</select></label>
+          <label class="field"><span>Soft Cap Multiplier</span><input name="softCapMultiplier" type="number" step="0.01" value="${category.softCapMultiplier ?? ""}" /></label>
+          <label class="field"><span>Penalty Multiplier</span><input name="penaltyMultiplier" type="number" step="0.01" value="${category.penaltyMultiplier ?? ""}" /></label>
+          <label class="field"><span>Minimum Penalty Unit</span><input name="minPenaltyUnit" type="number" step="0.01" value="${category.minPenaltyUnit ?? ""}" /></label>
+          <label class="field"><span>Display Order</span><input name="displayOrder" type="number" step="1" value="${category.displayOrder}" /></label>
+          <div class="boolean-grid">
+            ${renderCheckbox("monitor", "Show on Monitor", category.monitor)}
+            ${renderCheckbox("allowTransactions", "Allow transactions", category.allowTransactions)}
+            ${renderCheckbox("includeInVariableTotal", "Include in variable total", category.includeInVariableTotal)}
+            ${renderCheckbox("includeInWeeklyDiscipline", "Include in weekly discipline", category.includeInWeeklyDiscipline)}
+            ${renderCheckbox("active", "Active", category.active)}
+          </div>
+          <div class="button-row">
+            <button class="action-button" type="submit">Save Category</button>
+            <button class="ghost-button" type="button" data-archive-category>Archive</button>
+            ${used ? "" : `<button class="danger-button" type="button" data-delete-category>Delete</button>`}
+          </div>
+        </form>
+      </section>
+    </div>
+  `;
+}
+
+function openManageVaults() {
+  modalRoot.innerHTML = renderVaultManagerSheet();
+  bindSheetEvents();
+}
+
+function openAddVaultSheet() {
+  modalRoot.innerHTML = renderAddVaultSheet();
+  bindSheetEvents();
+}
+
+function openEditVault(vaultId) {
+  const vault = getVaultById(vaultId);
+  if (!vault) return;
+  modalRoot.innerHTML = renderVaultEditorSheet(vault);
+  bindSheetEvents();
+}
+
+function renderVaultManagerSheet() {
+  const vaults = getReserveVaults();
+  const active = vaults.filter((item) => !item.archived);
+  const archived = vaults.filter((item) => item.archived);
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Manage Vaults">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Manage Vaults</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        <form id="vaultManagerForm" class="quick-form">
+          <div class="manager-list">
+            ${active.length ? active.map((vault, index) => `
+              <div class="manager-row">
+                <div><strong>◆ ${escapeHtml(vault.name)}</strong><div class="settings-note">${money(vault.currentAmount)}${vault.targetAmount ? ` / ${money(vault.targetAmount)}` : ""}</div></div>
+                <input class="order-input" name="order.${vault.id}" type="number" step="1" value="${vault.displayOrder || index + 1}" />
+                <button class="mini-button" type="button" data-edit-vault="${vault.id}">Edit</button>
+              </div>
+            `).join("") : `<div class="empty-state">No active vaults.</div>`}
+          </div>
+          <button class="action-button" type="submit">Save Order</button>
+        </form>
+        <button class="action-button" type="button" data-add-vault>Add Vault</button>
+        ${archived.length ? `<div class="manager-archived"><h3>Archived</h3>${archived.map((vault) => `<button class="ghost-button" type="button" data-restore-vault="${vault.id}">Restore ${escapeHtml(vault.name)}</button>`).join("")}</div>` : ""}
+      </section>
+    </div>
+  `;
+}
+
+function renderAddVaultSheet() {
+  return renderSetupSheet("Add Vault", `
+    ${renderAddVaultForm()}
+  `, "Reserve");
+}
+
+function renderAddVaultForm() {
+  const pinnedCount = getMonitorReserveVaults().length;
+  return `
+    <form id="addVaultForm" class="quick-form add-form">
+      <h3>Add Vault</h3>
+      <label class="field"><span>Name</span><input name="name" type="text" required /></label>
+      <label class="field"><span>Current Amount</span><input name="currentAmount" type="number" step="0.01" value="0" /></label>
+      <label class="field"><span>Target Amount</span><input name="targetAmount" type="number" step="0.01" placeholder="Optional" /></label>
+      <label class="field"><span>Note</span><input name="note" type="text" placeholder="Purpose" /></label>
+      <label class="field"><span>Display Order</span><input name="displayOrder" type="number" step="1" value="${getReserveVaults().length + 1}" /></label>
+      <div class="boolean-grid">
+        ${renderCheckbox("includeInMonitor", "Show on Monitor", pinnedCount < 2)}
+      </div>
+      <p class="settings-note">Only the first 2 pinned vaults appear on Monitor.</p>
+      ${pinnedCount >= 2 ? `<p class="settings-note warning-text">This vault may not appear on Monitor unless it is within the first 2 pinned vaults.</p>` : ""}
+      <button class="action-button" type="submit">Add Vault</button>
+    </form>
+  `;
+}
+
+function renderVaultEditorSheet(vault) {
+  const pinnedCount = getMonitorReserveVaults().filter((item) => item.id !== vault.id).length;
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Edit reserve vault">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Edit Vault</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        <form id="vaultEditorForm" class="quick-form" data-vault-id="${vault.id}">
+          <label class="field"><span>Name</span><input name="name" type="text" value="${escapeHtml(vault.name)}" required /></label>
+          <label class="field"><span>Current Amount</span><input name="currentAmount" type="number" step="0.01" value="${vault.currentAmount}" /></label>
+          <label class="field"><span>Target Amount</span><input name="targetAmount" type="number" step="0.01" value="${vault.targetAmount ?? ""}" placeholder="Optional" /></label>
+          <label class="field"><span>Note</span><input name="note" type="text" value="${escapeHtml(vault.note)}" /></label>
+          <label class="field"><span>Color Token</span><select name="colorToken">${VAULT_COLORS.map((color) => `<option value="${color}" ${vault.colorToken === color ? "selected" : ""}>${startCase(color)}</option>`).join("")}</select></label>
+          <label class="field"><span>Display Order</span><input name="displayOrder" type="number" step="1" value="${vault.displayOrder}" /></label>
+          <div class="boolean-grid">
+            ${renderCheckbox("includeInMonitor", "Show on Monitor", vault.includeInMonitor)}
+            ${renderCheckbox("active", "Active", vault.active)}
+          </div>
+          ${pinnedCount >= 2 ? `<p class="settings-note warning-text">This vault may not appear on Monitor unless it is within the first 2 pinned vaults.</p>` : ""}
+          <div class="button-row">
+            <button class="action-button" type="submit">Save Vault</button>
+            <button class="ghost-button" type="button" data-archive-vault>Archive</button>
+            <button class="danger-button" type="button" data-delete-vault>Delete</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  `;
+}
+
+function openManageBackground() {
+  modalRoot.innerHTML = renderBackgroundManagerSheet();
+  bindSheetEvents();
+}
+
+function openEditBackgroundItem(sectionId, itemId) {
+  const section = getBackgroundSectionById(sectionId);
+  const item = section?.items.find((candidate) => candidate.id === itemId);
+  if (!section || !item) return;
+  modalRoot.innerHTML = renderBackgroundItemEditorSheet(section, item);
+  bindSheetEvents();
+}
+
+function renderBackgroundManagerSheet() {
+  const sections = getBackgroundSections();
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Manage Background Sections">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Manage Background</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        <form id="backgroundManagerForm" class="quick-form">
+          <div class="manager-list">
+            ${sections.filter((section) => !section.archived).map((section, index) => `
+              <div class="manager-row">
+                <div><strong>${escapeHtml(section.label)}</strong><div class="settings-note">${escapeHtml(section.type)} · ${section.items.length} items</div></div>
+                <input class="order-input" name="order.${section.id}" type="number" step="1" value="${section.displayOrder || index + 1}" />
+              </div>
+            `).join("") || `<div class="empty-state">No background sections yet.</div>`}
+          </div>
+          <button class="action-button" type="submit">Save Sections</button>
+        </form>
+        <form id="addBackgroundSectionForm" class="quick-form add-form">
+          <h3>Add Section</h3>
+          <label class="field"><span>Section Name</span><input name="label" type="text" required /></label>
+          <label class="field"><span>Type</span><select name="type"><option value="income">Income</option><option value="fixed">Fixed</option><option value="debt">Debt</option><option value="investment">Investment</option><option value="other">Other</option></select></label>
+          <button class="action-button" type="submit">Add Section</button>
+        </form>
+        <form id="addBackgroundItemForm" class="quick-form add-form">
+          <h3>Add Item</h3>
+          <label class="field"><span>Section</span><select name="sectionId">${sections.filter((section) => !section.archived).map((section) => `<option value="${section.id}">${escapeHtml(section.label)}</option>`).join("")}</select></label>
+          <label class="field"><span>Item Name</span><input name="label" type="text" required /></label>
+          <label class="field"><span>Amount</span><input name="amount" type="number" step="0.01" value="0" /></label>
+          <button class="action-button" type="submit">Add Item</button>
+        </form>
+      </section>
+    </div>
+  `;
+}
+
+function renderBackgroundItemEditorSheet(section, item) {
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Edit background item">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Edit Background Item</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        <form id="backgroundItemEditorForm" class="quick-form" data-section-id="${section.id}" data-item-id="${item.id}">
+          <label class="field"><span>Name</span><input name="label" type="text" value="${escapeHtml(item.label)}" required /></label>
+          <label class="field"><span>Amount</span><input name="amount" type="number" step="0.01" value="${item.amount}" /></label>
+          <label class="field"><span>Frequency</span><select name="frequency"><option value="monthly" ${item.frequency === "monthly" ? "selected" : ""}>Monthly</option><option value="annual" ${item.frequency === "annual" ? "selected" : ""}>Annual</option><option value="oneTime" ${item.frequency === "oneTime" ? "selected" : ""}>One Time</option></select></label>
+          <div class="boolean-grid">${renderCheckbox("active", "Active", item.active)}</div>
+          <div class="button-row">
+            <button class="action-button" type="submit">Save Item</button>
+            <button class="ghost-button" type="button" data-archive-background-item>Archive</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  `;
+}
+
+function openTransactionsManager() {
+  state.ui.txFilter = state.ui.monitorScope === "month" ? "month" : "week";
+  modalRoot.innerHTML = renderTransactionsManagerSheet();
+  bindSheetEvents();
+}
+
+function renderTransactionsManagerSheet() {
+  const transactions = getFilteredTransactions();
+  return `
+    <div class="sheet-backdrop" role="presentation">
+      <section class="quick-sheet manager-sheet" role="dialog" aria-label="Manage activity">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Activity</h2>
+          <button class="icon-close" type="button" data-close-sheet aria-label="Close">×</button>
+        </div>
+        <div class="tx-filter">
+          ${renderFilter("week", "This Week")}
+          ${renderFilter("month", "This Month")}
+          ${renderFilter("all", "All")}
+        </div>
+        <div class="tx-list">
+          ${transactions.length ? transactions.map(renderManagedTransaction).join("") : `<div class="empty-state">No transactions recorded yet.</div>`}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function renderFilter(filter, label) {
+  return `<button class="filter-chip ${state.ui.txFilter === filter ? "is-active" : ""}" type="button" data-filter="${filter}">${escapeHtml(label)}</button>`;
+}
+
+function renderManagedTransaction(transaction) {
+  return `
+    <div class="tx-item">
+      <div><strong>${escapeHtml(getCategoryLabel(transaction.category))}</strong><span>${formatDate(transaction.dateISO)} · ${escapeHtml(transaction.note || "No note")}</span></div>
+      <b>${money(transaction.amount)}</b>
+      <button class="mini-button" type="button" data-edit-transaction="${transaction.id}">Edit</button>
+      <button class="mini-button danger-text" type="button" data-delete-transaction="${transaction.id}">Delete</button>
+    </div>
+  `;
 }
 
 function renderCheckbox(name, label, checked) {
@@ -2696,488 +1466,1076 @@ function renderCheckbox(name, label, checked) {
   `;
 }
 
-function getDashboard() {
+function getMonitorCards() {
+  const scope = state.ui.monitorScope;
   const monthKey = state.ui.selectedMonth;
-  const referenceDateISO = getReferenceDateISO(monthKey);
-  const currentWeekKey = getWeekKey(referenceDateISO);
-  const reserve = buildReserveHeroData();
-  const projections = buildProjectionData(referenceDateISO);
-  const categories = {};
-  const scope = state.ui.monitorScope || "week";
-  const monitorDefs = getPrimaryMonitorCategories();
-
-  monitorDefs.forEach((categoryDef) => {
-    categories[categoryDef.id] = calculateCategoryDisplay(categoryDef.id, scope, monthKey, currentWeekKey);
-  });
-
-  return {
-    scope,
-    reserve,
-    projections,
-    categories,
-    monitorCards: monitorDefs.map((item) => categories[item.id]).filter(Boolean),
-    discipline: calculateWeeklyDiscipline(monthKey, currentWeekKey),
-    monthOutlook: calculateMonthOutlook(monthKey, categories),
-    overallStatus: calculateOverallMonitorStatus(categories, scope)
-  };
+  const weekKey = getWeekKey(getReferenceDateISO(monthKey));
+  return getMonitorCategories().map((category) => scope === "month"
+    ? calculateMonthCategoryStatus(category.id, monthKey, weekKey)
+    : calculateWeekCategoryStatus(category.id, monthKey, weekKey)
+  );
 }
 
-function getReservePlanningCore() {
-  const reserveBalanceNow = calculateReserveVaultTotal();
-  const runwayBalance = calculateReserveRunwayBalance();
-  const stableBaseGapMonthly = getStableGapFromSettings(state.settings);
-  return {
-    reserveBalanceNow,
-    runwayBalance,
-    stableBaseGapMonthly
-  };
-}
-
-function buildReserveHeroData() {
-  const core = getReservePlanningCore();
-  const reserveBalanceNow = Number(core.reserveBalanceNow) || 0;
-  const runwayBalance = Number(core.runwayBalance) || 0;
-  const stableBaseGapMonthly = Math.max(1, Number(core.stableBaseGapMonthly) || 0);
-  const runway = calculateReserveRunway(runwayBalance, stableBaseGapMonthly);
-  const tone = runway.months >= 12 ? "green" : runway.months >= 6 ? "yellow" : "red";
-  return {
-    balance: reserveBalanceNow,
-    runwayBalance,
-    gap: stableBaseGapMonthly,
-    runwayMonths: runway.months,
-    runwayDays: runway.days,
-    status: tone === "green"
-      ? { label: "Green", tone }
-      : tone === "yellow"
-        ? { label: "Yellow", tone }
-        : { label: "Red", tone },
-    conclusion: tone === "green"
-      ? "Reserve is above the 12-month threshold."
-      : tone === "yellow"
-        ? "Reserve runway is below target. Do not expand fixed lifestyle."
-        : "Reserve runway is critical. Structural reduction is required.",
-    nextAction: tone === "green"
-      ? "Maintain reserve building."
-      : tone === "yellow"
-        ? "Hold discretionary growth and protect monthly surplus."
-        : "Reduce stable gap and freeze discretionary spending."
-  };
-}
-
-function buildProjectionData() {
-  const anchorDateISO = getProjectionAnchorDateISO();
-  const targets = getProjectionTargets(anchorDateISO);
-  const sepValue = calculateReserveProjection(targets.sep.targetDateISO);
-  const janValue = calculateReserveProjection(targets.jan.targetDateISO);
-  return {
-    sep: {
-      label: targets.sep.label,
-      value: sepValue,
-      targetDateISO: targets.sep.targetDateISO,
-      summary: `${countProjectionSteps(anchorDateISO, targets.sep.targetDateISO)} months using reserve events.`
-    },
-    jan: {
-      label: targets.jan.label,
-      value: janValue,
-      targetDateISO: targets.jan.targetDateISO,
-      summary: `${countProjectionSteps(anchorDateISO, targets.jan.targetDateISO)} months using reserve events.`
-    }
-  };
-}
-
-function calculateOverallMonitorStatus(categories, scope = state.ui.monitorScope || "week") {
-  const items = Object.values(categories);
-  const totalItems = items.filter((item) => isVariableTotalCategory(getCategoryById(item.category)));
-  const projectedSpend = sum(totalItems.map((item) => item.primarySpent));
-  const budget = sum(totalItems.map((item) => item.primaryBudget));
-  const discretionaryExceeded = totalItems.some((item) => item.group === "discretionary" && item.actualExceededBudget);
-  let key = "safe";
-  let label = "Safe";
-  let action = scope === "month" ? "On pace this month." : "On pace this week.";
-
-  if (discretionaryExceeded) {
-    key = "freeze";
-    label = "Freeze";
-    action = scope === "month"
-      ? "Discretionary budget is already exceeded this month."
-      : "Discretionary spending should stop this week.";
-  } else if (projectedSpend > budget) {
-    key = "watch";
-    label = "Watch";
-    action = scope === "month"
-      ? "Month-end projection is over budget."
-      : "Spending pace is running ahead.";
-  }
-
-  return { key, label, action, projectedSpend, budget };
-}
-
-function calculateCategoryDisplay(category, scope = state.ui.monitorScope || "week", monthKey = state.ui.selectedMonth, weekKey = getWeekKey(getReferenceDateISO(monthKey))) {
-  return scope === "month"
-    ? calculateMonthCategoryStatus(category, monthKey, weekKey)
-    : calculateWeekCategoryStatus(category, monthKey, weekKey);
-}
-
-function calculateWeekCategoryStatus(category, monthKey = state.ui.selectedMonth, weekKey = getWeekKey(getReferenceDateISO(monthKey))) {
-  const categoryDef = getCategoryById(category);
-  const label = categoryDef.label;
-  const group = getCategoryDisplayGroup(categoryDef);
-  const ruleType = getCategoryRuleType(categoryDef);
-  const icon = categoryDef.icon;
-  const referenceDateISO = getReferenceDateISO(monthKey);
-  const timing = getWeekTiming(referenceDateISO);
-  const monthlyBudget = Number(categoryDef.monthlyBudget) || 0;
-  const monthSpent = getMonthSpent(category, monthKey);
-  const currentWeekBudget = getCurrentWeekBudget(category, weekKey, monthKey);
-  const weekSpent = getWeekSpent(category, weekKey, monthKey);
+function calculateWeekCategoryStatus(categoryId, monthKey = state.ui.selectedMonth, weekKey = getWeekKey(getReferenceDateISO(monthKey))) {
+  const category = getCategoryById(categoryId);
+  const timing = getWeekTiming(getReferenceDateISO(monthKey));
+  const monthlyBudget = Number(category.monthlyBudget) || 0;
+  const currentWeekBudget = getCurrentWeekBudget(categoryId, weekKey, monthKey);
+  const weekSpent = getWeekSpent(categoryId, weekKey, monthKey);
+  const monthSpent = getMonthSpent(categoryId, monthKey);
   const monthRemaining = Math.max(0, monthlyBudget - monthSpent);
-  const nextWeekBudget = getNextWeekBudget(category, weekKey, monthKey);
   const expectedSpendByToday = currentWeekBudget * timing.weekProgress;
   const paceRatio = expectedSpendByToday > 0 ? weekSpent / expectedSpendByToday : 0;
   const projectedWeekEndSpend = timing.weekProgress > 0 ? weekSpent / timing.weekProgress : weekSpent;
   const projectedOvershoot = Math.max(0, projectedWeekEndSpend - currentWeekBudget);
-  const dailyAllowanceRemaining = monthRemaining / Math.max(1, timing.daysRemainingInWeek);
-  const penalty = isPenaltyCategory(categoryDef)
-    ? calculateDiscretionaryPenalty(category, weekSpent, currentWeekBudget).penalty
-    : 0;
-  const overshoot = isPenaltyCategory(categoryDef)
-    ? calculateDiscretionaryPenalty(category, weekSpent, currentWeekBudget).overshoot
-    : Math.max(0, weekSpent - currentWeekBudget);
-  const softCapMultiplier = Number(categoryDef.softCapMultiplier ?? state.settings.weeklyRules.defaultSoftCapMultiplier ?? 1.1) || 1.1;
-  const softCap = isSoftCapCategory(categoryDef) ? currentWeekBudget * softCapMultiplier : currentWeekBudget;
-  const riskSentence = isSoftCapCategory(categoryDef) ? "Soft cap risk. Slow non-urgent spending." : isPenaltyCategory(categoryDef) ? "Penalty active. Freeze this category." : "Track only. No warning or penalty.";
-
-  let statusKey = "ok";
-  let statusTone = "green";
-  let statusLabel = "OK";
-  let conclusion = "";
-
-  if (isTrackOnlyCategory(categoryDef)) {
-    statusKey = "info";
-    statusTone = "neutral";
-    statusLabel = "Track";
-    conclusion = "Track only. No warning or penalty.";
-  } else if (isSoftCapCategory(categoryDef)) {
-    if (paceRatio > 1.25 || weekSpent > softCap) {
-      statusKey = "risk";
-      statusTone = "red";
-      statusLabel = "Risk";
-    } else if (paceRatio > 1.05 || weekSpent > currentWeekBudget) {
-      statusKey = "watch";
-      statusTone = "yellow";
-      statusLabel = "Watch";
-    } else {
-      statusKey = "ok";
-      statusTone = "green";
-      statusLabel = "OK";
-    }
-    conclusion = statusKey === "ok" ? "On pace." : statusKey === "watch" ? "Running ahead of weekly pace." : "Soft cap risk. Slow non-urgent spending.";
-  } else if (isPenaltyCategory(categoryDef)) {
-    if (weekSpent > currentWeekBudget || paceRatio > 1.5) {
-      statusKey = "freeze";
-      statusTone = "red";
-      statusLabel = "Freeze";
-    } else if (paceRatio > 1 && weekSpent <= currentWeekBudget) {
-      statusKey = "watch";
-      statusTone = "yellow";
-      statusLabel = "Watch";
-    } else {
-      statusKey = "ok";
-      statusTone = "green";
-      statusLabel = "OK";
-    }
-    conclusion = statusKey === "ok" ? "On pace." : statusKey === "watch" ? "Ahead of pace. Stop early if possible." : "Penalty active. Freeze this category.";
-  }
-
-  return {
-    category,
+  const penaltyData = calculatePenalty(categoryId, weekSpent, currentWeekBudget);
+  const softCap = currentWeekBudget * getSoftCapMultiplier(category);
+  const status = calculateStatus(category, {
     scope: "week",
-    label,
-    icon,
-    type: ruleType,
-    group,
-    ruleType,
+    weekSpent,
+    currentWeekBudget,
+    paceRatio,
+    softCap,
+    projected: projectedWeekEndSpend,
+    monthSpent,
+    monthlyBudget
+  });
+  return {
+    category: category.id,
+    label: category.label,
+    icon: category.icon,
+    group: category.group,
+    ruleType: category.ruleType,
+    scope: "week",
     monthlyBudget,
     weekSpent,
     currentWeekBudget,
-    expectedSpendByToday,
-    paceRatio,
-    projectedWeekEndSpend,
-    projectedOvershoot,
     monthSpent,
     monthRemaining,
-    dailyAllowanceRemaining,
-    nextWeekBudget,
-    overshoot,
-    penalty,
-    softCap,
-    riskSentence,
-    conclusion,
     primarySpent: projectedWeekEndSpend,
     primaryBudget: currentWeekBudget,
-    secondaryLine: isTrackOnlyCategory(categoryDef)
-      ? "Track only. No warning or penalty."
-      : isPenaltyCategory(categoryDef) && penalty > 0
-      ? `Penalty active: -${money(penalty)} next week`
-      : weekSpent === 0
-        ? "No spend yet. Full budget available."
-        : `Spent ${money(weekSpent)} so far · ${money(monthRemaining)} left this month`,
-    actualExceededBudget: isPenaltyCategory(categoryDef) && weekSpent > currentWeekBudget,
-    actualAmount: weekSpent,
     projectedAmount: projectedWeekEndSpend,
-    markerBudget: currentWeekBudget,
-    zoneBudget: currentWeekBudget,
-    zoneSoftCap: softCap,
-    displayRemaining: monthRemaining,
-    empty: weekSpent === 0,
-    secondaryHint: isTrackOnlyCategory(categoryDef)
-      ? "Track only. No warning or penalty."
-      : isPenaltyCategory(categoryDef) && penalty > 0
-      ? `Penalty active: -${money(penalty)} next week`
-      : `Spent ${money(weekSpent)} so far · ${money(monthRemaining)} left this month`,
-    status: {
-      key: statusKey,
-      label: statusLabel,
-      tone: statusTone
-    }
+    actualAmount: weekSpent,
+    projectedOvershoot,
+    overshoot: penaltyData.overshoot,
+    penalty: penaltyData.penalty,
+    actualExceededBudget: category.ruleType === "penalty" && weekSpent > currentWeekBudget,
+    status
   };
 }
 
-function calculateMonthCategoryStatus(category, monthKey = state.ui.selectedMonth, weekKey = getWeekKey(getReferenceDateISO(monthKey))) {
-  const categoryDef = getCategoryById(category);
-  const label = categoryDef.label;
-  const group = getCategoryDisplayGroup(categoryDef);
-  const ruleType = getCategoryRuleType(categoryDef);
-  const icon = categoryDef.icon;
-  const monthlyBudget = Number(categoryDef.monthlyBudget) || 0;
-  const monthSpent = getMonthSpent(category, monthKey);
+function calculateMonthCategoryStatus(categoryId, monthKey = state.ui.selectedMonth, weekKey = getWeekKey(getReferenceDateISO(monthKey))) {
+  const category = getCategoryById(categoryId);
   const timing = getMonthTiming(monthKey);
+  const monthlyBudget = Number(category.monthlyBudget) || 0;
+  const monthSpent = getMonthSpent(categoryId, monthKey);
+  const currentWeekBudget = getCurrentWeekBudget(categoryId, weekKey, monthKey);
+  const weekSpent = getWeekSpent(categoryId, weekKey, monthKey);
   const monthRemaining = Math.max(0, monthlyBudget - monthSpent);
   const projectedMonthEndSpend = timing.monthProgress > 0 ? monthSpent / timing.monthProgress : monthSpent;
-  const projectedMonthOvershoot = Math.max(0, projectedMonthEndSpend - monthlyBudget);
-  const currentWeekBudget = getCurrentWeekBudget(category, weekKey, monthKey);
-  const weekSpent = getWeekSpent(category, weekKey, monthKey);
+  const projectedOvershoot = Math.max(0, projectedMonthEndSpend - monthlyBudget);
+  const penaltyData = calculatePenalty(categoryId, weekSpent, currentWeekBudget);
   const expectedSpendByToday = monthlyBudget * timing.monthProgress;
   const paceRatio = expectedSpendByToday > 0 ? monthSpent / expectedSpendByToday : 0;
-  const penalty = isPenaltyCategory(categoryDef)
-    ? calculateDiscretionaryPenalty(category, weekSpent, currentWeekBudget).penalty
-    : 0;
-  const softCapMultiplier = Number(categoryDef.softCapMultiplier ?? state.settings.weeklyRules.defaultSoftCapMultiplier ?? 1.1) || 1.1;
-  const softCap = currentWeekBudget * softCapMultiplier;
-
-  let statusKey = "ok";
-  let statusTone = "green";
-  let statusLabel = "OK";
-  let conclusion = "On pace.";
-
-  if (isTrackOnlyCategory(categoryDef)) {
-    statusKey = "info";
-    statusTone = "neutral";
-    statusLabel = "Track";
-    conclusion = "Track only. No budget enforcement.";
-  } else if (isSoftCapCategory(categoryDef)) {
-    if (monthSpent > monthlyBudget || projectedMonthEndSpend > monthlyBudget * 1.15) {
-      statusKey = "risk";
-      statusTone = "red";
-      statusLabel = "Risk";
-      conclusion = "Month-end risk is elevated.";
-    } else if (projectedMonthEndSpend > monthlyBudget) {
-      statusKey = "watch";
-      statusTone = "yellow";
-      statusLabel = "Watch";
-      conclusion = "Month-end projection is running high.";
-    }
-  } else if (isPenaltyCategory(categoryDef)) {
-    if (monthSpent > monthlyBudget || projectedMonthEndSpend > monthlyBudget * 1.25) {
-      statusKey = "freeze";
-      statusTone = "red";
-      statusLabel = "Freeze";
-      conclusion = "Discretionary month budget is at risk.";
-    } else if (projectedMonthEndSpend > monthlyBudget) {
-      statusKey = "watch";
-      statusTone = "yellow";
-      statusLabel = "Watch";
-      conclusion = "Month-end projection is over budget.";
-    }
-  }
-
-  return {
-    category,
+  const status = calculateStatus(category, {
     scope: "month",
-    label,
-    icon,
-    type: ruleType,
-    group,
-    ruleType,
+    weekSpent,
+    currentWeekBudget,
+    paceRatio,
+    softCap: monthlyBudget * 1.15,
+    projected: projectedMonthEndSpend,
+    monthSpent,
+    monthlyBudget
+  });
+  return {
+    category: category.id,
+    label: category.label,
+    icon: category.icon,
+    group: category.group,
+    ruleType: category.ruleType,
+    scope: "month",
     monthlyBudget,
     weekSpent,
     currentWeekBudget,
-    expectedSpendByToday,
-    paceRatio,
-    projectedWeekEndSpend: weekSpent,
-    projectedOvershoot: projectedMonthOvershoot,
     monthSpent,
     monthRemaining,
-    dailyAllowanceRemaining: timing.daysRemainingInMonth > 0 ? monthRemaining / timing.daysRemainingInMonth : monthRemaining,
-    nextWeekBudget: getNextWeekBudget(category, weekKey, monthKey),
-    overshoot: Math.max(0, monthSpent - monthlyBudget),
-    penalty,
-    softCap,
-    riskSentence: conclusion,
-    conclusion,
     primarySpent: projectedMonthEndSpend,
     primaryBudget: monthlyBudget,
-    secondaryLine: monthSpent === 0
-      ? "No spend yet. Full budget available."
-      : `Spent ${money(monthSpent)} so far · ${money(monthRemaining)} left this month`,
-    actualExceededBudget: isPenaltyCategory(categoryDef) && monthSpent > monthlyBudget,
-    actualAmount: monthSpent,
     projectedAmount: projectedMonthEndSpend,
-    markerBudget: monthlyBudget,
-    zoneBudget: monthlyBudget,
-    zoneSoftCap: isSoftCapCategory(categoryDef) ? monthlyBudget * 1.15 : monthlyBudget,
-    displayRemaining: monthRemaining,
-    empty: monthSpent === 0,
-    projectedMonthEndSpend,
-    projectedMonthOvershoot,
-    status: {
-      key: statusKey,
-      label: statusLabel,
-      tone: statusTone
-    }
+    actualAmount: monthSpent,
+    projectedOvershoot,
+    overshoot: Math.max(0, monthSpent - monthlyBudget),
+    penalty: penaltyData.penalty,
+    actualExceededBudget: category.ruleType === "penalty" && monthSpent > monthlyBudget,
+    status
   };
 }
 
-function calculateMonthOutlook(monthKey = state.ui.selectedMonth, categoryMap = null) {
-  const categories = categoryMap
-    ? Object.values(categoryMap)
-    : getCategories().filter(isVariableTotalCategory).map((category) => calculateMonthCategoryStatus(category.id, monthKey));
-  const included = categories.filter((item) => isVariableTotalCategory(getCategoryById(item.category)));
-  const projectedMonthEndVariableSpend = sum(included.map((item) => item.primarySpent));
-  const monthlyVariableBudget = sum(included.map((item) => item.primaryBudget));
+function calculateStatus(category, values) {
+  if (category.ruleType === "trackOnly") return { key: "info", label: "Track", tone: "neutral" };
+  if (category.ruleType === "softCap") {
+    if (values.scope === "week" && (values.paceRatio > 1.25 || values.weekSpent > values.softCap)) return { key: "risk", label: "Risk", tone: "red" };
+    if (values.scope === "month" && (values.monthSpent > values.monthlyBudget || values.projected > values.monthlyBudget * 1.15)) return { key: "risk", label: "Risk", tone: "red" };
+    if (values.paceRatio > 1.05 || values.projected > values.monthlyBudget || values.weekSpent > values.currentWeekBudget) return { key: "watch", label: "Watch", tone: "yellow" };
+    return { key: "ok", label: "OK", tone: "green" };
+  }
+  if (category.ruleType === "penalty") {
+    if (values.scope === "week" && (values.weekSpent > values.currentWeekBudget || values.paceRatio > 1.5)) return { key: "freeze", label: "Freeze", tone: "red" };
+    if (values.scope === "month" && (values.monthSpent > values.monthlyBudget || values.projected > values.monthlyBudget * 1.25)) return { key: "freeze", label: "Freeze", tone: "red" };
+    if (values.paceRatio > 1 || values.projected > values.monthlyBudget) return { key: "watch", label: "Watch", tone: "yellow" };
+    return { key: "ok", label: "OK", tone: "green" };
+  }
+  return { key: "ok", label: "OK", tone: "green" };
+}
+
+function calculateOverallMonitorStatus(cards, scope) {
+  const included = cards.filter((card) => isVariableTotalCategory(getCategoryById(card.category)));
+  const projectedSpend = sum(included.map((card) => card.primarySpent));
+  const budget = sum(included.map((card) => card.primaryBudget));
+  const discretionaryExceeded = included.some((card) => card.group === "discretionary" && card.actualExceededBudget);
+  if (!included.length) return { key: "neutral", label: "Setup", action: "Create categories to start monitoring.", projectedSpend: 0, budget: 0 };
+  if (discretionaryExceeded) return { key: "freeze", label: "Freeze", action: scope === "month" ? "Discretionary budget is already exceeded this month." : "Discretionary spending should stop this week.", projectedSpend, budget };
+  if (projectedSpend > budget) return { key: "watch", label: "Watch", action: scope === "month" ? "Month-end projection is over budget." : "Spending pace is running ahead.", projectedSpend, budget };
+  return { key: "safe", label: "Safe", action: scope === "month" ? "On pace this month." : "On pace this week.", projectedSpend, budget };
+}
+
+function calculateWeeklyDiscipline() {
+  const monthKey = state.ui.selectedMonth;
+  const weekKey = getWeekKey(getReferenceDateISO(monthKey));
+  const rows = getActiveCategories()
+    .filter((category) => category.includeInWeeklyDiscipline && category.ruleType === "penalty")
+    .map((category) => calculateWeekCategoryStatus(category.id, monthKey, weekKey))
+    .filter((card) => card.penalty > 0)
+    .map((card) => ({ categoryId: card.category, label: card.label, overshoot: card.overshoot, penalty: card.penalty }));
+  return {
+    weekKey,
+    penaltyRows: rows,
+    discretionaryOvershoot: sum(rows.map((row) => row.overshoot)),
+    projectedDiscretionaryOvershoot: sum(getActiveCategories().filter((cat) => cat.ruleType === "penalty").map((cat) => calculateWeekCategoryStatus(cat.id, monthKey, weekKey).projectedOvershoot)),
+    nextWeekReduction: sum(rows.map((row) => row.penalty))
+  };
+}
+
+function calculateMonthOutlook() {
+  const cards = getMonitorCategories().map((category) => calculateMonthCategoryStatus(category.id));
+  const included = cards.filter((card) => isVariableTotalCategory(getCategoryById(card.category)));
+  const projectedMonthEndVariableSpend = sum(included.map((card) => card.primarySpent));
+  const monthlyVariableBudget = sum(included.map((card) => card.primaryBudget));
   const projectedDiff = projectedMonthEndVariableSpend - monthlyVariableBudget;
-  const freeze = included.some((item) => item.group === "discretionary" && item.monthSpent > item.monthlyBudget);
-  const atRisk = included
-    .filter((item) => item.projectedOvershoot > 0)
-    .sort((a, b) => b.projectedOvershoot - a.projectedOvershoot)
-    .slice(0, 3);
+  const freeze = included.some((card) => card.group === "discretionary" && card.monthSpent > card.monthlyBudget);
   const statusKey = freeze ? "freeze" : projectedDiff > 0 ? "watch" : "safe";
   return {
     projectedMonthEndVariableSpend,
     monthlyVariableBudget,
     projectedDiff,
-    atRisk,
+    atRisk: included.filter((card) => card.projectedOvershoot > 0).sort((a, b) => b.projectedOvershoot - a.projectedOvershoot).slice(0, 3),
     status: {
       key: statusKey,
       label: statusKey === "safe" ? "Safe" : statusKey === "watch" ? "Watch" : "Freeze",
-      action: statusKey === "safe"
-        ? "Month is on pace."
-        : statusKey === "watch"
-          ? "Month-end projection is over budget."
-          : "Discretionary budget is already exceeded this month."
+      action: statusKey === "safe" ? "Month is on pace." : statusKey === "watch" ? "Month-end projection is over budget." : "Discretionary budget is already exceeded this month."
     }
   };
 }
 
-function getMonthReviewStatus(monthKey) {
-  const review = state.monthReviews?.[monthKey] || {};
-  const lastMonthResult = calculateLastMonthResult(monthKey);
-  return {
-    reviewed: Boolean(review.reviewed),
-    backupDone: Boolean(review.backupDone),
-    lastMonthResult,
-    reserveUpdate: review.reviewed ? "ok" : "suggested"
-  };
+function getWeeklyCloseStatus(weekKey) {
+  if (state.weeklyClosures[weekKey]) return { key: "closed", label: "Closed", tone: "green", message: "This week has already been closed." };
+  const day = new Date(`${getReferenceDateISO(state.ui.selectedMonth)}T00:00:00`).getDay();
+  const previousWeekKey = getPreviousWeekKey(weekKey);
+  if (day === 1 && !state.weeklyClosures[previousWeekKey] && previousWeekNeedsClose(previousWeekKey)) {
+    return { key: "last-week-open", label: "Last week not closed", tone: "yellow", message: "Review last week before continuing." };
+  }
+  if (day === 0) return { key: "ready", label: "Ready to close", tone: "yellow", message: "Ready to close this week." };
+  return { key: "in-progress", label: "In progress", tone: "neutral", message: "Week is still in progress." };
 }
 
-function markMonthReviewed(monthKey) {
-  state.monthReviews ||= {};
-  state.monthReviews[monthKey] = {
-    ...(state.monthReviews[monthKey] || {}),
-    reviewed: true,
-    reviewedAtISO: new Date().toISOString()
-  };
-  saveState();
-  showToast("Month marked reviewed.");
-  render();
+function getPreviousWeekKey(weekKey) {
+  return shiftDateISO(weekKey, -7);
 }
 
-function markMonthBackupDone(monthKey) {
-  state.monthReviews ||= {};
-  state.monthReviews[monthKey] = {
-    ...(state.monthReviews[monthKey] || {}),
-    backupDone: true,
-    backupDoneAtISO: new Date().toISOString()
-  };
-  saveState();
-  showToast("Backup marked done.");
-  render();
+function previousWeekNeedsClose(weekKey) {
+  const weekEnd = getWeekEnd(weekKey);
+  const hasTransactions = state.transactions.some((item) => item.dateISO >= weekKey && item.dateISO <= weekEnd);
+  if (hasTransactions) return true;
+  return getActiveCategories()
+    .filter((category) => category.ruleType === "penalty")
+    .some((category) => {
+      const budget = getCurrentWeekBudget(category.id, weekKey, state.ui.selectedMonth);
+      const spent = getWeekSpent(category.id, weekKey, state.ui.selectedMonth);
+      return spent > budget;
+    });
 }
 
-function calculateLastMonthResult(monthKey) {
-  const lastMonth = shiftMonthKey(monthKey, -1);
-  const categories = getCategories().filter(isVariableTotalCategory).map((category) => calculateMonthCategoryStatus(category.id, lastMonth));
-  if (!categories.some((item) => item.monthSpent > 0)) return { key: "none", label: "no data", amount: 0 };
-  const spent = sum(categories.map((item) => item.monthSpent));
-  const budget = sum(categories.map((item) => item.monthlyBudget));
-  const diff = spent - budget;
-  return {
-    key: diff > 0 ? "over" : "under",
-    label: diff > 0 ? `${money(diff)} over` : `${money(Math.abs(diff))} under`,
-    amount: diff
-  };
-}
-
-function calculateWeeklyDiscipline(monthKey = state.ui.selectedMonth, weekKey = getWeekKey(getReferenceDateISO(monthKey))) {
-  const tracked = getCategories()
-    .filter(isWeeklyDisciplineCategory);
-  const categories = tracked.map((item) => calculateWeekCategoryStatus(item.id, monthKey, weekKey));
-  const penaltyRows = categories
-    .filter((item) => isPenaltyCategory(getCategoryById(item.category)))
-    .filter((item) => item.penalty > 0)
-    .map((item) => ({
-      categoryId: item.category,
-      label: item.label,
-      overshoot: item.overshoot,
-      penalty: item.penalty
-    }));
-  const penaltyCategories = categories.filter((item) => isPenaltyCategory(getCategoryById(item.category)));
-  const categoryPenalties = Object.fromEntries(penaltyRows.map((row) => [row.categoryId, row.penalty]));
-  const thisWeekVariableBudget = sum(categories.map((item) => item.currentWeekBudget));
-  const thisWeekVariableSpent = sum(categories.map((item) => item.weekSpent));
-  const discretionaryOvershoot = sum(penaltyCategories.map((item) => item.overshoot));
-  const projectedDiscretionaryOvershoot = sum(penaltyCategories.map((item) => item.projectedOvershoot));
-  const nextWeekReduction = sum(Object.values(categoryPenalties));
-  const isClosed = Boolean(state.weeklyClosures[weekKey]);
-  const closeStatus = getWeeklyCloseStatus(weekKey);
-  const penaltyBudgetBase = sum(penaltyCategories.map((item) => item.currentWeekBudget));
-  const statusTone = nextWeekReduction === 0 ? "green" : nextWeekReduction <= penaltyBudgetBase * 0.2 ? "yellow" : "red";
-  return {
-    weekKey,
-    thisWeekVariableBudget,
-    thisWeekVariableSpent,
-    discretionaryOvershoot,
-    projectedDiscretionaryOvershoot,
-    nextWeekReduction,
+function closeWeek() {
+  const discipline = calculateWeeklyDiscipline();
+  if (state.weeklyClosures[discipline.weekKey]) {
+    showToast("This week has already been closed.");
+    return;
+  }
+  const nextWeekKey = shiftDateISO(discipline.weekKey, 7);
+  const categoryPenalties = Object.fromEntries(discipline.penaltyRows.map((row) => [row.categoryId, row.penalty]));
+  state.weeklyBudgetAdjustments[nextWeekKey] = {
+    weekStartISO: nextWeekKey,
+    sourceWeekStartISO: discipline.weekKey,
     categoryPenalties,
-    penaltyRows,
-    isClosed,
-    closeStatus,
-    status: {
-      label: statusTone === "green" ? "Green" : statusTone === "yellow" ? "Yellow" : "Red",
-      tone: statusTone
-    },
-    conclusion: statusTone === "green"
-      ? "No penalty is projected for next week."
-      : statusTone === "yellow"
-        ? "A moderate penalty will reduce next week's discretionary budget."
-        : "A large penalty will materially reduce next week's discretionary budget.",
-    nextAction: statusTone === "green"
-      ? "Maintain current pace."
-      : statusTone === "yellow"
-        ? "Protect the remaining discretionary budget."
-        : "Treat discretionary spending as frozen."
+    totalPenalty: discipline.nextWeekReduction
   };
+  state.weeklyClosures[discipline.weekKey] = {
+    weekStartISO: discipline.weekKey,
+    closedAtISO: new Date().toISOString(),
+    categoryPenalties,
+    totalPenalty: discipline.nextWeekReduction
+  };
+  saveState();
+  showToast(`Week closed. Next week reduced by ${money(discipline.nextWeekReduction)}.`);
+  render();
+}
+
+function reopenWeek() {
+  const weekKey = getWeekKey(getReferenceDateISO(state.ui.selectedMonth));
+  if (!state.weeklyClosures[weekKey]) {
+    showToast("No week close to reopen.");
+    return;
+  }
+  if (!window.confirm("Reopen this week? This removes the week closure and the next-week budget adjustment created from it.")) return;
+  delete state.weeklyClosures[weekKey];
+  delete state.weeklyBudgetAdjustments[shiftDateISO(weekKey, 7)];
+  saveState();
+  showToast("Week reopened.");
+  render();
+}
+
+function reviewLastWeek() {
+  state.ui.txFilter = "week";
+  showToast("Review last week from Activity.");
+  openTransactionsManager();
+}
+
+function saveTransaction(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const category = String(form.get("category") || "");
+  if (!isCategoryAllowedForTransaction(category)) {
+    showToast("Create a category first.");
+    return;
+  }
+  const tx = {
+    id: String(form.get("id") || uid("txn")),
+    dateISO: normalizeDateValue(form.get("dateISO")),
+    amount: Number(form.get("amount")) || 0,
+    category,
+    note: String(form.get("note") || "").trim()
+  };
+  if (!tx.dateISO || tx.amount <= 0) {
+    showToast("Date and amount are required.");
+    return;
+  }
+  const index = state.transactions.findIndex((item) => item.id === tx.id);
+  if (index >= 0) state.transactions[index] = tx;
+  else state.transactions.push(tx);
+  state.ui.lastTransactionTemplate = { amount: tx.amount, category: tx.category, note: tx.note };
+  state.ui.editingTransactionId = null;
+  modalRoot.innerHTML = "";
+  state.ui.activeTab = "monitor";
+  saveState();
+  showToast(index >= 0 ? "Transaction updated." : "Transaction added.");
+  render();
+}
+
+function deleteTransaction(id) {
+  state.transactions = state.transactions.filter((item) => item.id !== id);
+  saveState();
+  showToast("Transaction deleted.");
+  modalRoot.innerHTML = renderTransactionsManagerSheet();
+  bindSheetEvents();
+  render();
+}
+
+function getEditingTransaction() {
+  return state.transactions.find((item) => item.id === state.ui.editingTransactionId) || null;
+}
+
+function saveCategoryEditor(event) {
+  event.preventDefault();
+  const id = event.currentTarget.dataset.categoryId;
+  const category = getCategoryById(id);
+  if (!category) return;
+  const form = new FormData(event.currentTarget);
+  Object.assign(category, {
+    label: String(form.get("label") || category.label).trim(),
+    icon: String(form.get("icon") || "◼").trim() || "◼",
+    group: CATEGORY_GROUPS.includes(form.get("group")) ? form.get("group") : "custom",
+    monthlyBudget: Number(form.get("monthlyBudget")) || 0,
+    ruleType: RULE_TYPES.includes(form.get("ruleType")) ? form.get("ruleType") : "trackOnly",
+    softCapMultiplier: form.get("softCapMultiplier") === "" ? null : Number(form.get("softCapMultiplier")),
+    penaltyMultiplier: form.get("penaltyMultiplier") === "" ? null : Number(form.get("penaltyMultiplier")),
+    minPenaltyUnit: form.get("minPenaltyUnit") === "" ? null : Number(form.get("minPenaltyUnit")),
+    displayOrder: Number(form.get("displayOrder")) || category.displayOrder,
+    monitor: form.has("monitor"),
+    allowTransactions: form.has("allowTransactions"),
+    includeInVariableTotal: form.has("includeInVariableTotal"),
+    includeInWeeklyDiscipline: form.has("includeInWeeklyDiscipline"),
+    active: form.has("active")
+  });
+  state.settings.monitorCategories.sort(byDisplayOrder);
+  saveState();
+  showToast("Category saved.");
+  closeSheet();
+}
+
+function saveCategoryManager(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  getCategories().forEach((category) => {
+    const value = form.get(`order.${category.id}`);
+    if (value != null) category.displayOrder = Number(value) || category.displayOrder;
+  });
+  state.settings.monitorCategories.sort(byDisplayOrder);
+  saveState();
+  showToast("Category order saved.");
+  openManageBudgetCategories();
+}
+
+function addCategory(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const label = String(form.get("label") || "").trim();
+  if (!label) return;
+  const id = uniqueId(slugify(label), getCategories().map((item) => item.id));
+  const preset = String(form.get("preset") || "discretionary");
+  const presetConfig = preset === "essential"
+    ? { group: "essentials", ruleType: "softCap", includeInVariableTotal: true, includeInWeeklyDiscipline: true }
+    : preset === "trackOnly"
+      ? { group: "custom", ruleType: "trackOnly", includeInVariableTotal: false, includeInWeeklyDiscipline: false }
+      : { group: "discretionary", ruleType: "penalty", includeInVariableTotal: true, includeInWeeklyDiscipline: true };
+  state.settings.monitorCategories.push(normalizeCategory({
+    id,
+    label,
+    icon: "◼",
+    monthlyBudget: Number(form.get("monthlyBudget")) || 0,
+    ...presetConfig,
+    monitor: form.has("monitor"),
+    allowTransactions: form.has("allowTransactions"),
+    displayOrder: getCategories().length + 1
+  }));
+  saveState();
+  showToast("Category added. Mark the checklist step done if complete.");
+  if (state.ui.returnToQuickAddAfterCategoryCreate) {
+    state.ui.returnToQuickAddAfterCategoryCreate = false;
+    saveState();
+    openQuickAdd();
+  } else {
+    modalRoot.innerHTML = renderBudgetSetupSheet();
+    bindSheetEvents();
+  }
+}
+
+function archiveCurrentCategory() {
+  const id = modalRoot.querySelector("#categoryEditorForm")?.dataset.categoryId;
+  const category = getCategoryById(id);
+  if (!category) return;
+  category.active = false;
+  category.archived = true;
+  saveState();
+  showToast("Category archived.");
+  closeSheet();
+}
+
+function deleteCurrentCategory() {
+  const id = modalRoot.querySelector("#categoryEditorForm")?.dataset.categoryId;
+  if (!id || categoryHasTransactions(id)) return;
+  if (!window.confirm("Delete this category?")) return;
+  state.settings.monitorCategories = state.settings.monitorCategories.filter((item) => item.id !== id);
+  saveState();
+  showToast("Category deleted.");
+  closeSheet();
+}
+
+function restoreCategory(id) {
+  const category = getCategoryById(id);
+  if (!category) return;
+  category.active = true;
+  category.archived = false;
+  saveState();
+  openManageBudgetCategories();
+}
+
+function saveVaultEditor(event) {
+  event.preventDefault();
+  const id = event.currentTarget.dataset.vaultId;
+  const vault = getVaultById(id);
+  if (!vault) return;
+  const form = new FormData(event.currentTarget);
+  Object.assign(vault, {
+    name: String(form.get("name") || vault.name).trim(),
+    currentAmount: Number(form.get("currentAmount")) || 0,
+    targetAmount: form.get("targetAmount") === "" ? null : Number(form.get("targetAmount")) || null,
+    note: String(form.get("note") || "").trim(),
+    colorToken: VAULT_COLORS.includes(form.get("colorToken")) ? form.get("colorToken") : "gold",
+    displayOrder: Number(form.get("displayOrder")) || vault.displayOrder,
+    includeInMonitor: form.has("includeInMonitor"),
+    active: form.has("active")
+  });
+  state.settings.reserveVaults.sort(byDisplayOrder);
+  saveState();
+  showToast("Vault saved. Mark the checklist step done if complete.");
+  closeSheet();
+}
+
+function saveVaultManager(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  getReserveVaults().forEach((vault) => {
+    const value = form.get(`order.${vault.id}`);
+    if (value != null) vault.displayOrder = Number(value) || vault.displayOrder;
+  });
+  state.settings.reserveVaults.sort(byDisplayOrder);
+  saveState();
+  showToast("Vault order saved.");
+  openManageVaults();
+}
+
+function addVault(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const name = String(form.get("name") || "").trim();
+  if (!name) return;
+  const id = uniqueId(slugify(name), getReserveVaults().map((item) => item.id));
+  state.settings.reserveVaults.push(normalizeVault({
+    id,
+    name,
+    currentAmount: Number(form.get("currentAmount")) || 0,
+    targetAmount: form.get("targetAmount") === "" ? null : Number(form.get("targetAmount")) || null,
+    note: String(form.get("note") || "").trim(),
+    includeInMonitor: form.has("includeInMonitor"),
+    colorToken: "gold",
+    displayOrder: Number(form.get("displayOrder")) || getReserveVaults().length + 1
+  }));
+  saveState();
+  showToast("Vault added. Mark the checklist step done if complete.");
+  modalRoot.innerHTML = renderReserveSetupSheet();
+  bindSheetEvents();
+}
+
+function archiveCurrentVault() {
+  const id = modalRoot.querySelector("#vaultEditorForm")?.dataset.vaultId;
+  const vault = getVaultById(id);
+  if (!vault) return;
+  vault.active = false;
+  vault.archived = true;
+  saveState();
+  showToast("Vault archived.");
+  closeSheet();
+}
+
+function deleteCurrentVault() {
+  const id = modalRoot.querySelector("#vaultEditorForm")?.dataset.vaultId;
+  if (!id || !window.confirm("Delete this vault?")) return;
+  state.settings.reserveVaults = state.settings.reserveVaults.filter((item) => item.id !== id);
+  saveState();
+  showToast("Vault deleted.");
+  closeSheet();
+}
+
+function restoreVault(id) {
+  const vault = getVaultById(id);
+  if (!vault) return;
+  vault.active = true;
+  vault.archived = false;
+  saveState();
+  openManageVaults();
+}
+
+function saveBackgroundManager(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  getBackgroundSections().forEach((section) => {
+    const value = form.get(`order.${section.id}`);
+    if (value != null) section.displayOrder = Number(value) || section.displayOrder;
+  });
+  state.settings.backgroundSections.sort(byDisplayOrder);
+  saveState();
+  showToast("Background order saved.");
+  openManageBackground();
+}
+
+function addBackgroundSection(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const label = String(form.get("label") || "").trim();
+  if (!label) return;
+  const id = uniqueId(slugify(label), getBackgroundSections().map((item) => item.id));
+  state.settings.backgroundSections.push(normalizeBackgroundSection({
+    id,
+    label,
+    type: form.get("type"),
+    displayOrder: getBackgroundSections().length + 1,
+    items: []
+  }));
+  saveState();
+  showToast("Background section added.");
+  openManageBackground();
+}
+
+function addBackgroundItem(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const section = getBackgroundSectionById(form.get("sectionId"));
+  const label = String(form.get("label") || "").trim();
+  if (!section || !label) return;
+  section.items.push(normalizeBackgroundItem({
+    id: uniqueId(slugify(label), section.items.map((item) => item.id)),
+    label,
+    amount: Number(form.get("amount")) || 0,
+    frequency: "monthly"
+  }));
+  saveState();
+  showToast("Background item added.");
+  openManageBackground();
+}
+
+function saveBackgroundItemEditor(event) {
+  event.preventDefault();
+  const section = getBackgroundSectionById(event.currentTarget.dataset.sectionId);
+  const item = section?.items.find((candidate) => candidate.id === event.currentTarget.dataset.itemId);
+  if (!item) return;
+  const form = new FormData(event.currentTarget);
+  item.label = String(form.get("label") || item.label).trim();
+  item.amount = Number(form.get("amount")) || 0;
+  item.frequency = form.get("frequency");
+  item.active = form.has("active");
+  saveState();
+  showToast("Background item saved.");
+  closeSheet();
+}
+
+function archiveCurrentBackgroundItem() {
+  const form = modalRoot.querySelector("#backgroundItemEditorForm");
+  const section = getBackgroundSectionById(form?.dataset.sectionId);
+  const item = section?.items.find((candidate) => candidate.id === form?.dataset.itemId);
+  if (!item) return;
+  item.active = false;
+  item.archived = true;
+  saveState();
+  showToast("Background item archived.");
+  closeSheet();
+}
+
+function toggleMonthReviewItem(monthKey, key) {
+  const review = ensureMonthReview(monthKey);
+  markMonthReviewItem(monthKey, key, !review[key]);
+  saveState();
+  render();
+}
+
+function runReviewAction(key) {
+  if (key === "reviewSpendingDone") {
+    state.ui.activeTab = "monitor";
+    state.ui.monitorScope = "month";
+    saveState();
+    render();
+    closeSheet();
+    return;
+  }
+  if (key === "adjustBudgetsDone") {
+    openPlanningSheet("budget");
+    return;
+  }
+  if (key === "updateVaultsDone") {
+    openPlanningSheet("reserve");
+    return;
+  }
+  if (key === "backupDone") exportCSV();
+}
+
+function markMonthReviewItem(monthKey, key, value = true) {
+  const review = ensureMonthReview(monthKey);
+  review[key] = Boolean(value);
+  review[`${key}AtISO`] = value ? new Date().toISOString() : null;
+}
+
+function ensureMonthReview(monthKey) {
+  state.monthReviews ||= {};
+  state.monthReviews[monthKey] = normalizeMonthReview(state.monthReviews[monthKey]);
+  return state.monthReviews[monthKey];
+}
+
+function getMonthReview(monthKey) {
+  return normalizeMonthReview(state.monthReviews?.[monthKey]);
+}
+
+function getMonthReviewStatus(monthKey) {
+  const review = getMonthReview(monthKey);
+  const doneCount = REVIEW_KEYS.filter((key) => review[key]).length;
+  return {
+    ...review,
+    doneCount,
+    label: doneCount === 4 ? "Done" : doneCount ? "In progress" : "Not started"
+  };
+}
+
+function openPlanningSheet(sectionKey) {
+  state.ui.activeTab = "planning";
+  saveState();
+  if (sectionKey === "budget") modalRoot.innerHTML = renderBudgetSetupSheet();
+  else if (sectionKey === "reserve") modalRoot.innerHTML = renderReserveSetupSheet();
+  else if (sectionKey === "background") modalRoot.innerHTML = renderBackgroundSetupSheet();
+  else if (sectionKey === "monthSetup") modalRoot.innerHTML = renderMonthSetupSheet();
+  else if (sectionKey === "data") modalRoot.innerHTML = renderDataCenterSheet();
+  else return;
+  bindSheetEvents();
+}
+
+function toggleMonitorCardDetails(categoryId) {
+  state.ui.monitorExpandedCards[categoryId] = !state.ui.monitorExpandedCards[categoryId];
+  saveState();
+  render();
+}
+
+function toggleWeeklyCloseDetails() {
+  state.ui.weeklyCloseExpanded = !state.ui.weeklyCloseExpanded;
+  saveState();
+  render();
+}
+
+function exportCSV() {
+  markMonthReviewItem(state.ui.selectedMonth, "backupDone", true);
+  saveState();
+  downloadText(`finance-tracker-v3-${state.ui.selectedMonth}.csv`, serializeStateToCSV(state), "text/csv");
+  showToast("CSV backup exported.");
+  render();
+}
+
+function importCSV(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  event.target.value = "";
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const { state: imported, skipped } = parseCSVToState(String(reader.result || ""));
+      openCsvImportPreview(imported, skipped);
+    } catch {
+      showToast("Invalid CSV import.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+function openCsvImportPreview(imported, skipped) {
+  pendingCsvImport = { state: normalizeState(imported), skipped };
+  modalRoot.innerHTML = renderCsvImportPreviewSheet();
+  bindSheetEvents();
+}
+
+function renderCsvImportPreviewSheet() {
+  if (!pendingCsvImport) return "";
+  const imported = pendingCsvImport.state;
+  const stats = [
+    ["Categories", imported.settings.monitorCategories.length],
+    ["Vaults", imported.settings.reserveVaults.length],
+    ["Background sections", imported.settings.backgroundSections.length],
+    ["Background items", imported.settings.backgroundSections.flatMap((section) => section.items || []).length],
+    ["Transactions", imported.transactions.length],
+    ["Month reviews", Object.keys(imported.monthReviews || {}).length],
+    ["Weekly adjustments", Object.keys(imported.weeklyBudgetAdjustments || {}).length],
+    ["Weekly closures", Object.keys(imported.weeklyClosures || {}).length],
+    ["Skipped rows", pendingCsvImport.skipped]
+  ];
+  return renderSetupSheet("Import Preview", `
+    <div class="import-preview-grid">
+      ${stats.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${value}</strong></div>`).join("")}
+    </div>
+    <div class="notice-strip warning">Importing will replace current local data.</div>
+    <div class="button-row">
+      <button id="confirmCsvImportButton" class="action-button" type="button">Confirm Import</button>
+      <button id="cancelCsvImportButton" class="ghost-button" type="button">Cancel</button>
+    </div>
+  `, "CSV");
+}
+
+function confirmCsvImport() {
+  if (!pendingCsvImport) return;
+  state = normalizeState(pendingCsvImport.state);
+  const skipped = pendingCsvImport.skipped;
+  pendingCsvImport = null;
+  saveState();
+  showToast(skipped ? `CSV imported with ${skipped} skipped rows.` : "CSV imported.");
+  modalRoot.innerHTML = "";
+  render();
+}
+
+function cancelCsvImport() {
+  pendingCsvImport = null;
+  modalRoot.innerHTML = "";
+  showToast("CSV import canceled.");
+}
+
+function downloadSampleCSV() {
+  downloadText("finance-tracker-v3-sample.csv", getSampleCSV(), "text/csv");
+  showToast("Sample CSV downloaded.");
+}
+
+function getSampleCSV() {
+  const sample = structuredClone(DEFAULT_STATE);
+  sample.settings.monitorCategories.push(normalizeCategory({
+    id: "sample-category",
+    label: "Sample Category",
+    group: "discretionary",
+    ruleType: "penalty",
+    monthlyBudget: 100,
+    monitor: true,
+    allowTransactions: true,
+    displayOrder: 1
+  }));
+  sample.settings.reserveVaults.push(normalizeVault({
+    id: "sample-vault",
+    name: "Sample Vault",
+    currentAmount: 0,
+    targetAmount: 100,
+    note: "Example savings goal",
+    includeInMonitor: true,
+    displayOrder: 1
+  }));
+  sample.settings.backgroundSections.push(normalizeBackgroundSection({
+    id: "sample-background",
+    label: "Sample Background",
+    type: "other",
+    displayOrder: 1,
+    items: [{ id: "sample-item", label: "Sample Item", amount: 0, frequency: "monthly", active: true, archived: false }]
+  }));
+  sample.transactions.push({ id: "sample-transaction", dateISO: `${state.ui.selectedMonth}-01`, amount: 1, category: "sample-category", note: "Example transaction" });
+  sample.monthReviews[state.ui.selectedMonth] = normalizeMonthReview({ backupDone: true, backupDoneAtISO: new Date().toISOString() });
+  return serializeStateToCSV(sample);
+}
+
+function serializeStateToCSV(source) {
+  const columns = ["record_type", "id", "parent_id", "name", "label", "date", "amount", "current_amount", "target_amount", "category", "group", "rule_type", "monthly_budget", "note", "frequency", "active", "archived", "include_in_monitor", "allow_transactions", "display_order"];
+  const rows = [columns];
+  source.settings.monitorCategories.forEach((item) => rows.push([
+    "category", item.id, "", "", item.label, "", "", "", "", "", item.group, item.ruleType, item.monthlyBudget, "", "", item.active, item.archived, item.monitor, item.allowTransactions, item.displayOrder
+  ]));
+  source.settings.reserveVaults.forEach((item) => rows.push([
+    "vault", item.id, "", item.name, "", "", "", item.currentAmount, item.targetAmount ?? "", "", "", "", "", item.note, "", item.active, item.archived, item.includeInMonitor, "", item.displayOrder
+  ]));
+  source.settings.backgroundSections.forEach((section) => {
+    rows.push(["background_section", section.id, "", section.label, "", "", "", "", "", "", section.type, "", "", "", "", section.active, section.archived, "", "", section.displayOrder]);
+    section.items.forEach((item) => rows.push(["background_item", item.id, section.id, "", item.label, "", item.amount, "", "", "", "", "", "", "", item.frequency, item.active, item.archived, "", "", ""]));
+  });
+  source.transactions.forEach((item) => rows.push(["transaction", item.id, "", "", "", item.dateISO, item.amount, "", "", item.category, "", "", "", item.note, "", true, false, "", "", ""]));
+  Object.entries(source.monthReviews || {}).forEach(([month, review]) => {
+    rows.push(["month_review", month, "", "", "", month, "", "", "", "", "", "", "", JSON.stringify(review), "", true, false, "", "", ""]);
+  });
+  Object.entries(source.weeklyBudgetAdjustments || {}).forEach(([week, adjustment]) => {
+    rows.push(["weekly_adjustment", week, "", "", "", week, adjustment.totalPenalty || 0, "", "", "", "", "", "", JSON.stringify(adjustment.categoryPenalties || {}), "", true, false, "", "", ""]);
+  });
+  Object.entries(source.weeklyClosures || {}).forEach(([week, closure]) => {
+    rows.push(["weekly_closure", week, "", "", "", week, closure.totalPenalty || 0, "", "", "", "", "", "", JSON.stringify(closure.categoryPenalties || {}), "", true, false, "", "", ""]);
+  });
+  return rows.map((row) => row.map(csvEscape).join(",")).join("\n");
+}
+
+function parseCSVToState(text) {
+  const records = csvParse(text);
+  if (!records.length) return { state: structuredClone(DEFAULT_STATE), skipped: 0 };
+  const headers = records[0].map((item) => String(item).trim());
+  const next = structuredClone(DEFAULT_STATE);
+  const sectionMap = new Map();
+  let skipped = 0;
+  records.slice(1).forEach((values) => {
+    const row = Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
+    try {
+      if (row.record_type === "category") next.settings.monitorCategories.push(normalizeCategory(rowToCategory(row)));
+      else if (row.record_type === "vault") next.settings.reserveVaults.push(normalizeVault(rowToVault(row)));
+      else if (row.record_type === "background_section") {
+        const section = normalizeBackgroundSection(rowToBackgroundSection(row));
+        if (section) {
+          next.settings.backgroundSections.push(section);
+          sectionMap.set(section.id, section);
+        }
+      } else if (row.record_type === "background_item") {
+        const section = sectionMap.get(row.parent_id);
+        const item = normalizeBackgroundItem(rowToBackgroundItem(row));
+        if (section && item) section.items.push(item);
+        else skipped += 1;
+      } else if (row.record_type === "transaction") {
+        const tx = normalizeTransaction(rowToTransaction(row));
+        if (tx) next.transactions.push(tx);
+        else skipped += 1;
+      } else if (row.record_type === "month_review") {
+        next.monthReviews[row.id || row.date] = normalizeMonthReview(safeJson(row.note));
+      } else if (row.record_type === "weekly_adjustment") {
+        next.weeklyBudgetAdjustments[row.id || row.date] = { weekStartISO: row.id || row.date, categoryPenalties: safeJson(row.note), totalPenalty: number(row.amount) };
+      } else if (row.record_type === "weekly_closure") {
+        next.weeklyClosures[row.id || row.date] = { weekStartISO: row.id || row.date, closedAtISO: new Date().toISOString(), categoryPenalties: safeJson(row.note), totalPenalty: number(row.amount) };
+      } else if (row.record_type) skipped += 1;
+    } catch {
+      skipped += 1;
+    }
+  });
+  return { state: next, skipped };
+}
+
+function rowToCategory(row) {
+  return {
+    id: row.id,
+    label: row.label,
+    group: row.group,
+    ruleType: row.rule_type,
+    monthlyBudget: number(row.monthly_budget),
+    active: bool(row.active),
+    archived: bool(row.archived),
+    monitor: bool(row.include_in_monitor),
+    allowTransactions: bool(row.allow_transactions),
+    displayOrder: number(row.display_order) || 1,
+    icon: "◼"
+  };
+}
+
+function rowToVault(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    currentAmount: number(row.current_amount),
+    targetAmount: row.target_amount === "" ? null : number(row.target_amount),
+    note: row.note,
+    includeInMonitor: bool(row.include_in_monitor),
+    active: bool(row.active),
+    archived: bool(row.archived),
+    displayOrder: number(row.display_order) || 1,
+    colorToken: "gold"
+  };
+}
+
+function rowToBackgroundSection(row) {
+  return {
+    id: row.id,
+    label: row.name || row.label,
+    type: row.group || "other",
+    active: bool(row.active),
+    archived: bool(row.archived),
+    displayOrder: number(row.display_order) || 1,
+    items: []
+  };
+}
+
+function rowToBackgroundItem(row) {
+  return {
+    id: row.id,
+    label: row.label,
+    amount: number(row.amount),
+    frequency: row.frequency || "monthly",
+    active: bool(row.active),
+    archived: bool(row.archived)
+  };
+}
+
+function rowToTransaction(row) {
+  return {
+    id: row.id,
+    dateISO: row.date,
+    amount: number(row.amount),
+    category: row.category,
+    note: row.note
+  };
+}
+
+function csvEscape(value) {
+  const text = value == null ? "" : String(value);
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function csvParse(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (quoted) {
+      if (char === '"' && next === '"') {
+        cell += '"';
+        index += 1;
+      } else if (char === '"') quoted = false;
+      else cell += char;
+    } else if (char === '"') quoted = true;
+    else if (char === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (char === "\n") {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else if (char !== "\r") cell += char;
+  }
+  row.push(cell);
+  if (row.some((item) => item !== "")) rows.push(row);
+  return rows;
+}
+
+function resetData() {
+  if (!window.confirm("Reset local data? This clears the V3 tracker data stored in this browser.")) return;
+  state = structuredClone(DEFAULT_STATE);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  showToast("Local data reset.");
+  render();
+}
+
+function getCategories() {
+  return state.settings.monitorCategories || [];
+}
+
+function getActiveCategories() {
+  return getCategories().filter((item) => item.active && !item.archived);
+}
+
+function getMonitorCategories() {
+  return getActiveCategories()
+    .filter((item) => item.monitor)
+    .sort(byDisplayOrder)
+    .slice(0, 6);
+}
+
+function getActiveTransactionCategories() {
+  return getActiveCategories().filter((item) => item.allowTransactions).sort(byDisplayOrder);
+}
+
+function getCategoryById(id) {
+  return getCategories().find((item) => item.id === id) || {
+    id,
+    label: id ? startCase(id) : "Unknown",
+    icon: "◼",
+    group: "custom",
+    monthlyBudget: 0,
+    ruleType: "trackOnly",
+    active: false,
+    archived: true
+  };
+}
+
+function getCategoryLabel(id) {
+  return getCategoryById(id).label;
+}
+
+function isCategoryAllowedForTransaction(id) {
+  return getActiveTransactionCategories().some((item) => item.id === id);
+}
+
+function isVariableTotalCategory(category) {
+  return category?.active !== false && !category?.archived && category?.includeInVariableTotal !== false;
+}
+
+function categoryHasTransactions(categoryId) {
+  return state.transactions.some((item) => item.category === categoryId);
+}
+
+function getReserveVaults() {
+  return state.settings.reserveVaults || [];
+}
+
+function getActiveReserveVaults() {
+  return getReserveVaults().filter((item) => item.active && !item.archived).sort(byDisplayOrder);
+}
+
+function getMonitorReserveVaults() {
+  return getActiveReserveVaults().filter((item) => item.includeInMonitor).sort(byDisplayOrder);
+}
+
+function getVaultById(id) {
+  return getReserveVaults().find((item) => item.id === id) || null;
+}
+
+function calculateVaultTotal() {
+  return sum(getActiveReserveVaults().map((vault) => vault.currentAmount));
+}
+
+function calculateVaultProgress(vault) {
+  if (!vault.targetAmount) return { percent: Math.min(100, vault.currentAmount > 0 ? 100 : 0), status: "Tracking" };
+  const percent = Math.max(0, Math.min(100, vault.currentAmount / vault.targetAmount * 100));
+  return {
+    percent,
+    status: vault.currentAmount >= vault.targetAmount ? "Complete" : "Building"
+  };
+}
+
+function getVaultRemainingText(vault) {
+  if (!vault.targetAmount) return "Tracking";
+  const remaining = Math.max(0, vault.targetAmount - vault.currentAmount);
+  return remaining <= 0 ? "Target reached" : `${money(remaining)} left`;
+}
+
+function getBackgroundSections() {
+  return state.settings.backgroundSections || [];
+}
+
+function getActiveBackgroundSections() {
+  return getBackgroundSections().filter((item) => item.active && !item.archived).sort(byDisplayOrder);
+}
+
+function getActiveBackgroundItems() {
+  return getActiveBackgroundSections().flatMap((section) => section.items.filter((item) => item.active && !item.archived));
+}
+
+function getBackgroundSectionById(id) {
+  return getBackgroundSections().find((item) => item.id === id) || null;
+}
+
+function getCurrentWeekBudget(categoryId, weekKey, monthKey = state.ui.selectedMonth) {
+  const category = getCategoryById(categoryId);
+  const weeks = getWeeksOverlappingMonth(monthKey);
+  const base = weeks.length ? (Number(category.monthlyBudget) || 0) / weeks.length : 0;
+  return Math.max(0, base - getWeekAdjustmentPenalty(weekKey, categoryId));
+}
+
+function getWeekAdjustmentPenalty(weekKey, categoryId) {
+  const adjustment = state.weeklyBudgetAdjustments?.[weekKey];
+  return Number(adjustment?.categoryPenalties?.[categoryId]) || 0;
+}
+
+function calculatePenalty(categoryId, actual, budget) {
+  const category = getCategoryById(categoryId);
+  if (category.ruleType !== "penalty") return { overshoot: 0, penalty: 0 };
+  const overshoot = Math.max(0, actual - budget);
+  const multiplier = Number(category.penaltyMultiplier ?? state.settings.weeklyRules.penaltyMultiplier) || 1.5;
+  const min = Number(category.minPenaltyUnit ?? state.settings.weeklyRules.minPenaltyUnit) || 5;
+  return { overshoot, penalty: overshoot > 0 ? Math.max(min, overshoot * multiplier) : 0 };
+}
+
+function getSoftCapMultiplier(category) {
+  return Number(category.softCapMultiplier ?? state.settings.weeklyRules.defaultSoftCapMultiplier) || 1.1;
+}
+
+function getMonthSpent(categoryId, monthKey = state.ui.selectedMonth) {
+  return sum(state.transactions.filter((item) => item.category === categoryId && item.dateISO.slice(0, 7) === monthKey).map((item) => item.amount));
+}
+
+function getWeekSpent(categoryId, weekKey, monthKey = state.ui.selectedMonth) {
+  const weekEnd = getWeekEnd(weekKey);
+  return sum(state.transactions.filter((item) => item.category === categoryId && item.dateISO.slice(0, 7) === monthKey && item.dateISO >= weekKey && item.dateISO <= weekEnd).map((item) => item.amount));
+}
+
+function getScopedTransactions() {
+  const monthKey = state.ui.selectedMonth;
+  const weekKey = getWeekKey(getReferenceDateISO(monthKey));
+  const weekEnd = getWeekEnd(weekKey);
+  return state.transactions
+    .filter((item) => state.ui.monitorScope === "month"
+      ? item.dateISO.slice(0, 7) === monthKey
+      : item.dateISO.slice(0, 7) === monthKey && item.dateISO >= weekKey && item.dateISO <= weekEnd)
+    .sort(sortTransactionsDesc);
+}
+
+function getFilteredTransactions() {
+  const monthKey = state.ui.selectedMonth;
+  const weekKey = getWeekKey(getReferenceDateISO(monthKey));
+  const weekEnd = getWeekEnd(weekKey);
+  let list = state.transactions.slice();
+  if (state.ui.txFilter === "month") list = list.filter((item) => item.dateISO.slice(0, 7) === monthKey);
+  if (state.ui.txFilter === "week") list = list.filter((item) => item.dateISO.slice(0, 7) === monthKey && item.dateISO >= weekKey && item.dateISO <= weekEnd);
+  if (state.ui.txFilter === "essentials") list = list.filter((item) => getCategoryById(item.category).group === "essentials");
+  if (state.ui.txFilter === "discretionary") list = list.filter((item) => getCategoryById(item.category).group === "discretionary");
+  return list.sort(sortTransactionsDesc);
 }
 
 function getReferenceDateISO(monthKey) {
@@ -3191,159 +2549,36 @@ function getMonthTiming(monthKey) {
   const today = currentDateISO();
   const daysInMonth = getDaysInMonth(monthKey);
   let dayOfMonth = daysInMonth;
-
-  if (today.slice(0, 7) === monthKey) {
-    dayOfMonth = Number(today.slice(8, 10));
-  } else if (monthKey > today.slice(0, 7)) {
-    dayOfMonth = 1;
-  }
-
-  const monthProgress = Math.min(1, Math.max(1 / daysInMonth, dayOfMonth / daysInMonth));
+  if (today.slice(0, 7) === monthKey) dayOfMonth = Number(today.slice(8, 10));
+  if (monthKey > today.slice(0, 7)) dayOfMonth = 1;
   return {
     daysInMonth,
     dayOfMonth,
-    daysRemainingInMonth: Math.max(0, daysInMonth - dayOfMonth),
-    monthProgress
+    monthProgress: Math.min(1, Math.max(1 / daysInMonth, dayOfMonth / daysInMonth))
   };
-}
-
-function getDaysInMonth(monthKey) {
-  const [year, month] = monthKey.split("-").map(Number);
-  return new Date(year, month, 0).getDate();
-}
-
-function shiftMonthKey(monthKey, offset) {
-  const [year, month] = monthKey.split("-").map(Number);
-  const date = new Date(year, month - 1 + offset, 1);
-  return date.toISOString().slice(0, 7);
 }
 
 function getWeekTiming(referenceDateISO) {
   const weekStartISO = getWeekStart(referenceDateISO);
-  const weekEndISO = getWeekEnd(referenceDateISO);
   const elapsed = Math.floor((new Date(`${referenceDateISO}T00:00:00`) - new Date(`${weekStartISO}T00:00:00`)) / 86400000) + 1;
   const daysElapsedInWeek = Math.min(7, Math.max(1, elapsed));
-  const daysRemainingInWeek = Math.min(7, Math.max(1, 8 - daysElapsedInWeek));
-  return {
-    weekStartISO,
-    weekEndISO,
-    daysElapsedInWeek,
-    daysRemainingInWeek,
-    weekProgress: daysElapsedInWeek / 7
-  };
+  return { weekStartISO, daysElapsedInWeek, weekProgress: daysElapsedInWeek / 7 };
 }
 
-function getCurrentWeekBudget(category, weekKey, monthKey = state.ui.selectedMonth) {
-  const monthlyBudget = Number(getCategoryById(category).monthlyBudget) || 0;
-  const weeks = getWeeksOverlappingMonth(monthKey);
-  const baseBudget = weeks.length ? monthlyBudget / weeks.length : monthlyBudget;
-  const adjustment = getWeekAdjustmentPenalty(weekKey, category);
-  return Math.max(0, baseBudget - adjustment);
-}
-
-function getNextWeekBudget(category, weekKey, monthKey = state.ui.selectedMonth) {
-  const monthlyBudget = Number(getCategoryById(category).monthlyBudget) || 0;
-  const weekEnd = getWeekEnd(weekKey);
-  const spentThroughCurrentWeek = getMonthSpentThroughDate(category, monthKey, weekEnd);
-  const remainingMonthlyBudget = Math.max(0, monthlyBudget - spentThroughCurrentWeek);
-  const weeks = getWeeksOverlappingMonth(monthKey);
-  const remainingWeeksAfterCurrentWeek = weeks.filter((startISO) => startISO > weekKey).length;
-  const nextWeekBaseBudget = Math.max(0, remainingMonthlyBudget / Math.max(1, remainingWeeksAfterCurrentWeek));
-  const nextWeekKey = shiftDateISO(weekKey, 7);
-  const adjustment = getWeekAdjustmentPenalty(nextWeekKey, category);
-  return Math.max(0, nextWeekBaseBudget - adjustment);
-}
-
-function getMonthSpent(category, monthKey = state.ui.selectedMonth) {
-  return sum(
-    state.transactions
-      .filter((item) => item.category === category && item.dateISO.slice(0, 7) === monthKey)
-      .map((item) => item.amount)
-  );
-}
-
-function getMonthSpentThroughDate(category, monthKey, dateISO) {
-  return sum(
-    state.transactions
-      .filter((item) => item.category === category && item.dateISO.slice(0, 7) === monthKey && item.dateISO <= dateISO)
-      .map((item) => item.amount)
-  );
-}
-
-function getWeekSpent(category, weekKey, monthKey = state.ui.selectedMonth) {
-  const weekEnd = getWeekEnd(weekKey);
-  return sum(
-    state.transactions
-      .filter((item) => item.category === category && item.dateISO.slice(0, 7) === monthKey && item.dateISO >= weekKey && item.dateISO <= weekEnd)
-      .map((item) => item.amount)
-  );
-}
-
-function calculateDiscretionaryPenalty(category, actual, budget) {
-  const categoryDef = getCategoryById(category);
-  if (!isPenaltyCategory(categoryDef)) {
-    return { overshoot: 0, penalty: 0 };
+function getWeeksOverlappingMonth(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const days = new Date(year, month, 0).getDate();
+  const seen = new Set();
+  for (let day = 1; day <= days; day += 1) {
+    seen.add(getWeekKey(new Date(year, month - 1, day).toISOString().slice(0, 10)));
   }
-  const overshoot = Math.max(0, actual - budget);
-  const penaltyMultiplier = Number(categoryDef.penaltyMultiplier ?? state.settings.weeklyRules.penaltyMultiplier) || 1.5;
-  const minPenaltyUnit = Number(categoryDef.minPenaltyUnit ?? state.settings.weeklyRules.minPenaltyUnit) || 5;
-  const penalty = overshoot > 0 ? Math.max(minPenaltyUnit, penaltyMultiplier * overshoot) : 0;
-  return { overshoot, penalty };
-}
-
-function calculateReserveRunway(reserveBalance, stableGap) {
-  const safeGap = Math.max(1, Number(stableGap) || 0);
-  const months = Math.floor((Number(reserveBalance) || 0) / safeGap);
-  return {
-    months,
-    days: months * 30
-  };
-}
-
-function calculateReserveProjection(targetDateISO) {
-  const startDateISO = getProjectionAnchorDateISO();
-  let balance = calculateReserveVaultTotal();
-  if (targetDateISO <= startDateISO) return balance;
-  let cursor = firstOfNextMonth(startDateISO);
-
-  while (cursor < targetDateISO) {
-    balance += calculateProjectionMonthlyNet(cursor.slice(0, 7), state.settings);
-    cursor = firstOfNextMonth(cursor);
-  }
-
-  return balance;
-}
-
-function getProjectionAnchorDateISO() {
-  const anchorMonth = normalizeMonthValue(state.settings.reserve?.projectionAnchorMonth) || currentMonthKey();
-  return `${anchorMonth}-01`;
-}
-
-function projectionTone(value) {
-  const amount = Number(value) || 0;
-  const gap = Math.max(1, getStableGapFromSettings(state.settings) || 0);
-  if (amount < 0) return "red";
-  if (amount <= gap * 2) return "yellow";
-  return "green";
-}
-
-function getProjectionTargets(referenceDateISO) {
-  const [year] = referenceDateISO.slice(0, 7).split("-").map(Number);
-  const sepThisYear = `${year}-09-01`;
-  const janNext = `${year + 1}-01-01`;
-  const sepTarget = referenceDateISO < sepThisYear ? sepThisYear : `${year + 1}-09-01`;
-  const janTarget = janNext;
-  return {
-    sep: { targetDateISO: sepTarget, label: formatProjectionLabel(sepTarget) },
-    jan: { targetDateISO: janTarget, label: formatProjectionLabel(janTarget) }
-  };
+  return Array.from(seen).sort();
 }
 
 function getWeekStart(dateISO) {
   const date = new Date(`${dateISO}T00:00:00`);
   const day = date.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  date.setDate(date.getDate() + diff);
+  date.setDate(date.getDate() + (day === 0 ? -6 : 1 - day));
   return date.toISOString().slice(0, 10);
 }
 
@@ -3355,857 +2590,30 @@ function getWeekKey(dateISO) {
   return getWeekStart(dateISO);
 }
 
-function getPreviousWeekKey(weekKey) {
-  return shiftDateISO(weekKey, -7);
-}
-
-function getWeeklyCloseStatus(weekKey) {
-  if (state.weeklyClosures[weekKey]) {
-    return {
-      key: "closed",
-      label: "Closed",
-      tone: "green",
-      message: "This week has already been closed."
-    };
-  }
-  const referenceDateISO = getReferenceDateISO(state.ui.selectedMonth);
-  const day = new Date(`${referenceDateISO}T00:00:00`).getDay();
-  const previousWeekKey = getPreviousWeekKey(weekKey);
-  if (day === 1 && !state.weeklyClosures[previousWeekKey]) {
-    return {
-      key: "last-week-open",
-      label: "Last week not closed",
-      tone: "yellow",
-      message: "Last week was not closed. Review before continuing."
-    };
-  }
-  if (day === 0) {
-    return {
-      key: "ready",
-      label: "Ready to close",
-      tone: "yellow",
-      message: "Ready to close this week."
-    };
-  }
-  return {
-    key: "in-progress",
-    label: "In progress",
-    tone: "neutral",
-    message: "Week is still in progress."
-  };
-}
-
-function getWeeksOverlappingMonth(monthKey) {
+function getDaysInMonth(monthKey) {
   const [year, month] = monthKey.split("-").map(Number);
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const seen = new Set();
-  const weeks = [];
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    const dateISO = new Date(year, month - 1, day).toISOString().slice(0, 10);
-    const weekKey = getWeekKey(dateISO);
-    if (!seen.has(weekKey)) {
-      seen.add(weekKey);
-      weeks.push(weekKey);
-    }
-  }
-  return weeks.sort();
+  return new Date(year, month, 0).getDate();
 }
 
-function getWeekAdjustmentPenalty(weekKey, category) {
-  const item = state.weeklyBudgetAdjustments[weekKey];
-  if (!item) return 0;
-  if (item.categoryPenalties && item.categoryPenalties[category] != null) {
-    return Number(item.categoryPenalties[category]) || 0;
-  }
-  if (category === "entertainment") return Number(item.entertainmentPenalty ?? item.legacy?.entertainmentPenalty) || 0;
-  if (category === "misc") return Number(item.miscPenalty ?? item.legacy?.miscPenalty) || 0;
-  return 0;
-}
-
-function getFilteredTransactions() {
-  const monthKey = state.ui.selectedMonth;
-  const filter = state.ui.txFilter || "month";
-  const weekKey = getWeekKey(getReferenceDateISO(monthKey));
-  const weekEnd = getWeekEnd(weekKey);
-  let list = state.transactions.filter((item) => item.dateISO.slice(0, 7) === monthKey);
-
-  if (filter === "week") {
-    list = list.filter((item) => item.dateISO >= weekKey && item.dateISO <= weekEnd);
-  }
-  if (filter === "essentials") {
-    list = list.filter((item) => getCategoryDisplayGroup(getCategoryById(item.category)) === "essentials");
-  }
-  if (filter === "discretionary") {
-    list = list.filter((item) => getCategoryDisplayGroup(getCategoryById(item.category)) === "discretionary");
-  }
-  if (filter === "all") {
-    list = state.transactions.slice();
-  }
-
-  return list.sort((a, b) => `${b.dateISO}-${b.id}`.localeCompare(`${a.dateISO}-${a.id}`));
-}
-
-function getEditingTransaction() {
-  return state.transactions.find((item) => item.id === state.ui.editingTransactionId) || null;
-}
-
-function saveTransaction(event) {
-  event.preventDefault();
-  const formData = new FormData(event.currentTarget);
-  const payload = Object.fromEntries(formData.entries());
-  const category = normalizeCategory(payload.category);
-  if (!category || !isCategoryAllowedForTransaction(category)) {
-    showToast("Invalid category.");
-    return;
-  }
-  const transaction = {
-    id: payload.id || uid("txn"),
-    dateISO: payload.dateISO,
-    amount: Number(payload.amount) || 0,
-    category,
-    note: String(payload.note || "").trim()
-  };
-  if (!transaction.dateISO || transaction.amount <= 0) {
-    showToast("Date and amount are required.");
-    return;
-  }
-
-  const index = state.transactions.findIndex((item) => item.id === transaction.id);
-  if (index >= 0) {
-    state.transactions[index] = transaction;
-  } else {
-    state.transactions.push(transaction);
-  }
-
-  state.ui.lastTransactionTemplate = {
-    amount: transaction.amount,
-    category: transaction.category,
-    note: transaction.note
-  };
-  state.ui.editingTransactionId = null;
-  modalRoot.innerHTML = "";
-  state.ui.activeTab = "monitor";
-  saveState();
-  showToast(index >= 0 ? "Transaction updated." : "Transaction added.");
-  render();
-}
-
-function deleteTransaction(id) {
-  state.transactions = state.transactions.filter((item) => item.id !== id);
-  if (state.ui.editingTransactionId === id) state.ui.editingTransactionId = null;
-  saveState();
-  showToast("Transaction deleted.");
-  render();
-}
-
-function categoryHasTransactions(categoryId) {
-  return state.transactions.some((item) => item.category === categoryId);
-}
-
-function cancelEditingTransaction() {
-  state.ui.editingTransactionId = null;
-  saveState();
-  render();
-}
-
-function closeWeek() {
-  const monthKey = state.ui.selectedMonth;
-  const weekKey = getWeekKey(getReferenceDateISO(monthKey));
-  if (state.weeklyClosures[weekKey]) {
-    showToast("This week has already been closed.");
-    return;
-  }
-
-  const nextWeekKey = shiftDateISO(weekKey, 7);
-  const categoryPenalties = {};
-  getCategories()
-    .filter(isWeeklyDisciplineCategory)
-    .filter(isPenaltyCategory)
-    .forEach((category) => {
-      const status = calculateWeekCategoryStatus(category.id, monthKey, weekKey);
-      if (status.penalty > 0) categoryPenalties[category.id] = status.penalty;
-    });
-  const totalPenalty = sum(Object.values(categoryPenalties));
-
-  state.weeklyBudgetAdjustments[nextWeekKey] = {
-    weekStartISO: nextWeekKey,
-    sourceWeekStartISO: weekKey,
-    categoryPenalties,
-    totalPenalty
-  };
-
-  state.weeklyClosures[weekKey] = {
-    weekStartISO: weekKey,
-    closedAtISO: new Date().toISOString(),
-    categoryPenalties,
-    totalPenalty
-  };
-
-  saveState();
-  showToast(`Week closed. Next week reduced by ${money(totalPenalty)}.`);
-  render();
-}
-
-function reopenWeek() {
-  const weekKey = getWeekKey(getReferenceDateISO(state.ui.selectedMonth));
-  const closure = state.weeklyClosures[weekKey];
-  if (!closure) {
-    showToast("No week close to reopen.");
-    return;
-  }
-  const ok = window.confirm("Reopen this week? This removes the week closure and the next-week budget adjustment created from it.");
-  if (!ok) return;
-  const nextWeekKey = shiftDateISO(weekKey, 7);
-  delete state.weeklyClosures[weekKey];
-  delete state.weeklyBudgetAdjustments[nextWeekKey];
-  saveState();
-  showToast("Week reopened.");
-  render();
-}
-
-function reviewLastWeek() {
-  state.ui.txFilter = "week";
-  showToast("Review last week's activity, then close when ready.");
-  saveState();
-  render();
-}
-
-function saveSettings(event) {
-  event.preventDefault();
-  const next = structuredClone(state);
-  const formData = new FormData(event.currentTarget);
-  for (const [path, rawValue] of formData.entries()) {
-    const value = path === "settings.reserve.projectionAnchorMonth"
-      ? normalizeMonthValue(rawValue) || currentMonthKey()
-      : rawValue === "" ? null : Number(rawValue);
-    setByPath(next, path, value);
-  }
-  state = normalizeState(next);
-  saveState();
-  showToast("Settings saved.");
-  render();
-}
-
-function saveCategoryEdits(event, categoryId) {
-  event.preventDefault();
-  const formData = new FormData(event.currentTarget);
-  const next = structuredClone(state);
-  const index = next.settings.monitorCategories.findIndex((item) => item.id === categoryId);
-  if (index < 0) return;
-  const current = next.settings.monitorCategories[index];
-  next.settings.monitorCategories[index] = {
-    ...current,
-    label: String(formData.get("label") || current.label).trim() || current.label,
-    icon: String(formData.get("icon") || current.icon).trim() || "•",
-    group: String(formData.get("group") || current.group),
-    monthlyBudget: Number(formData.get("monthlyBudget")) || 0,
-    ruleType: String(formData.get("ruleType") || current.ruleType),
-    softCapMultiplier: nullableNumber(formData.get("softCapMultiplier")),
-    penaltyMultiplier: nullableNumber(formData.get("penaltyMultiplier")),
-    minPenaltyUnit: nullableNumber(formData.get("minPenaltyUnit")),
-    priority: String(formData.get("priority") || current.priority),
-    displayOrder: Number(formData.get("displayOrder")) || current.displayOrder,
-    monitor: formData.has("monitor"),
-    allowTransactions: formData.has("allowTransactions"),
-    includeInVariableTotal: formData.has("includeInVariableTotal"),
-    includeInWeeklyDiscipline: formData.has("includeInWeeklyDiscipline"),
-    active: formData.has("active")
-  };
-  state = normalizeState(next);
-  saveState();
-  closeQuickAdd();
-  showToast("Category updated.");
-  render();
-}
-
-function archiveCategory(categoryId) {
-  const next = structuredClone(state);
-  const category = next.settings.monitorCategories.find((item) => item.id === categoryId);
-  if (!category) return;
-  category.active = false;
-  category.archived = true;
-  state = normalizeState(next);
-  saveState();
-  closeQuickAdd();
-  showToast("Category archived.");
-  render();
-}
-
-function deleteCategory(categoryId) {
-  if (categoryHasTransactions(categoryId)) {
-    showToast("This category has transactions and cannot be deleted.");
-    return;
-  }
-  if (!confirm("Delete this category permanently?")) return;
-  const next = structuredClone(state);
-  next.settings.monitorCategories = next.settings.monitorCategories.filter((item) => item.id !== categoryId);
-  state = normalizeState(next);
-  saveState();
-  closeQuickAdd();
-  showToast("Category deleted.");
-  render();
-}
-
-function restoreCategory(categoryId) {
-  const next = structuredClone(state);
-  const category = next.settings.monitorCategories.find((item) => item.id === categoryId);
-  if (!category) return;
-  category.active = true;
-  category.archived = false;
-  state = normalizeState(next);
-  saveState();
-  openManageBudgetCategories();
-}
-
-function saveBudgetCategoriesManager(event) {
-  event.preventDefault();
-  const next = structuredClone(state);
-  const formData = new FormData(event.currentTarget);
-  next.settings.monitorCategories.forEach((category) => {
-    const raw = formData.get(`order:${category.id}`);
-    if (raw != null) category.displayOrder = Number(raw) || category.displayOrder;
-  });
-  state = normalizeState(next);
-  saveState();
-  openManageBudgetCategories();
-  showToast("Category order saved.");
-}
-
-function addMonitorCategory(event) {
-  event.preventDefault();
-  const formData = new FormData(event.currentTarget);
-  const label = String(formData.get("label") || "").trim();
-  if (!label) return;
-  const next = structuredClone(state);
-  const id = uniqueCategoryId(label, next.settings.monitorCategories);
-  const rulePreset = String(formData.get("rulePreset") || "penalty");
-  next.settings.monitorCategories.push({
-    id,
-    label,
-    icon: String(formData.get("icon") || "•").trim() || "•",
-    group: String(formData.get("group") || "discretionary"),
-    monthlyBudget: Number(formData.get("monthlyBudget")) || 0,
-    monitor: formData.has("monitor"),
-    allowTransactions: formData.has("allowTransactions"),
-    includeInVariableTotal: true,
-    includeInWeeklyDiscipline: true,
-    ruleType: rulePreset,
-    softCapMultiplier: rulePreset === "softCap" ? Number(state.settings.weeklyRules.defaultSoftCapMultiplier) || 1.1 : null,
-    penaltyMultiplier: rulePreset === "penalty" ? Number(state.settings.weeklyRules.penaltyMultiplier) || 1.5 : null,
-    minPenaltyUnit: rulePreset === "penalty" ? Number(state.settings.weeklyRules.minPenaltyUnit) || 5 : null,
-    priority: String(formData.get("priority") || "secondary"),
-    displayOrder: next.settings.monitorCategories.length + 1,
-    active: true,
-    archived: false
-  });
-  state = normalizeState(next);
-  saveState();
-  openManageBudgetCategories();
-  showToast("Category added.");
-}
-
-function saveBackgroundItemEdits(event, sectionId, itemId) {
-  event.preventDefault();
-  const next = structuredClone(state);
-  const section = next.settings.backgroundSections.find((entry) => entry.id === sectionId);
-  const item = section?.items?.find((entry) => entry.id === itemId);
-  if (!section || !item) return;
-  const formData = new FormData(event.currentTarget);
-  item.label = String(formData.get("label") || item.label).trim() || item.label;
-  item.amount = Number(formData.get("amount")) || 0;
-  item.frequency = String(formData.get("frequency") || item.frequency);
-  item.type = String(formData.get("type") || item.type || section.type);
-  item.includeInGap = formData.has("includeInGap");
-  item.includeInProjection = formData.has("includeInProjection");
-  item.includeInSummary = formData.has("includeInSummary");
-  item.active = formData.has("active");
-  state = normalizeState(next);
-  saveState();
-  closeQuickAdd();
-  showToast("Background item updated.");
-  render();
-}
-
-function archiveBackgroundItem(sectionId, itemId) {
-  const next = structuredClone(state);
-  const item = next.settings.backgroundSections.find((entry) => entry.id === sectionId)?.items?.find((entry) => entry.id === itemId);
-  if (!item) return;
-  item.active = false;
-  item.archived = true;
-  state = normalizeState(next);
-  saveState();
-  closeQuickAdd();
-  showToast("Background item archived.");
-  render();
-}
-
-function saveBackgroundSectionsManager(event) {
-  event.preventDefault();
-  const next = structuredClone(state);
-  const formData = new FormData(event.currentTarget);
-  next.settings.backgroundSections.forEach((section) => {
-    const raw = formData.get(`section-order:${section.id}`);
-    const label = String(formData.get(`section-label:${section.id}`) || section.label).trim();
-    const type = String(formData.get(`section-type:${section.id}`) || section.type);
-    if (raw != null) section.displayOrder = Number(raw) || section.displayOrder;
-    section.label = label || section.label;
-    section.type = type || section.type;
-  });
-  state = normalizeState(next);
-  saveState();
-  openManageBackgroundSections();
-  showToast("Sections updated.");
-}
-
-function addBackgroundSection(event) {
-  event.preventDefault();
-  const formData = new FormData(event.currentTarget);
-  const label = String(formData.get("label") || "").trim();
-  if (!label) return;
-  const next = structuredClone(state);
-  next.settings.backgroundSections.push({
-    id: uniqueSectionId(label, next.settings.backgroundSections),
-    label,
-    type: String(formData.get("type") || "other"),
-    displayOrder: Number(formData.get("displayOrder")) || next.settings.backgroundSections.length + 1,
-    active: true,
-    archived: false,
-    items: []
-  });
-  state = normalizeState(next);
-  saveState();
-  openManageBackgroundSections();
-  showToast("Background section added.");
-}
-
-function addBackgroundItem(event) {
-  event.preventDefault();
-  const formData = new FormData(event.currentTarget);
-  const sectionId = String(formData.get("sectionId") || "");
-  const label = String(formData.get("label") || "").trim();
-  if (!sectionId || !label) return;
-  const next = structuredClone(state);
-  const section = next.settings.backgroundSections.find((entry) => entry.id === sectionId);
-  if (!section) return;
-  section.items.push({
-    id: uniqueBackgroundItemId(label, section.items),
-    label,
-    amount: Number(formData.get("amount")) || 0,
-    frequency: String(formData.get("frequency") || "monthly"),
-    type: String(formData.get("type") || section.type || "other"),
-    includeInGap: formData.has("includeInGap"),
-    includeInProjection: formData.has("includeInProjection"),
-    includeInSummary: formData.has("includeInSummary"),
-    active: formData.has("active"),
-    archived: false
-  });
-  state = normalizeState(next);
-  saveState();
-  openManageBackgroundSections();
-  showToast("Background item added.");
-}
-
-function renderBackgroundTypeOptions(selected = "other") {
-  const options = [
-    ["income", "Income"],
-    ["fixed", "Fixed"],
-    ["debt", "Debt"],
-    ["investment", "Investment"],
-    ["other", "Other"]
-  ];
-  return options
-    .map(([value, label]) => `<option value="${value}" ${selected === value ? "selected" : ""}>${label}</option>`)
-    .join("");
-}
-
-function archiveBackgroundSection(sectionId) {
-  const next = structuredClone(state);
-  const section = next.settings.backgroundSections.find((entry) => entry.id === sectionId);
-  if (!section) return;
-  section.active = false;
-  section.archived = true;
-  state = normalizeState(next);
-  saveState();
-  openManageBackgroundSections();
-}
-
-function restoreBackgroundSection(sectionId) {
-  const next = structuredClone(state);
-  const section = next.settings.backgroundSections.find((entry) => entry.id === sectionId);
-  if (!section) return;
-  section.active = true;
-  section.archived = false;
-  state = normalizeState(next);
-  saveState();
-  openManageBackgroundSections();
-}
-
-function saveReserveAccountEdits(event, accountId) {
-  event.preventDefault();
-  const next = structuredClone(state);
-  const account = next.settings.reserve.accounts.find((entry) => entry.id === accountId);
-  if (!account) return;
-  const formData = new FormData(event.currentTarget);
-  account.label = String(formData.get("label") || account.label).trim() || account.label;
-  account.balance = Number(formData.get("balance")) || 0;
-  account.displayOrder = Number(formData.get("displayOrder")) || account.displayOrder;
-  account.includeInRunway = formData.has("includeInRunway");
-  account.includeInVaultTotal = formData.has("includeInVaultTotal");
-  account.active = formData.has("active");
-  state = normalizeState(next);
-  saveState();
-  closeQuickAdd();
-  showToast("Reserve account updated.");
-  render();
-}
-
-function archiveReserveAccount(accountId) {
-  const next = structuredClone(state);
-  const account = next.settings.reserve.accounts.find((entry) => entry.id === accountId);
-  if (!account) return;
-  account.active = false;
-  account.archived = true;
-  state = normalizeState(next);
-  saveState();
-  closeQuickAdd();
-  showToast("Reserve account archived.");
-  render();
-}
-
-function restoreReserveAccount(accountId) {
-  const next = structuredClone(state);
-  const account = next.settings.reserve.accounts.find((entry) => entry.id === accountId);
-  if (!account) return;
-  account.active = true;
-  account.archived = false;
-  state = normalizeState(next);
-  saveState();
-  openManageReserveAccounts();
-}
-
-function saveReserveAccountsManager(event) {
-  event.preventDefault();
-  const next = structuredClone(state);
-  const formData = new FormData(event.currentTarget);
-  next.settings.reserve.accounts.forEach((account) => {
-    const raw = formData.get(`account-order:${account.id}`);
-    if (raw != null) account.displayOrder = Number(raw) || account.displayOrder;
-  });
-  state = normalizeState(next);
-  saveState();
-  openManageReserveAccounts();
-  showToast("Reserve account order saved.");
-}
-
-function addReserveAccount(event) {
-  event.preventDefault();
-  const formData = new FormData(event.currentTarget);
-  const label = String(formData.get("label") || "").trim();
-  if (!label) return;
-  const next = structuredClone(state);
-  next.settings.reserve.accounts.push({
-    id: uniqueReserveAccountId(label, next.settings.reserve.accounts),
-    label,
-    balance: Number(formData.get("balance")) || 0,
-    includeInRunway: formData.has("includeInRunway"),
-    includeInVaultTotal: formData.has("includeInVaultTotal"),
-    active: formData.has("active"),
-    archived: false,
-    displayOrder: next.settings.reserve.accounts.length + 1
-  });
-  state = normalizeState(next);
-  saveState();
-  openManageReserveAccounts();
-  showToast("Reserve account added.");
-}
-
-function saveProjectionEventEdits(event, eventId) {
-  event.preventDefault();
-  const next = structuredClone(state);
-  const item = next.settings.reserve.events.find((entry) => entry.id === eventId);
-  if (!item) return;
-  const formData = new FormData(event.currentTarget);
-  item.label = String(formData.get("label") || item.label).trim() || item.label;
-  item.type = String(formData.get("type") || item.type) === "oneTime" ? "oneTime" : "monthly";
-  item.amount = Number(formData.get("amount")) || 0;
-  item.startMonth = normalizeMonthValue(formData.get("startMonth")) || item.startMonth || state.ui.selectedMonth;
-  item.endMonth = normalizeMonthValue(formData.get("endMonth"));
-  item.month = normalizeMonthValue(formData.get("month"));
-  item.displayOrder = Number(formData.get("displayOrder")) || item.displayOrder;
-  item.affectsProjection = formData.has("affectsProjection");
-  item.active = formData.has("active");
-  state = normalizeState(next);
-  saveState();
-  closeQuickAdd();
-  showToast("Projection event updated.");
-  render();
-}
-
-function archiveProjectionEvent(eventId) {
-  const next = structuredClone(state);
-  const item = next.settings.reserve.events.find((entry) => entry.id === eventId);
-  if (!item) return;
-  item.active = false;
-  item.archived = true;
-  state = normalizeState(next);
-  saveState();
-  closeQuickAdd();
-  showToast("Projection event archived.");
-  render();
-}
-
-function restoreProjectionEvent(eventId) {
-  const next = structuredClone(state);
-  const item = next.settings.reserve.events.find((entry) => entry.id === eventId);
-  if (!item) return;
-  item.active = true;
-  item.archived = false;
-  state = normalizeState(next);
-  saveState();
-  openManageProjectionEvents();
-}
-
-function saveProjectionEventsManager(event) {
-  event.preventDefault();
-  const next = structuredClone(state);
-  const formData = new FormData(event.currentTarget);
-  next.settings.reserve.events.forEach((item) => {
-    const raw = formData.get(`event-order:${item.id}`);
-    if (raw != null) item.displayOrder = Number(raw) || item.displayOrder;
-  });
-  state = normalizeState(next);
-  saveState();
-  openManageProjectionEvents();
-  showToast("Projection event order saved.");
-}
-
-function addProjectionEvent(event) {
-  event.preventDefault();
-  const formData = new FormData(event.currentTarget);
-  const label = String(formData.get("label") || "").trim();
-  if (!label) return;
-  const next = structuredClone(state);
-  const type = String(formData.get("type") || "monthly") === "oneTime" ? "oneTime" : "monthly";
-  next.settings.reserve.events.push({
-    id: uniqueReserveEventId(label, next.settings.reserve.events),
-    label,
-    type,
-    amount: Number(formData.get("amount")) || 0,
-    startMonth: normalizeMonthValue(formData.get("startMonth")) || state.ui.selectedMonth,
-    endMonth: normalizeMonthValue(formData.get("endMonth")),
-    month: normalizeMonthValue(formData.get("month")),
-    active: formData.has("active"),
-    archived: false,
-    affectsProjection: formData.has("affectsProjection"),
-    displayOrder: next.settings.reserve.events.length + 1
-  });
-  state = normalizeState(next);
-  saveState();
-  openManageProjectionEvents();
-  showToast("Projection event added.");
-}
-
-function recalcReserveFromLedger() {
-  const ledgerTotal = calculateReserveFromLedger(state.settings.reserveSchedule);
-  const next = structuredClone(state);
-  const account = next.settings.reserve.accounts.find((entry) => entry.id === "cash-reserve") || next.settings.reserve.accounts[0];
-  if (account) account.balance = ledgerTotal;
-  next.settings.systemCore.reserveBalanceNow = ledgerTotal;
-  state = normalizeState(next);
-  saveState();
-  showToast("Reserve recalculated from ledger.");
-  render();
-}
-
-function exportJSON() {
-  state.monthReviews ||= {};
-  state.monthReviews[state.ui.selectedMonth] = {
-    ...(state.monthReviews[state.ui.selectedMonth] || {}),
-    backupDone: true,
-    backupDoneAtISO: new Date().toISOString()
-  };
-  saveState();
-  downloadText(`finance-cashflow-os-v11-${state.ui.selectedMonth}.json`, JSON.stringify(state, null, 2), "application/json");
-  showToast("JSON exported. Backup marked done.");
-  render();
-}
-
-function importJSON(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const parsed = JSON.parse(String(reader.result || "{}"));
-      const candidate = adaptImportedPayload(parsed.data || parsed);
-      state = normalizeState(deepMerge(state, candidate));
-      saveState();
-      showToast("JSON imported.");
-      render();
-    } catch {
-      showToast("Invalid JSON import.");
-    }
-  };
-  reader.readAsText(file);
-}
-
-function adaptImportedPayload(raw) {
-  if (!isObject(raw)) return {};
-  if (raw.schemaVersion === SCHEMA_VERSION || raw.appVersion === APP_VERSION) return raw;
-  if (raw.currentMonth || raw.yearPlanVersions || raw.poolEntries) return migrateFromBoxBudgetV3(raw);
-  if (raw.settings?.income || raw.settings?.coreIncome || raw.settings?.reserveIncome || raw.weeklyBudgetAdjustments) {
-    return migrateFromPlannerV2(raw);
-  }
-  return raw;
-}
-
-function resetData() {
-  if (!confirm("Reset local tracker data?")) return;
-  state = structuredClone(DEFAULT_STATE);
-  saveState();
-  showToast("Local data reset.");
-  render();
-}
-
-function calculateReserveFromLedger(schedule) {
-  return sum([
-    schedule?.preMay,
-    schedule?.may,
-    schedule?.june,
-    schedule?.july,
-    schedule?.august,
-    schedule?.september,
-    schedule?.october,
-    schedule?.november,
-    schedule?.december
-  ]);
-}
-
-function calculateTotals() {
-  const categories = getCategories().filter((item) => item.active && !item.archived);
-  return {
-    coreIncome: calculateSectionTotal("core-income"),
-    reserveIncome: calculateSectionTotal("reserve-income"),
-    investment: calculateInvestmentTotal(),
-    fixed: calculateTotalByType("fixed"),
-    debt: calculateTotalByType("debt"),
-    variableEssentials: sum(categories.filter((item) => isVariableTotalCategory(item) && getCategoryDisplayGroup(item) === "essentials").map((item) => Number(item.monthlyBudget) || 0)),
-    discretionary: sum(categories.filter((item) => isVariableTotalCategory(item) && getCategoryDisplayGroup(item) === "discretionary").map((item) => Number(item.monthlyBudget) || 0)),
-    customVariable: sum(categories.filter((item) => isVariableTotalCategory(item) && getCategoryDisplayGroup(item) === "custom").map((item) => Number(item.monthlyBudget) || 0)),
-    variableTotal: sum(categories.filter(isVariableTotalCategory).map((item) => Number(item.monthlyBudget) || 0)),
-    reserveLedger: calculateReserveFromLedger(state.settings.reserveSchedule),
-    reserveAccountsTotal: calculateReserveVaultTotal(),
-    fixedDebtTotal: calculateFixedDebtTotal(),
-    incomeTotal: calculateIncomeTotal()
-  };
-}
-
-function deepMerge(base, extra) {
-  if (Array.isArray(base) || Array.isArray(extra)) {
-    return structuredClone(extra ?? base);
-  }
-  if (!isObject(base) || !isObject(extra)) {
-    return extra === undefined ? structuredClone(base) : structuredClone(extra);
-  }
-  const result = structuredClone(base);
-  Object.entries(extra).forEach(([key, value]) => {
-    if (Array.isArray(value)) {
-      result[key] = structuredClone(value);
-    } else if (isObject(value) && isObject(result[key])) {
-      result[key] = deepMerge(result[key], value);
-    } else {
-      result[key] = structuredClone(value);
-    }
-  });
-  return result;
-}
-
-function setByPath(target, path, value) {
-  const parts = path.split(".");
-  let ref = target;
-  while (parts.length > 1) {
-    const key = parts.shift();
-    ref[key] ||= {};
-    ref = ref[key];
-  }
-  ref[parts[0]] = value;
-}
-
-function findAmount(items, aliases, fallback) {
-  if (!Array.isArray(items)) return fallback;
-  const match = items.find((item) => aliases.some((alias) => item?.id === alias || String(item?.name || "").includes(alias)));
-  return Number(match?.amount ?? match?.monthlyPayment) || fallback;
-}
-
-function pickReserveSchedule(ledger) {
-  if (!ledger || !isObject(ledger)) return {};
-  return {
-    preMay: ledger.preMay ?? 2700,
-    may: ledger.may ?? 1531,
-    june: ledger.june ?? null,
-    july: ledger.july ?? null,
-    august: ledger.august ?? null,
-    september: ledger.september ?? null,
-    october: ledger.october ?? null,
-    november: ledger.november ?? null,
-    december: ledger.december ?? null
-  };
-}
-
-function deriveReserveFromBoxBudget(raw) {
-  const poolEntries = Array.isArray(raw?.poolEntries) ? raw.poolEntries : [];
-  const net = poolEntries.reduce((acc, entry) => {
-    const amount = Number(entry?.amount) || 0;
-    const type = String(entry?.type || "").toLowerCase();
-    return acc + (type === "spend" ? -amount : amount);
-  }, 4231);
-  return Math.round(net);
-}
-
-function isObject(value) {
-  return value && typeof value === "object" && !Array.isArray(value);
-}
-
-function currentMonthKey() {
-  return currentDateISO().slice(0, 7);
+function defaultDateForMonth(monthKey) {
+  const today = currentDateISO();
+  return today.slice(0, 7) === monthKey ? today : `${monthKey}-01`;
 }
 
 function currentDateISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function defaultDateForMonth(monthKey) {
-  return monthKey === currentMonthKey() ? currentDateISO() : `${monthKey}-01`;
+function currentMonthKey() {
+  return currentDateISO().slice(0, 7);
 }
 
 function normalizeMonthValue(value) {
-  const text = String(value || "").trim();
-  return /^\d{4}-\d{2}$/.test(text) ? text : null;
+  return /^\d{4}-\d{2}$/.test(String(value || "")) ? String(value) : "";
 }
 
-function firstOfNextMonth(dateISO) {
-  const [year, month] = dateISO.slice(0, 7).split("-").map(Number);
-  const next = month === 12 ? [year + 1, 1] : [year, month + 1];
-  return `${next[0]}-${String(next[1]).padStart(2, "0")}-01`;
-}
-
-function monthDiffExclusive(startDateISO, targetDateISO) {
-  const startMonth = startDateISO.slice(0, 7);
-  const targetMonth = targetDateISO.slice(0, 7);
-  const [startYear, startMonthNumber] = startMonth.split("-").map(Number);
-  const [targetYear, targetMonthNumber] = targetMonth.split("-").map(Number);
-  const diff = (targetYear - startYear) * 12 + (targetMonthNumber - startMonthNumber);
-  return Math.max(0, diff);
-}
-
-function countProjectionSteps(startDateISO, targetDateISO) {
-  let steps = 0;
-  let cursor = firstOfNextMonth(startDateISO);
-  while (cursor < targetDateISO) {
-    steps += 1;
-    cursor = firstOfNextMonth(cursor);
-  }
-  return steps;
+function normalizeDateValue(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "")) ? String(value) : "";
 }
 
 function shiftDateISO(dateISO, days) {
@@ -4214,28 +2622,40 @@ function shiftDateISO(dateISO, days) {
   return date.toISOString().slice(0, 10);
 }
 
-function clampPercent(value) {
-  return Math.max(0, Math.min(100, Number(value) || 0));
+function sortTransactionsDesc(a, b) {
+  return `${b.dateISO}-${b.id}`.localeCompare(`${a.dateISO}-${a.id}`);
 }
 
-function showToast(message) {
-  clearTimeout(toastTimer);
-  document.querySelectorAll(".toast").forEach((node) => node.remove());
-  const template = document.querySelector("#toastTemplate");
-  const node = template.content.firstElementChild.cloneNode(true);
-  node.textContent = message;
-  document.body.appendChild(node);
-  toastTimer = setTimeout(() => node.remove(), 2200);
+function byDisplayOrder(a, b) {
+  return (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0) || String(a.label || a.name || a.id).localeCompare(String(b.label || b.name || b.id));
 }
 
-function downloadText(filename, text, type) {
-  const blob = new Blob([text], { type });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
+function monthlyEquivalent(item) {
+  if (item.frequency === "annual") return (Number(item.amount) || 0) / 12;
+  if (item.frequency === "oneTime") return 0;
+  return Number(item.amount) || 0;
+}
+
+function sum(values) {
+  return values.reduce((total, value) => total + (Number(value) || 0), 0);
+}
+
+function number(value) {
+  return Number(value) || 0;
+}
+
+function bool(value) {
+  if (typeof value === "boolean") return value;
+  const text = String(value || "").toLowerCase();
+  return ["true", "1", "yes", "y"].includes(text);
+}
+
+function safeJson(value) {
+  try {
+    return JSON.parse(String(value || "{}"));
+  } catch {
+    return {};
+  }
 }
 
 function money(value) {
@@ -4245,33 +2665,26 @@ function money(value) {
   return amount < 0 ? `-$${formatted}` : `$${formatted}`;
 }
 
-function percent(value) {
-  return `${Number(value || 0).toFixed(1)}%`;
-}
-
 function formatDate(dateISO) {
-  return new Date(`${dateISO}T00:00:00`).toLocaleDateString("en-CA", {
-    month: "short",
-    day: "numeric"
-  });
+  return new Date(`${dateISO}T00:00:00`).toLocaleDateString("en-CA", { month: "short", day: "numeric" });
 }
 
 function formatMonthLabel(monthKey) {
-  return new Date(`${monthKey}-01T00:00:00`).toLocaleDateString("en-CA", {
-    month: "short",
-    year: "numeric"
-  });
+  return new Date(`${monthKey}-01T00:00:00`).toLocaleDateString("en-CA", { month: "short", year: "numeric" });
 }
 
-function formatProjectionLabel(dateISO) {
-  return new Date(`${dateISO}T00:00:00`).toLocaleDateString("en-CA", {
-    month: "short",
-    year: "numeric"
-  });
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  }[char]));
 }
 
 function startCase(value) {
-  return String(value)
+  return String(value || "")
     .replace(/([A-Z])/g, " $1")
     .replace(/[_-]+/g, " ")
     .replace(/^\w/, (letter) => letter.toUpperCase())
@@ -4279,72 +2692,55 @@ function startCase(value) {
 }
 
 function slugify(value) {
-  return String(value ?? "")
-    .trim()
+  return String(value || "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/^-|-$/g, "") || "item";
 }
 
-function camelCaseFromSlug(value) {
-  return String(value || "")
-    .split("-")
-    .filter(Boolean)
-    .map((part, index) => (index === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)))
-    .join("");
-}
-
-function uniqueCategoryId(label, existing) {
-  return uniqueSlug(label, existing.map((item) => item.id));
-}
-
-function uniqueSectionId(label, existing) {
-  return uniqueSlug(label, existing.map((item) => item.id));
-}
-
-function uniqueBackgroundItemId(label, existing) {
-  return uniqueSlug(label, existing.map((item) => item.id));
-}
-
-function uniqueReserveAccountId(label, existing) {
-  return uniqueSlug(label, existing.map((item) => item.id));
-}
-
-function uniqueReserveEventId(label, existing) {
-  return uniqueSlug(label, existing.map((item) => item.id));
-}
-
-function uniqueSlug(label, usedIds) {
-  const base = slugify(label) || "item";
-  let candidate = base;
+function uniqueId(base, existing) {
+  let id = base || "item";
   let index = 2;
-  const used = new Set(usedIds);
-  while (used.has(candidate)) {
-    candidate = `${base}-${index}`;
+  while (existing.includes(id)) {
+    id = `${base}-${index}`;
     index += 1;
   }
-  return candidate;
-}
-
-function nullableNumber(value) {
-  if (value == null || value === "") return null;
-  const num = Number(value);
-  return Number.isFinite(num) ? num : null;
-}
-
-function sum(values) {
-  return values.reduce((acc, value) => acc + (Number(value) || 0), 0);
+  return id;
 }
 
 function uid(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+function isObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value);
+}
+
+function clampPercent(value) {
+  return Math.max(0, Math.min(100, Number(value) || 0));
+}
+
+function downloadText(filename, text, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function showToast(message) {
+  clearTimeout(toastTimer);
+  const template = document.querySelector("#toastTemplate");
+  const toast = template.content.firstElementChild.cloneNode(true);
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("is-visible"));
+  toastTimer = setTimeout(() => {
+    toast.classList.remove("is-visible");
+    setTimeout(() => toast.remove(), 200);
+  }, 2200);
 }

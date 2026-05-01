@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-04-30 · V3.1.1 UX Polish
+
+- Suppressed empty Monitor $0 / $0 status, Weekly Close, and Month Outlook when no monitor categories exist; the header now shows Setup.
+- Kept Weekly Close compact in every state unless Details is opened manually.
+- Changed Planning into cleaner entry tiles with only a lightweight Month Setup reminder when incomplete.
+- Moved Add Category and Add Vault into dedicated sheets, added Quick Add return flow, and clarified pinned vault expectations.
+- Added CSV import preview, sample CSV download, folded About details, lighter card shadows, and updated service worker cache to `finance-tracker-cache-v3-1-1`.
+
+## 2026-04-30 · V3.1 Planning Sheets + CSV Backup + Compact Weekly Close
+
+- Changed Planning from long accordion sections into status tiles that open dedicated setup sheets for Budget, Reserve, Background, Month Setup, and Data Center.
+- Replaced the large Weekly Close card with a compact workflow strip and expandable penalty details.
+- Made CSV the primary backup format with full-state CSV export/import and automatic Month Setup backup completion after export.
+- Clarified Add Category presets, Reserve Vault setup, unpinned vault empty states, and Month Setup checklist semantics.
+- Removed main JSON backup controls, compatibility wording, and header version/eyebrow DOM; updated service worker cache to `finance-tracker-cache-v3-1`.
+
+## 2026-04-30 · V3.0.0 Empty-State Vault Finance OS
+
+- Promoted the tracker to a clean formal V3 app with the new `financeTracker_v3` storage key and no legacy migration or demo defaults.
+- Replaced reserve runway/projection logic with user-defined Reserve Vaults, including vault notes, targets, pinned Monitor previews, and vault management.
+- Rebuilt fresh empty states for Monitor, Planning, Quick Add, categories, vaults, background data, and activity.
+- Converted Month Setup into a four-step checklist ritual and kept Planning Summary as 2x2 status navigation.
+- Added mobile zoom locking, updated the visible app version, and updated the service worker cache to `finance-tracker-cache-v3-0-0`.
+
 ## 2026-04-29 · v13.3 Workflow Simplification + Review Rituals
 
 - Reworked Weekly Impact into a scoped weekly close workflow with in-progress, ready, closed, reopen, and last-week reminder states.
