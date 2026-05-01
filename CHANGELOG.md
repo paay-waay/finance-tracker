@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-05-01 · V3.2.0 Envelope Budget Setup
+
+- Rebuilt the user-facing budget model around income sources, budget groups, subcategories, and transactions recorded against subcategories.
+- Added a guided Monthly Setup sheet with Income, Groups, Subcategories, Allocation Check, and Finish steps.
+- Added allocation status: Balanced, Unallocated, and Overallocated, with setup completion allowed only when income equals allocated budget.
+- Reworked Monitor into envelope group cards with weekly/monthly totals, month remaining, and subcategory progress bars.
+- Updated CSV import/export for `income_source`, `budget_group`, `subcategory`, and `transaction` records; migrated existing V3.1.1 data into the new envelope model where possible.
+- Removed weekly close / penalty UI from the main experience and updated service worker cache to `finance-tracker-cache-v3-2-0`.
+
 ## 2026-04-30 · V3.1.1 UX Polish
 
 - Suppressed empty Monitor $0 / $0 status, Weekly Close, and Month Outlook when no monitor categories exist; the header now shows Setup.
