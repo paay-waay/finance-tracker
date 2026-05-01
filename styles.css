@@ -758,6 +758,129 @@ button:disabled {
   font-weight: 850;
 }
 
+.monthly-plan-sheet {
+  display: grid;
+  gap: 14px;
+}
+
+.plan-block {
+  background: rgba(255, 253, 248, 0.88);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.plan-block-head {
+  align-items: start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.plan-block-head h3 {
+  font-size: 17px;
+  margin: 0 0 5px;
+}
+
+.type-pill {
+  background: var(--slate-soft);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 5px 8px;
+}
+
+.block-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  max-width: 190px;
+}
+
+.plan-table {
+  border: 1px solid rgba(122, 111, 95, 0.14);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.plan-row {
+  align-items: center;
+  background: rgba(250, 246, 239, 0.58);
+  border-bottom: 1px solid rgba(122, 111, 95, 0.12);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(62px, 0.7fr) minmax(62px, 0.7fr) 34px;
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+.plan-row:last-child {
+  border-bottom: 0;
+}
+
+.plan-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-header,
+.plan-total {
+  background: rgba(238, 232, 220, 0.78);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.plan-total {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.plan-empty {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.add-row-form {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 112px auto;
+}
+
+.add-row-form input {
+  background: rgba(255, 253, 248, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font: inherit;
+  min-height: 42px;
+  min-width: 0;
+  padding: 0 10px;
+}
+
+@media (max-width: 430px) {
+  .plan-block-head {
+    display: grid;
+  }
+
+  .block-menu {
+    justify-content: flex-start;
+    max-width: none;
+  }
+
+  .add-row-form {
+    grid-template-columns: 1fr;
+  }
+}
+
 .planning-card-actions {
   align-items: center;
   display: flex;

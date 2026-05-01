@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-05-01 · V3.3.0 Monthly Plan Sheet
+
+- Replaced the guided setup wizard with a single compact Monthly Plan Sheet made of Blocks and Rows.
+- Added the Debt block type and updated the allocation equation to include Spend, Debt, Save, and Investment against Income.
+- Simplified row creation to item name plus plan amount, with Actual calculated from transactions where applicable.
+- Changed Quick Add to show only rows inside Spend blocks, keeping Debt, Save, Investment, and Income out of daily spending entry.
+- Kept the under-$10 Add to Savings helper, now allocating small gaps into a Save block row named Rounding Buffer, and updated service worker cache to `finance-tracker-cache-v3-3-0`.
+
 ## 2026-05-01 · V3.2.1 Free-form Monthly Allocation Planner
 
 - Reworked the planning model into free-form monthly projects/envelopes with `income`, `spend`, `save`, and `investment` project types.

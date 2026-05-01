@@ -1,9 +1,8 @@
-const APP_VERSION = "V3.2.1 Free-form Monthly Allocation Planner";
-const SCHEMA_VERSION = 5;
+const APP_VERSION = "V3.3.0 Monthly Plan Sheet";
+const SCHEMA_VERSION = 6;
 const STORAGE_KEY = "financeTracker_v3";
 
-const PROJECT_TYPES = ["income", "spend", "save", "investment"];
-const SETUP_STEPS = ["projects", "items", "check"];
+const PROJECT_TYPES = ["income", "spend", "debt", "save", "investment"];
 
 const DEFAULT_STATE = {
   appVersion: APP_VERSION,
@@ -14,7 +13,6 @@ const DEFAULT_STATE = {
     monitorScope: "week",
     txFilter: "month",
     editingTransactionId: null,
-    setupStep: "projects",
     setupComplete: false,
     expandedProjects: {},
     lastTransactionTemplate: null
@@ -99,7 +97,6 @@ function normalizeProjectState(input) {
   next.ui.selectedMonth = normalizeMonthValue(next.ui.selectedMonth) || currentMonthKey();
   next.ui.monitorScope = next.ui.monitorScope === "month" ? "month" : "week";
   next.ui.txFilter = ["week", "month", "all"].includes(next.ui.txFilter) ? next.ui.txFilter : next.ui.monitorScope;
-  next.ui.setupStep = SETUP_STEPS.includes(next.ui.setupStep) ? next.ui.setupStep : "projects";
   next.ui.setupComplete = Boolean(next.ui.setupComplete);
   next.ui.expandedProjects = isObject(input.ui?.expandedProjects || input.ui?.expandedGroups) ? (input.ui.expandedProjects || input.ui.expandedGroups) : {};
   next.ui.lastTransactionTemplate = normalizeTemplate(input.ui?.lastTransactionTemplate);
@@ -197,7 +194,7 @@ function normalizeProject(raw) {
   return {
     id: id || uid("project"),
     label: label || startCase(id),
-    type: PROJECT_TYPES.includes(raw.type) ? raw.type : "spend",
+    type: normalizeProjectType(raw.type) || "spend",
     displayOrder: Number(raw.displayOrder) || 1,
     active: raw.active !== false,
     archived: Boolean(raw.archived),
@@ -325,15 +322,15 @@ function renderPlanningPage() {
   const allocation = calculateAllocation();
   return `
     <section class="page planning-page">
-      <article class="planning-card monthly-setup-card ${allocation.status}">
+      <article class="planning-card monthly-setup-card ${allocation.isReady ? "balanced" : allocation.status}">
         <div class="planning-accordion-head">
-          <div><p class="section-kicker">Monthly allocation</p><h2>Monthly Allocation Setup</h2></div>
+          <div><p class="section-kicker">Monthly plan</p><h2>Monthly Allocation Setup</h2></div>
           <span class="header-status-pill ${allocation.isReady ? "safe" : allocation.status === "overallocated" ? "freeze" : "neutral"}">${escapeHtml(allocation.displayLabel)}</span>
         </div>
         ${renderAllocationMetrics(allocation)}
         ${renderAlmostBalancedHelper(allocation)}
         <p class="settings-note">${escapeHtml(allocation.message)}</p>
-        <button class="action-button" type="button" data-open-setup="${allocation.nextStep}">${allocation.isReady ? "Edit Setup" : "Continue Setup"}</button>
+        <button class="action-button" type="button" data-open-setup>${allocation.isReady ? "Edit Plan" : "Continue Setup"}</button>
       </article>
       <article class="planning-card is-weak data-center-card">
         <div class="planning-accordion-head">
@@ -348,13 +345,13 @@ function renderPlanningPage() {
 
 function renderAllocationStatusCard(allocation) {
   return `
-    <section class="setup-status-card ${allocation.status}">
+    <section class="setup-status-card ${allocation.isReady ? "balanced" : allocation.status}">
       <div>
         <p class="section-kicker">Setup status</p>
         <h2>${escapeHtml(allocation.displayLabel)}</h2>
         <span>${escapeHtml(allocation.message)}</span>
       </div>
-      <button class="action-button" type="button" data-open-setup="${allocation.nextStep}">${allocation.isReady ? "Edit Setup" : "Continue Setup"}</button>
+      <button class="action-button" type="button" data-open-setup>${allocation.isReady ? "Edit Plan" : "Continue Setup"}</button>
     </section>
   `;
 }
@@ -364,10 +361,11 @@ function renderAllocationMetrics(allocation) {
     <div class="setup-metrics allocation-metrics">
       <div><span>Total Income</span><strong>${money(allocation.income)}</strong></div>
       <div><span>Total Spend</span><strong>${money(allocation.spend)}</strong></div>
+      <div><span>Total Debt</span><strong>${money(allocation.debt)}</strong></div>
       <div><span>Total Save</span><strong>${money(allocation.save)}</strong></div>
       <div><span>Total Investment</span><strong>${money(allocation.investment)}</strong></div>
       <div><span>Total Allocation</span><strong>${money(allocation.allocation)}</strong></div>
-      <div><span>Difference</span><strong>${money(allocation.difference)}</strong></div>
+      <div><span>Gap</span><strong>${money(allocation.difference)}</strong></div>
     </div>
   `;
 }
@@ -398,8 +396,8 @@ function renderMonitorEmpty() {
   return `
     <section class="empty-state hero-empty">
       <strong>No dashboard items yet.</strong>
-      <span>Create projects and sub-items, then choose which sub-items appear on the dashboard.</span>
-      <button class="action-button" type="button" data-open-setup="projects">Open Monthly Setup</button>
+      <span>Create blocks and rows in your monthly plan.</span>
+      <button class="action-button" type="button" data-open-setup>Open Monthly Plan</button>
     </section>
   `;
 }
@@ -414,7 +412,7 @@ function renderProjectCard(project) {
         <span><strong>${escapeHtml(project.label)}</strong><em>${escapeHtml(startCase(project.type))}</em></span>
         <b>${money(stats.spent)} / ${money(stats.budget)}</b>
       </button>
-      <div class="group-meta"><span>Remaining ${money(stats.remaining)}</span><span>${items.length} items</span></div>
+      <div class="group-meta"><span>Remaining ${money(stats.remaining)}</span><span>${items.length} rows</span></div>
       ${expanded ? `<div class="subcategory-list">${items.map((item) => renderSubItemProgress(project, item)).join("")}</div>` : ""}
     </article>
   `;
@@ -464,9 +462,9 @@ function renderQuickAddSheet() {
   if (!items.length && !editing) {
     return renderSheet("Quick Add", `
       <div class="empty-state">
-        <strong>Create a recordable sub-item first.</strong>
-        <span>Transactions are recorded against sub-items.</span>
-        <button class="action-button" type="button" data-open-setup="items">Open Setup</button>
+        <strong>Create a Spend row first.</strong>
+        <span>Quick Add only records against rows inside Spend blocks.</span>
+        <button class="action-button" type="button" data-open-setup>Open Monthly Plan</button>
       </div>
     `, "Entry");
   }
@@ -485,78 +483,76 @@ function renderQuickAddSheet() {
   `, "Entry");
 }
 
-function openSetupSheet(step = state.ui.setupStep) {
-  state.ui.setupStep = SETUP_STEPS.includes(step) ? step : "projects";
+function openSetupSheet() {
   modalRoot.innerHTML = renderSetupSheet();
   bindSheetEvents();
 }
 
 function renderSetupSheet() {
-  const step = state.ui.setupStep;
   const allocation = calculateAllocation();
-  return renderSheet("Monthly Setup", `
-    <div class="setup-stepper">${SETUP_STEPS.map((item, index) => `<button class="${item === step ? "is-active" : ""}" type="button" data-setup-step="${item}">${index + 1}</button>`).join("")}</div>
-    ${step === "projects" ? renderProjectsStep() : ""}
-    ${step === "items" ? renderItemsStep() : ""}
-    ${step === "check" ? renderCheckStep(allocation) : ""}
+  return renderSheet("Monthly Plan Sheet", `
+    ${renderAllocationMetrics(allocation)}
+    ${renderAlmostBalancedHelper(allocation)}
+    <div class="notice-strip ${allocation.isReady ? "success" : allocation.status === "overallocated" ? "danger" : "warning"}">${escapeHtml(allocation.message)}</div>
+    ${renderMonthlyPlanSheet()}
+    <form id="projectForm" class="quick-form inline-form">
+      <div class="section-head"><h3>Add Block</h3><span class="tiny-label">Required type</span></div>
+      <label class="field"><span>Block Name</span><input name="label" required /></label>
+      <label class="field"><span>Type</span><select name="type">${PROJECT_TYPES.map((type) => `<option value="${type}">${escapeHtml(blockTypeLabel(type))}</option>`).join("")}</select></label>
+      <button class="action-button" type="submit">Add Block</button>
+    </form>
     <div class="button-row">
-      ${step !== "projects" ? `<button class="ghost-button" type="button" data-prev-step>Back</button>` : ""}
-      ${step !== "check" ? `<button class="action-button" type="button" data-next-step>Next</button>` : ""}
-      ${step === "check" ? `<button class="action-button" type="button" data-finish-setup ${allocation.isReady ? "" : "disabled"}>Finish Setup</button>` : ""}
+      <button class="action-button" type="button" data-finish-setup ${allocation.isReady ? "" : "disabled"}>Finish Setup</button>
     </div>
-  `, "Allocation");
+  `, "Plan");
 }
 
-function renderProjectsStep() {
+function renderMonthlyPlanSheet() {
   return `
-    <section class="setup-step">
-      <h3>Step 1 · Projects</h3>
-      <div class="manager-list">${state.settings.projects.length ? state.settings.projects.map((project) => `
-        <div class="manager-row">
-          <div><strong>${escapeHtml(project.label)}</strong><div class="settings-note">${escapeHtml(startCase(project.type))} · ${project.subItems.length} items</div></div>
+    <section class="monthly-plan-sheet">
+      ${state.settings.projects.length ? state.settings.projects.map(renderPlanBlock).join("") : `<div class="empty-state">No blocks yet. Add Income, Spend, Debt, Save, or Investment blocks.</div>`}
+    </section>
+  `;
+}
+
+function renderPlanBlock(project) {
+  const stats = calculateProjectStats(project.id);
+  return `
+    <article class="plan-block">
+      <div class="plan-block-head">
+        <div><h3>${escapeHtml(project.label)}</h3><span class="type-pill">${escapeHtml(blockTypeLabel(project.type))}</span></div>
+        <div class="block-menu">
+          <button class="mini-button" type="button" data-rename-block="${project.id}">Rename</button>
+          <button class="mini-button" type="button" data-change-block-type="${project.id}">Change Type</button>
+          <button class="mini-button" type="button" data-move-block="${project.id}" data-direction="-1">↑</button>
+          <button class="mini-button" type="button" data-move-block="${project.id}" data-direction="1">↓</button>
           <button class="mini-button danger-text" type="button" data-delete-project="${project.id}">Delete</button>
-        </div>`).join("") : `<div class="empty-state">No projects yet.</div>`}</div>
-      <form id="projectForm" class="quick-form inline-form">
-        <label class="field"><span>Project Name</span><input name="label" required /></label>
-        <label class="field"><span>Type</span><select name="type">${PROJECT_TYPES.map((type) => `<option value="${type}">${escapeHtml(startCase(type))}</option>`).join("")}</select></label>
-        <button class="action-button" type="submit">Add Project</button>
+        </div>
+      </div>
+      <div class="plan-table">
+        <div class="plan-row plan-header"><span>Item</span><span>Plan</span><span>Actual</span><span></span></div>
+        ${project.subItems.length ? project.subItems.map((item) => renderPlanRow(project, item)).join("") : `<div class="plan-row plan-empty"><span>No rows yet.</span><span></span><span></span><span></span></div>`}
+        <div class="plan-row plan-total"><span>Total</span><span>${money(stats.budget)}</span><span>${money(stats.spent)}</span><span></span></div>
+      </div>
+      <form class="add-row-form" data-add-row-form="${project.id}">
+        <input name="label" placeholder="Item name" required />
+        <input name="monthlyAmount" type="number" step="0.01" placeholder="Plan amount" required />
+        <button class="mini-button" type="submit">+ Add Row</button>
       </form>
-    </section>
+    </article>
   `;
 }
 
-function renderItemsStep() {
+function renderPlanRow(project, item) {
+  const stats = calculateSubItemStats(item.id);
+  const actual = project.type === "income" ? 0 : stats.monthSpent;
   return `
-    <section class="setup-step">
-      <h3>Step 2 · Sub-items</h3>
-      ${state.settings.projects.length ? state.settings.projects.map((project) => `
-        <div class="readonly-card">
-          <div class="section-head"><h3>${escapeHtml(project.label)}</h3><span class="tiny-label">${escapeHtml(startCase(project.type))}</span></div>
-          <div class="manager-list" style="margin-top:10px;">${project.subItems.length ? project.subItems.map((item) => `
-            <div class="manager-row">
-              <div><strong>${escapeHtml(item.label)}</strong><div class="settings-note">${money(item.monthlyAmount)} · ${item.recordable ? "Recordable" : "Plan only"} · ${item.showOnDashboard ? "Dashboard" : "Hidden"}</div></div>
-              <button class="mini-button danger-text" type="button" data-delete-item="${item.id}">Delete</button>
-            </div>`).join("") : `<div class="empty-state">No sub-items in this project.</div>`}</div>
-        </div>`).join("") : `<div class="empty-state">Create a project before adding sub-items.</div>`}
-      <form id="subItemForm" class="quick-form inline-form">
-        <label class="field"><span>Name</span><input name="label" required /></label>
-        <label class="field"><span>Parent Project</span><select name="parentProjectId">${state.settings.projects.map((project) => `<option value="${project.id}">${escapeHtml(project.label)}</option>`).join("")}</select></label>
-        <label class="field"><span>Monthly Amount</span><input name="monthlyAmount" type="number" step="0.01" value="0" /></label>
-        <div class="boolean-grid">${renderCheckbox("recordable", "Recordable", false)}${renderCheckbox("showOnDashboard", "Show on Dashboard", true)}</div>
-        <button class="action-button" type="submit">Add Sub-item</button>
-      </form>
-    </section>
-  `;
-}
-
-function renderCheckStep(allocation) {
-  return `
-    <section class="setup-step">
-      <h3>Step 3 · Allocation Check</h3>
-      ${renderAllocationMetrics(allocation)}
-      ${renderAlmostBalancedHelper(allocation)}
-      <div class="notice-strip ${allocation.status === "balanced" ? "success" : allocation.status === "overallocated" ? "danger" : "warning"}">${escapeHtml(allocation.message)}</div>
-    </section>
+    <div class="plan-row">
+      <span>${escapeHtml(item.label)}</span>
+      <span>${money(item.monthlyAmount)}</span>
+      <span>${money(actual)}</span>
+      <button class="mini-button danger-text" type="button" data-delete-item="${item.id}">×</button>
+    </div>
   `;
 }
 
@@ -597,18 +593,14 @@ function bindSheetEvents() {
   modalRoot.querySelector(".sheet-backdrop")?.addEventListener("click", (event) => {
     if (event.target.classList.contains("sheet-backdrop")) closeSheet();
   });
-  modalRoot.querySelectorAll("[data-setup-step]").forEach((button) => button.addEventListener("click", () => {
-    state.ui.setupStep = button.dataset.setupStep;
-    saveState();
-    openSetupSheet(state.ui.setupStep);
-  }));
-  modalRoot.querySelector("[data-next-step]")?.addEventListener("click", () => moveSetupStep(1));
-  modalRoot.querySelector("[data-prev-step]")?.addEventListener("click", () => moveSetupStep(-1));
   modalRoot.querySelector("[data-finish-setup]")?.addEventListener("click", finishSetup);
   modalRoot.querySelector("#projectForm")?.addEventListener("submit", addProject);
-  modalRoot.querySelector("#subItemForm")?.addEventListener("submit", addSubItem);
+  modalRoot.querySelectorAll("[data-add-row-form]").forEach((form) => form.addEventListener("submit", addSubItem));
   modalRoot.querySelectorAll("[data-delete-project]").forEach((button) => button.addEventListener("click", () => deleteProject(button.dataset.deleteProject)));
   modalRoot.querySelectorAll("[data-delete-item]").forEach((button) => button.addEventListener("click", () => deleteSubItem(button.dataset.deleteItem)));
+  modalRoot.querySelectorAll("[data-rename-block]").forEach((button) => button.addEventListener("click", () => renameBlock(button.dataset.renameBlock)));
+  modalRoot.querySelectorAll("[data-change-block-type]").forEach((button) => button.addEventListener("click", () => changeBlockType(button.dataset.changeBlockType)));
+  modalRoot.querySelectorAll("[data-move-block]").forEach((button) => button.addEventListener("click", () => moveBlock(button.dataset.moveBlock, Number(button.dataset.direction))));
   modalRoot.querySelector("#transactionForm")?.addEventListener("submit", saveTransaction);
   modalRoot.querySelectorAll("[data-item-chip]").forEach((button) => button.addEventListener("click", () => {
     modalRoot.querySelector("input[name='subItemId']").value = button.dataset.itemChip;
@@ -643,13 +635,6 @@ function closeSheet() {
   render();
 }
 
-function moveSetupStep(delta) {
-  const index = SETUP_STEPS.indexOf(state.ui.setupStep);
-  state.ui.setupStep = SETUP_STEPS[Math.max(0, Math.min(SETUP_STEPS.length - 1, index + delta))];
-  saveState();
-  openSetupSheet(state.ui.setupStep);
-}
-
 function addProject(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
@@ -657,13 +642,13 @@ function addProject(event) {
   if (!label) return;
   state.settings.projects.push(normalizeProject({ id: uniqueId(slugify(label), state.settings.projects.map((item) => item.id)), label, type: form.get("type"), displayOrder: state.settings.projects.length + 1, subItems: [] }));
   saveState();
-  openSetupSheet("projects");
+  openSetupSheet();
 }
 
 function addSubItem(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  const project = getProjectById(form.get("parentProjectId"));
+  const project = getProjectById(event.currentTarget.dataset.addRowForm);
   const label = String(form.get("label") || "").trim();
   if (!project || !label) return;
   project.subItems.push(normalizeSubItem({
@@ -671,31 +656,70 @@ function addSubItem(event) {
     parentProjectId: project.id,
     label,
     monthlyAmount: Number(form.get("monthlyAmount")) || 0,
-    recordable: form.has("recordable"),
-    showOnDashboard: form.has("showOnDashboard"),
+    recordable: project.type === "spend",
+    showOnDashboard: true,
     displayOrder: project.subItems.length + 1
   }));
   saveState();
-  openSetupSheet("items");
+  openSetupSheet();
 }
 
 function deleteProject(id) {
-  if (!window.confirm("Delete this project and its sub-items?")) return;
+  if (!window.confirm("Delete this block and its rows?")) return;
   const ids = new Set((getProjectById(id)?.subItems || []).map((item) => item.id));
   state.settings.projects = state.settings.projects.filter((project) => project.id !== id);
   state.transactions = state.transactions.filter((tx) => !ids.has(tx.subItemId));
   saveState();
-  openSetupSheet("projects");
+  openSetupSheet();
 }
 
 function deleteSubItem(id) {
-  if (!window.confirm("Delete this sub-item and its transactions?")) return;
+  if (!window.confirm("Delete this row and its transactions?")) return;
   state.settings.projects.forEach((project) => {
     project.subItems = project.subItems.filter((item) => item.id !== id);
   });
   state.transactions = state.transactions.filter((tx) => tx.subItemId !== id);
   saveState();
-  openSetupSheet("items");
+  openSetupSheet();
+}
+
+function renameBlock(id) {
+  const project = getProjectById(id);
+  if (!project) return;
+  const label = window.prompt("Block name", project.label);
+  if (!label || !label.trim()) return;
+  project.label = label.trim();
+  saveState();
+  openSetupSheet();
+}
+
+function changeBlockType(id) {
+  const project = getProjectById(id);
+  if (!project) return;
+  const type = window.prompt("Type: Income, Spend, Debt, Save, or Investment", blockTypeLabel(project.type));
+  const normalized = normalizeProjectType(type);
+  if (!normalized) {
+    showToast("Choose Income, Spend, Debt, Save, or Investment.");
+    return;
+  }
+  project.type = normalized;
+  project.subItems.forEach((item) => {
+    item.recordable = normalized === "spend";
+    item.showOnDashboard = true;
+  });
+  saveState();
+  openSetupSheet();
+}
+
+function moveBlock(id, direction) {
+  const projects = state.settings.projects.sort(byDisplayOrder);
+  const index = projects.findIndex((project) => project.id === id);
+  const nextIndex = index + direction;
+  if (index < 0 || nextIndex < 0 || nextIndex >= projects.length) return;
+  [projects[index].displayOrder, projects[nextIndex].displayOrder] = [projects[nextIndex].displayOrder, projects[index].displayOrder];
+  state.settings.projects = projects.sort(byDisplayOrder);
+  saveState();
+  openSetupSheet();
 }
 
 function finishSetup() {
@@ -735,7 +759,7 @@ function saveTransaction(event) {
   const form = new FormData(event.currentTarget);
   const subItemId = String(form.get("subItemId") || "");
   if (!getRecordableItems().some((item) => item.id === subItemId)) {
-    showToast("Choose a recordable sub-item.");
+    showToast("Choose a Spend row.");
     return;
   }
   const transaction = { id: String(form.get("id") || uid("txn")), dateISO: normalizeDateValue(form.get("dateISO")), amount: Number(form.get("amount")) || 0, subItemId, note: String(form.get("note") || "").trim() };
@@ -815,7 +839,7 @@ function importCSV(event) {
 
 function renderImportPreviewSheet() {
   const imported = pendingCsvImport.state;
-  const stats = [["Projects", imported.settings.projects.length], ["Sub-items", getAllSubItems(imported).length], ["Transactions", imported.transactions.length], ["Skipped rows", pendingCsvImport.skipped]];
+  const stats = [["Blocks", imported.settings.projects.length], ["Rows", getAllSubItems(imported).length], ["Transactions", imported.transactions.length], ["Skipped rows", pendingCsvImport.skipped]];
   return renderSheet("Import Preview", `
     <div class="import-preview-grid">${stats.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${value}</strong></div>`).join("")}</div>
     <div class="notice-strip warning">Importing will replace current local data.</div>
@@ -901,7 +925,7 @@ function resetData() {
 }
 
 function calculateAllocation(source = state) {
-  const totals = { income: 0, spend: 0, save: 0, investment: 0 };
+  const totals = { income: 0, spend: 0, debt: 0, save: 0, investment: 0 };
   const activeProjects = source.settings.projects.filter((project) => project.active && !project.archived);
   const activeItems = [];
   activeProjects.forEach((project) => {
@@ -910,10 +934,11 @@ function calculateAllocation(source = state) {
     const total = sum(projectItems.map((item) => item.monthlyAmount));
     if (project.type === "income") totals.income += total;
     if (project.type === "spend") totals.spend += total;
+    if (project.type === "debt") totals.debt += total;
     if (project.type === "save") totals.save += total;
     if (project.type === "investment") totals.investment += total;
   });
-  const allocation = totals.spend + totals.save + totals.investment;
+  const allocation = totals.spend + totals.debt + totals.save + totals.investment;
   const difference = roundCents(totals.income - allocation);
   const status = difference === 0 ? "balanced" : difference > 0 ? "unallocated" : "overallocated";
   const hasSetupData = activeItems.length > 0 && totals.income > 0;
@@ -928,7 +953,7 @@ function calculateAllocation(source = state) {
     displayLabel: hasSetupData ? label : "Setup",
     isReady,
     message: !hasSetupData ? "Create income and allocations to start." : status === "balanced" ? "Income equals allocation. Ready." : status === "overallocated" ? `${money(Math.abs(difference))} over income.` : `${money(difference)} left unallocated.`,
-    nextStep: !source.settings.projects.length ? "projects" : !getAllSubItems(source).length ? "items" : "check"
+    nextStep: "plan"
   };
 }
 
@@ -978,7 +1003,7 @@ function getAllSubItems(source = state) {
 }
 
 function getRecordableItems() {
-  return getAllSubItems().filter((item) => item.active && !item.archived && item.recordable).sort(byDisplayOrder);
+  return getAllSubItems().filter((item) => item.active && !item.archived && item.recordable && getProjectById(item.parentProjectId)?.type === "spend").sort(byDisplayOrder);
 }
 
 function getSubItemById(id) {
@@ -1008,11 +1033,28 @@ function getFilteredTransactions() {
 }
 
 function mapGroupType(type) {
+  const normalized = normalizeProjectType(type);
+  if (normalized) return normalized;
   if (type === "income") return "income";
   if (type === "savings" || type === "save") return "save";
-  if (type === "debt" || type === "investment" || type === "debtInvestment") return "investment";
+  if (type === "debt") return "debt";
+  if (type === "investment" || type === "debtInvestment") return "investment";
   if (type === "fixed" || type === "flexible" || type === "essentials" || type === "discretionary") return "spend";
   return "spend";
+}
+
+function normalizeProjectType(value) {
+  const normalized = String(value || "").toLowerCase().replace(/\s+/g, "");
+  if (normalized === "income") return "income";
+  if (normalized === "spend" || normalized === "spending") return "spend";
+  if (normalized === "debt") return "debt";
+  if (normalized === "save" || normalized === "saving" || normalized === "savings") return "save";
+  if (normalized === "investment" || normalized === "invest" || normalized === "debtinvestment") return "investment";
+  return "";
+}
+
+function blockTypeLabel(type) {
+  return type === "save" ? "Save" : startCase(type);
 }
 
 function monthlyEquivalent(item) {
