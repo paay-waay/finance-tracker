@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-05-01 · V3.2.1 Free-form Monthly Allocation Planner
+
+- Reworked the planning model into free-form monthly projects/envelopes with `income`, `spend`, `save`, and `investment` project types.
+- Changed transactions to reference recordable sub-items, while weekly tracking focuses on recordable spend items by default.
+- Added the allocation equation: income minus spend/save/investment allocation, with Balanced, Unallocated, and Overallocated setup states.
+- Added the Almost Balanced helper for small unallocated balances under $10, with one-tap allocation into a Savings / Rounding Buffer sub-item.
+- Updated Monitor and CSV backup around projects, sub-items, and transaction records; updated service worker cache to `finance-tracker-cache-v3-2-1`.
+
 ## 2026-05-01 · V3.2.0 Envelope Budget Setup
 
 - Rebuilt the user-facing budget model around income sources, budget groups, subcategories, and transactions recorded against subcategories.
