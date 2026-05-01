@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-05-01 · V3.3.1 Formula Inputs
+
+- Added safe formula-capable amount inputs for plan rows, row edits, and Quick Add transactions.
+- Preserved original formula strings as `monthlyAmountInput` / `amountInput` while storing calculated numeric values rounded to two decimals.
+- Added live calculated previews and invalid formula blocking without using `eval()`.
+- Extended CSV export/import with formula input columns and updated service worker cache to `finance-tracker-cache-v3-3-1`.
+
 ## 2026-05-01 · V3.3.0 Monthly Plan Sheet
 
 - Replaced the guided setup wizard with a single compact Monthly Plan Sheet made of Blocks and Rows.

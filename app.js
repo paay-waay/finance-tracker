@@ -1,4 +1,4 @@
-const APP_VERSION = "V3.3.0 Monthly Plan Sheet";
+const APP_VERSION = "V3.3.1 Formula Inputs";
 const SCHEMA_VERSION = 6;
 const STORAGE_KEY = "financeTracker_v3";
 
@@ -209,11 +209,14 @@ function normalizeSubItem(raw) {
   const label = String(raw.label || raw.name || "").trim();
   const id = String(raw.id || slugify(label)).trim();
   if (!id && !label) return null;
+  const amountInput = String(raw.monthlyAmountInput ?? raw.monthlyBudgetInput ?? raw.monthlyAmount ?? raw.monthlyBudget ?? "0");
+  const parsedAmount = parseFormula(amountInput);
   return {
     id: id || uid("item"),
     parentProjectId: String(raw.parentProjectId || raw.groupId || ""),
     label: label || startCase(id),
-    monthlyAmount: Number(raw.monthlyAmount ?? raw.monthlyBudget) || 0,
+    monthlyAmountInput: amountInput,
+    monthlyAmount: roundCents(Number(raw.monthlyAmount ?? raw.monthlyBudget) || (parsedAmount.ok ? parsedAmount.value : 0)),
     recordable: Boolean(raw.recordable),
     showOnDashboard: raw.showOnDashboard !== false,
     active: raw.active !== false,
@@ -224,16 +227,18 @@ function normalizeSubItem(raw) {
 
 function normalizeTransaction(raw) {
   if (!isObject(raw)) return null;
-  const amount = Number(raw.amount) || 0;
+  const amountInput = String(raw.amountInput ?? raw.amount ?? "");
+  const parsedAmount = parseFormula(amountInput);
+  const amount = roundCents(Number(raw.amount) || (parsedAmount.ok ? parsedAmount.value : 0));
   const subItemId = String(raw.subItemId || raw.subcategoryId || raw.category || "").trim();
   const dateISO = normalizeDateValue(raw.dateISO || raw.date);
   if (!amount || !subItemId || !dateISO) return null;
-  return { id: String(raw.id || uid("txn")), dateISO, amount, subItemId, note: String(raw.note || "").trim() };
+  return { id: String(raw.id || uid("txn")), dateISO, amountInput, amount, subItemId, note: String(raw.note || "").trim() };
 }
 
 function normalizeTemplate(raw) {
   if (!isObject(raw)) return null;
-  return { amount: Number(raw.amount) || 0, subItemId: String(raw.subItemId || raw.subcategoryId || ""), note: String(raw.note || "").trim() };
+  return { amountInput: String(raw.amountInput ?? raw.amount ?? ""), amount: Number(raw.amount) || 0, subItemId: String(raw.subItemId || raw.subcategoryId || ""), note: String(raw.note || "").trim() };
 }
 
 function saveState() {
@@ -470,10 +475,11 @@ function renderQuickAddSheet() {
   }
   const template = state.ui.lastTransactionTemplate;
   const selected = editing?.subItemId || (template && items.some((item) => item.id === template.subItemId) ? template.subItemId : items[0]?.id);
+  const amountValue = editing?.amountInput || editing?.amount || "";
   return renderSheet(editing ? "Edit Entry" : "Quick Add", `
     <form id="transactionForm" class="quick-form">
       <input name="id" type="hidden" value="${escapeHtml(editing?.id || "")}" />
-      <label class="amount-field"><span>Amount</span><input name="amount" type="number" inputmode="decimal" step="0.01" min="0" value="${editing?.amount || ""}" required /></label>
+      <label class="amount-field formula-field"><span>Amount</span><input name="amount" type="text" inputmode="decimal" value="${escapeHtml(amountValue)}" data-formula-input required /><small class="formula-preview"></small></label>
       <input name="subItemId" type="hidden" value="${escapeHtml(selected)}" />
       <div class="category-chip-grid">${items.map((item) => `<button class="category-chip ${item.id === selected ? "is-active" : ""}" type="button" data-item-chip="${item.id}">${escapeHtml(item.label)}</button>`).join("")}</div>
       <label class="field"><span>Date</span><input name="dateISO" type="date" value="${escapeHtml(editing?.dateISO || defaultDateForMonth(state.ui.selectedMonth))}" required /></label>
@@ -536,7 +542,7 @@ function renderPlanBlock(project) {
       </div>
       <form class="add-row-form" data-add-row-form="${project.id}">
         <input name="label" placeholder="Item name" required />
-        <input name="monthlyAmount" type="number" step="0.01" placeholder="Plan amount" required />
+        <label class="formula-stack"><input name="monthlyAmount" type="text" inputmode="decimal" placeholder="Plan amount" data-formula-input required /><small class="formula-preview"></small></label>
         <button class="mini-button" type="submit">+ Add Row</button>
       </form>
     </article>
@@ -551,9 +557,22 @@ function renderPlanRow(project, item) {
       <span>${escapeHtml(item.label)}</span>
       <span>${money(item.monthlyAmount)}</span>
       <span>${money(actual)}</span>
-      <button class="mini-button danger-text" type="button" data-delete-item="${item.id}">×</button>
+      <span><button class="mini-button" type="button" data-edit-row="${item.id}">Edit</button><button class="mini-button danger-text" type="button" data-delete-item="${item.id}">×</button></span>
     </div>
   `;
+}
+
+function openEditRowSheet(id) {
+  const item = getSubItemById(id);
+  if (!item) return;
+  modalRoot.innerHTML = renderSheet("Edit Row", `
+    <form id="rowEditForm" class="quick-form" data-row-id="${escapeHtml(item.id)}">
+      <label class="field"><span>Item name</span><input name="label" value="${escapeHtml(item.label)}" required /></label>
+      <label class="field formula-field"><span>Plan amount</span><input name="monthlyAmount" type="text" inputmode="decimal" value="${escapeHtml(item.monthlyAmountInput || item.monthlyAmount)}" data-formula-input required /><small class="formula-preview"></small></label>
+      <button class="action-button sheet-save" type="submit">Save Row</button>
+    </form>
+  `, "Plan");
+  bindSheetEvents();
 }
 
 function renderCheckbox(name, label, checked) {
@@ -589,6 +608,7 @@ function renderSheet(title, body, kicker = "Setup") {
 }
 
 function bindSheetEvents() {
+  bindFormulaInputs(modalRoot);
   modalRoot.querySelectorAll("[data-close-sheet]").forEach((button) => button.addEventListener("click", closeSheet));
   modalRoot.querySelector(".sheet-backdrop")?.addEventListener("click", (event) => {
     if (event.target.classList.contains("sheet-backdrop")) closeSheet();
@@ -596,8 +616,10 @@ function bindSheetEvents() {
   modalRoot.querySelector("[data-finish-setup]")?.addEventListener("click", finishSetup);
   modalRoot.querySelector("#projectForm")?.addEventListener("submit", addProject);
   modalRoot.querySelectorAll("[data-add-row-form]").forEach((form) => form.addEventListener("submit", addSubItem));
+  modalRoot.querySelector("#rowEditForm")?.addEventListener("submit", saveRowEdit);
   modalRoot.querySelectorAll("[data-delete-project]").forEach((button) => button.addEventListener("click", () => deleteProject(button.dataset.deleteProject)));
   modalRoot.querySelectorAll("[data-delete-item]").forEach((button) => button.addEventListener("click", () => deleteSubItem(button.dataset.deleteItem)));
+  modalRoot.querySelectorAll("[data-edit-row]").forEach((button) => button.addEventListener("click", () => openEditRowSheet(button.dataset.editRow)));
   modalRoot.querySelectorAll("[data-rename-block]").forEach((button) => button.addEventListener("click", () => renameBlock(button.dataset.renameBlock)));
   modalRoot.querySelectorAll("[data-change-block-type]").forEach((button) => button.addEventListener("click", () => changeBlockType(button.dataset.changeBlockType)));
   modalRoot.querySelectorAll("[data-move-block]").forEach((button) => button.addEventListener("click", () => moveBlock(button.dataset.moveBlock, Number(button.dataset.direction))));
@@ -650,16 +672,42 @@ function addSubItem(event) {
   const form = new FormData(event.currentTarget);
   const project = getProjectById(event.currentTarget.dataset.addRowForm);
   const label = String(form.get("label") || "").trim();
+  const parsedAmount = parseAmountField(event.currentTarget.querySelector("input[name='monthlyAmount']"));
   if (!project || !label) return;
+  if (!parsedAmount.ok) {
+    showToast("Invalid formula.");
+    return;
+  }
   project.subItems.push(normalizeSubItem({
     id: uniqueId(slugify(label), getAllSubItems().map((item) => item.id)),
     parentProjectId: project.id,
     label,
-    monthlyAmount: Number(form.get("monthlyAmount")) || 0,
+    monthlyAmountInput: parsedAmount.input,
+    monthlyAmount: parsedAmount.value,
     recordable: project.type === "spend",
     showOnDashboard: true,
     displayOrder: project.subItems.length + 1
   }));
+  saveState();
+  openSetupSheet();
+}
+
+function saveRowEdit(event) {
+  event.preventDefault();
+  const item = getSubItemById(event.currentTarget.dataset.rowId);
+  const label = String(new FormData(event.currentTarget).get("label") || "").trim();
+  const parsedAmount = parseAmountField(event.currentTarget.querySelector("input[name='monthlyAmount']"));
+  if (!item || !label) return;
+  if (!parsedAmount.ok) {
+    showToast("Invalid formula.");
+    return;
+  }
+  const project = getProjectById(item.parentProjectId);
+  const realItem = project?.subItems.find((row) => row.id === item.id);
+  if (!realItem) return;
+  realItem.label = label;
+  realItem.monthlyAmountInput = parsedAmount.input;
+  realItem.monthlyAmount = parsedAmount.value;
   saveState();
   openSetupSheet();
 }
@@ -744,10 +792,11 @@ function addUnallocatedToSavings() {
   }
   let buffer = project.subItems.find((item) => item.active && !item.archived && item.label.toLowerCase() === "rounding buffer");
   if (!buffer) {
-    buffer = normalizeSubItem({ id: uniqueId("rounding-buffer", getAllSubItems().map((item) => item.id)), parentProjectId: project.id, label: "Rounding Buffer", monthlyAmount: 0, recordable: false, showOnDashboard: false, active: true, archived: false, displayOrder: project.subItems.length + 1 });
+    buffer = normalizeSubItem({ id: uniqueId("rounding-buffer", getAllSubItems().map((item) => item.id)), parentProjectId: project.id, label: "Rounding Buffer", monthlyAmountInput: "0", monthlyAmount: 0, recordable: false, showOnDashboard: false, active: true, archived: false, displayOrder: project.subItems.length + 1 });
     project.subItems.push(buffer);
   }
   buffer.monthlyAmount = roundCents(buffer.monthlyAmount + allocation.difference);
+  buffer.monthlyAmountInput = String(buffer.monthlyAmount);
   state.ui.setupComplete = calculateAllocation().isReady;
   saveState();
   showToast("Rounding Buffer updated.");
@@ -762,7 +811,12 @@ function saveTransaction(event) {
     showToast("Choose a Spend row.");
     return;
   }
-  const transaction = { id: String(form.get("id") || uid("txn")), dateISO: normalizeDateValue(form.get("dateISO")), amount: Number(form.get("amount")) || 0, subItemId, note: String(form.get("note") || "").trim() };
+  const parsedAmount = parseAmountField(event.currentTarget.querySelector("input[name='amount']"));
+  if (!parsedAmount.ok) {
+    showToast("Invalid formula.");
+    return;
+  }
+  const transaction = { id: String(form.get("id") || uid("txn")), dateISO: normalizeDateValue(form.get("dateISO")), amountInput: parsedAmount.input, amount: parsedAmount.value, subItemId, note: String(form.get("note") || "").trim() };
   if (!transaction.dateISO || transaction.amount <= 0) {
     showToast("Date and amount are required.");
     return;
@@ -770,7 +824,7 @@ function saveTransaction(event) {
   const index = state.transactions.findIndex((item) => item.id === transaction.id);
   if (index >= 0) state.transactions[index] = transaction;
   else state.transactions.push(transaction);
-  state.ui.lastTransactionTemplate = { amount: transaction.amount, subItemId: transaction.subItemId, note: transaction.note };
+  state.ui.lastTransactionTemplate = { amountInput: transaction.amountInput, amount: transaction.amount, subItemId: transaction.subItemId, note: transaction.note };
   state.ui.editingTransactionId = null;
   modalRoot.innerHTML = "";
   state.ui.activeTab = "monitor";
@@ -874,13 +928,13 @@ function downloadSampleCSV() {
 }
 
 function serializeStateToCSV(source) {
-  const columns = ["record_type", "id", "parent_id", "label", "amount", "monthly_amount", "date", "sub_item_id", "project_type", "recordable", "show_on_dashboard", "active", "archived", "display_order"];
+  const columns = ["record_type", "id", "parent_id", "label", "amount", "amount_input", "monthly_amount", "monthly_amount_input", "date", "sub_item_id", "project_type", "recordable", "show_on_dashboard", "active", "archived", "display_order"];
   const rows = [columns];
   source.settings.projects.forEach((project) => {
-    rows.push(["project", project.id, "", project.label, "", "", "", "", project.type, "", "", project.active, project.archived, project.displayOrder]);
-    project.subItems.forEach((item) => rows.push(["sub_item", item.id, project.id, item.label, "", item.monthlyAmount, "", "", "", item.recordable, item.showOnDashboard, item.active, item.archived, item.displayOrder]));
+    rows.push(["project", project.id, "", project.label, "", "", "", "", "", "", project.type, "", "", project.active, project.archived, project.displayOrder]);
+    project.subItems.forEach((item) => rows.push(["sub_item", item.id, project.id, item.label, "", "", item.monthlyAmount, item.monthlyAmountInput || item.monthlyAmount, "", "", "", item.recordable, item.showOnDashboard, item.active, item.archived, item.displayOrder]));
   });
-  source.transactions.forEach((tx) => rows.push(["transaction", tx.id, "", "", tx.amount, "", tx.dateISO, tx.subItemId, "", "", "", true, false, ""]));
+  source.transactions.forEach((tx) => rows.push(["transaction", tx.id, "", "", tx.amount, tx.amountInput || tx.amount, "", "", tx.dateISO, tx.subItemId, "", "", "", true, false, ""]));
   return rows.map((row) => row.map(csvEscape).join(",")).join("\n");
 }
 
@@ -900,11 +954,11 @@ function parseCSVToState(text) {
         projectMap.set(project.id, project);
       } else if (row.record_type === "sub_item" || row.record_type === "subcategory") {
         const project = projectMap.get(row.parent_id);
-        const item = normalizeSubItem({ id: row.id, parentProjectId: row.parent_id, label: row.label, monthlyAmount: number(row.monthly_amount || row.monthly_budget), recordable: bool(row.recordable), showOnDashboard: row.show_on_dashboard === "" ? true : bool(row.show_on_dashboard), active: bool(row.active), archived: bool(row.archived), displayOrder: number(row.display_order) || 1 });
+        const item = normalizeSubItem({ id: row.id, parentProjectId: row.parent_id, label: row.label, monthlyAmountInput: row.monthly_amount_input || row.monthly_amount || row.monthly_budget, monthlyAmount: number(row.monthly_amount || row.monthly_budget), recordable: bool(row.recordable), showOnDashboard: row.show_on_dashboard === "" ? true : bool(row.show_on_dashboard), active: bool(row.active), archived: bool(row.archived), displayOrder: number(row.display_order) || 1 });
         if (project && item) project.subItems.push(item);
         else skipped += 1;
       } else if (row.record_type === "transaction") {
-        const tx = normalizeTransaction({ id: row.id, amount: number(row.amount), dateISO: row.date, subItemId: row.sub_item_id || row.subcategory_id });
+        const tx = normalizeTransaction({ id: row.id, amountInput: row.amount_input || row.amount, amount: number(row.amount), dateISO: row.date, subItemId: row.sub_item_id || row.subcategory_id });
         if (tx) next.transactions.push(tx);
         else skipped += 1;
       } else if (row.record_type) skipped += 1;
@@ -1055,6 +1109,108 @@ function normalizeProjectType(value) {
 
 function blockTypeLabel(type) {
   return type === "save" ? "Save" : startCase(type);
+}
+
+function bindFormulaInputs(root = document) {
+  root.querySelectorAll("[data-formula-input]").forEach((input) => {
+    const update = () => updateFormulaPreview(input);
+    input.addEventListener("input", update);
+    update();
+  });
+}
+
+function parseAmountField(input) {
+  const parsed = parseFormula(input?.value || "");
+  updateFormulaPreview(input, parsed);
+  return parsed;
+}
+
+function updateFormulaPreview(input, parsed = parseFormula(input?.value || "")) {
+  if (!input) return;
+  const preview = input.parentElement?.querySelector(".formula-preview");
+  if (!preview) return;
+  preview.classList.toggle("is-error", !parsed.ok && Boolean(parsed.input));
+  if (!parsed.input) {
+    preview.textContent = "";
+  } else if (parsed.ok) {
+    preview.textContent = `= ${money(parsed.value)}`;
+  } else {
+    preview.textContent = "Invalid formula";
+  }
+}
+
+function parseFormula(raw) {
+  const input = String(raw ?? "").trim();
+  if (!input) return { ok: false, input, value: 0, error: "empty" };
+  const expression = input.startsWith("=") ? input.slice(1).trim() : input;
+  if (!expression || /[^0-9+\-*/().\s]/.test(expression)) return { ok: false, input, value: 0, error: "unsupported" };
+  let index = 0;
+
+  const skip = () => {
+    while (/\s/.test(expression[index] || "")) index += 1;
+  };
+  const parseNumber = () => {
+    skip();
+    const start = index;
+    while (/[0-9.]/.test(expression[index] || "")) index += 1;
+    const text = expression.slice(start, index);
+    if (!text || (text.match(/\./g) || []).length > 1) throw new Error("number");
+    const value = Number(text);
+    if (!Number.isFinite(value)) throw new Error("number");
+    return value;
+  };
+  const parseFactor = () => {
+    skip();
+    if (expression[index] === "+") {
+      index += 1;
+      return parseFactor();
+    }
+    if (expression[index] === "-") {
+      index += 1;
+      return -parseFactor();
+    }
+    if (expression[index] === "(") {
+      index += 1;
+      const value = parseExpression();
+      skip();
+      if (expression[index] !== ")") throw new Error("paren");
+      index += 1;
+      return value;
+    }
+    return parseNumber();
+  };
+  const parseTerm = () => {
+    let value = parseFactor();
+    while (true) {
+      skip();
+      const op = expression[index];
+      if (op !== "*" && op !== "/") return value;
+      index += 1;
+      const right = parseFactor();
+      if (op === "/" && right === 0) throw new Error("divide");
+      value = op === "*" ? value * right : value / right;
+    }
+  };
+  const parseExpression = () => {
+    let value = parseTerm();
+    while (true) {
+      skip();
+      const op = expression[index];
+      if (op !== "+" && op !== "-") return value;
+      index += 1;
+      const right = parseTerm();
+      value = op === "+" ? value + right : value - right;
+    }
+  };
+
+  try {
+    const value = parseExpression();
+    skip();
+    if (index !== expression.length || !Number.isFinite(value)) throw new Error("invalid");
+    return { ok: true, input, value: roundCents(value) };
+  } catch (error) {
+    return { ok: false, input, value: 0, error: error.message };
+  }
 }
 
 function monthlyEquivalent(item) {
