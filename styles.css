@@ -763,6 +763,64 @@ button:disabled {
   gap: 14px;
 }
 
+.compact-plan-sheet {
+  gap: 10px;
+}
+
+.plan-scope-switch {
+  justify-self: start;
+}
+
+.plan-strip {
+  background: rgba(255, 253, 248, 0.96);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.plan-strip-main {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 14px 16px;
+  text-align: left;
+  width: 100%;
+}
+
+.plan-strip-main strong {
+  display: block;
+  font-size: 16px;
+  line-height: 1.15;
+}
+
+.plan-strip-main span,
+.plan-strip-main small,
+.plan-strip-main em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.plan-strip-main b {
+  display: block;
+  font-size: 17px;
+  font-weight: 950;
+  text-align: right;
+}
+
+.plan-strip-main em {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  justify-self: end;
+  min-width: 58px;
+  padding: 8px 10px;
+  text-align: center;
+}
+
 .plan-block {
   background: rgba(255, 253, 248, 0.88);
   border: 1px solid var(--line);
@@ -884,6 +942,13 @@ button:disabled {
   color: #8f4637;
 }
 
+.block-detail-form {
+  background: rgba(250, 246, 239, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 12px;
+}
+
 @media (max-width: 430px) {
   .plan-block-head {
     display: grid;
@@ -896,6 +961,15 @@ button:disabled {
 
   .add-row-form {
     grid-template-columns: 1fr;
+  }
+
+  .plan-strip-main {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .plan-strip-main em {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 }
 

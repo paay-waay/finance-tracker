@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-05-01 · V3.3.3 Year Plan Template
+
+- Split planning into a shared Year Plan template plus independent monthly copies that are created only when a month is first opened.
+- Replaced the broad plan editor with compact block strips and focused block detail sheets, keeping row entry inside the current block.
+- Added an explicit `Update Year Plan from This Month` action so future uncreated months can inherit the current month's refined plan without rewriting existing months.
+- Kept formula-capable amount inputs across rows and transactions while preserving original formula text and calculated numeric values.
+- Updated service worker cache version to `finance-tracker-cache-v3-3-3`.
+
 ## 2026-05-01 · V3.3.1 Formula Inputs
 
 - Added safe formula-capable amount inputs for plan rows, row edits, and Quick Add transactions.
