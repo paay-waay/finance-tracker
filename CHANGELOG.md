@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-05-02 · V3.5.4 Mobile Layout Repair
+
+- Repaired mobile header controls so the month chip no longer overlaps with planning state labels.
+- Made the Default Plan / selected month switch responsive, full-width, and safe on narrow screens.
+- Tightened Planning and Monitor card headers with mobile-first wrapping and `min-width: 0` safeguards.
+- Reworked compact row tables and row action menus so detail sheets do not overflow on iPhone-sized screens.
+- Added narrow-screen fallbacks for summary strips, category grids, vault cards, and pinned Spend cards.
+- Updated service worker cache to `finance-tracker-cache-v3-5-4`.
+
+## 2026-05-02 · V3.5.3 Premium Signal System
+
+- Refined the visual system around warm ivory, near-black, graphite, muted gold, and restrained clay signal colors.
+- Changed status pills toward small signal-dot labels instead of tinted badges.
+- Reworked Monitor card state treatment to use subtle top lines, borders, and rhythm colors rather than large colored surfaces.
+- Reduced default shadows and color fills across ordinary cards while preserving depth for sheets, navigation, and gold vault moments.
+- Tuned Allocation Map, category accents, weekly rhythm, and danger states into a quieter private-wealth visual language.
+- Updated service worker cache to `finance-tracker-cache-v3-5-3`.
+
 ## 2026-05-02 · V3.5.2 Daily Cockpit Cleanup
 
 - Hid the Monitor plan status card when the monthly plan is already balanced, keeping attention on pinned Spend cards.

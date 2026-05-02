@@ -1,4 +1,4 @@
-const APP_VERSION = "V3.5.2 Daily Cockpit Cleanup";
+const APP_VERSION = "V3.5.4 Mobile Layout Repair";
 const SCHEMA_VERSION = 8;
 const STORAGE_KEY = "financeTracker_v3";
 
@@ -450,7 +450,6 @@ function renderHeaderControls() {
       <span>Month</span>
       <input id="monthInputLive" type="month" value="${state.ui.selectedMonth}" />
     </label>
-    ${state.ui.activeTab === "planning" ? `<span class="header-mode-label">${escapeHtml(state.ui.planEditorScope === "year" ? "Default Plan" : "This Month")}</span>` : ""}
   `;
   controls.querySelector("#monthInputLive")?.addEventListener("change", (event) => {
     state.ui.selectedMonth = normalizeMonthValue(event.target.value) || currentMonthKey();
