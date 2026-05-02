@@ -775,6 +775,294 @@ textarea {
   width: 7px;
 }
 
+.sheet-page {
+  gap: 14px;
+}
+
+.sheet-reconciliation,
+.sheet-logs,
+.sheet-vault-area {
+  background: rgba(255, 254, 250, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.sheet-reconciliation-head,
+.worksheet-section-head,
+.worksheet-block-head {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.sheet-reconciliation-head > *,
+.worksheet-section-head > *,
+.worksheet-block-head > * {
+  min-width: 0;
+}
+
+.sheet-reconciliation-head h2 {
+  font-size: 24px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.sheet-reconcile-strip {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  overflow: hidden;
+}
+
+.sheet-reconcile-strip div {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+}
+
+.sheet-reconcile-strip div + div {
+  border-left: 1px solid var(--line);
+}
+
+.sheet-reconcile-strip span,
+.worksheet-section-head em,
+.worksheet-block-head small,
+.worksheet-row small,
+.sheet-log-panel p {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.sheet-reconcile-strip strong {
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.sheet-matrix {
+  display: grid;
+  gap: 14px;
+}
+
+.worksheet-section {
+  background: rgba(255, 254, 250, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: grid;
+  gap: 10px;
+  overflow: hidden;
+  padding: 0 0 10px;
+}
+
+.worksheet-section-head {
+  background: rgba(250, 246, 239, 0.86);
+  border-top: 2px solid var(--line-strong);
+  padding: 11px 12px;
+}
+
+.worksheet-section.type-income .worksheet-section-head {
+  border-top-color: var(--graphite);
+}
+
+.worksheet-section.type-spend .worksheet-section-head {
+  border-top-color: #b8aea3;
+}
+
+.worksheet-section.type-debt .worksheet-section-head {
+  border-top-color: var(--risk);
+}
+
+.worksheet-section.type-save .worksheet-section-head {
+  border-top-color: var(--gold);
+}
+
+.worksheet-section.type-investment .worksheet-section-head {
+  border-top-color: var(--slate);
+}
+
+.worksheet-section-head div {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.worksheet-section-head strong {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.worksheet-block {
+  display: grid;
+  gap: 0;
+  padding: 0 10px;
+}
+
+.worksheet-block + .worksheet-block {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.worksheet-block-head {
+  padding: 4px 0 7px;
+}
+
+.worksheet-block-head button:first-child {
+  background: transparent;
+  border: 0;
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  text-align: left;
+}
+
+.worksheet-block-head strong {
+  font-size: 14px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.worksheet-table {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.worksheet-row {
+  align-items: center;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(86px, 0.8fr) minmax(76px, 0.7fr) minmax(58px, 0.55fr) minmax(92px, 0.65fr);
+  min-height: 38px;
+  padding: 7px 9px;
+}
+
+.worksheet-row:last-child {
+  border-bottom: 0;
+}
+
+.worksheet-header,
+.worksheet-total {
+  background: var(--paper-soft);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.worksheet-total {
+  color: var(--ink);
+}
+
+.worksheet-row > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.worksheet-item-cell {
+  display: grid;
+  gap: 1px;
+}
+
+.sheet-cell-input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  min-height: 30px;
+  padding: 4px 6px;
+}
+
+.sheet-cell-input:focus {
+  background: var(--paper);
+  border-color: var(--gold-line);
+  outline: none;
+}
+
+.sheet-cell-input.is-invalid {
+  border-color: var(--over);
+}
+
+.amount-cell {
+  text-align: right;
+}
+
+.row-mode {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 650;
+  padding: 3px 6px;
+}
+
+.row-mode.pinned,
+.row-mode.vault {
+  border-color: var(--gold-line);
+  color: var(--gold-deep);
+}
+
+.row-mode.override {
+  border-color: rgba(111, 79, 71, 0.24);
+  color: var(--over);
+}
+
+.worksheet-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.tiny-toggle {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 11px;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.tiny-toggle input {
+  min-height: auto;
+  width: auto;
+}
+
+.worksheet-empty {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 0 12px 4px;
+}
+
+.sheet-log-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sheet-log-panel {
+  background: var(--paper-soft);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
@@ -2157,6 +2445,51 @@ button:disabled {
     overflow-wrap: anywhere;
   }
 
+  .sheet-reconciliation-head {
+    align-items: start;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sheet-reconciliation-head .header-status-pill {
+    justify-self: start;
+  }
+
+  .sheet-reconcile-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sheet-reconcile-strip div + div {
+    border-left: 0;
+  }
+
+  .sheet-reconcile-strip div:nth-child(even) {
+    border-left: 1px solid var(--line);
+  }
+
+  .sheet-reconcile-strip div:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+
+  .worksheet-row {
+    grid-template-columns: minmax(0, 1.2fr) minmax(72px, 0.72fr) minmax(66px, 0.66fr);
+  }
+
+  .worksheet-row > span:nth-child(4),
+  .worksheet-row > span:nth-child(5) {
+    grid-column: 1 / -1;
+    white-space: normal;
+  }
+
+  .worksheet-header > span:nth-child(4),
+  .worksheet-header > span:nth-child(5) {
+    display: none;
+  }
+
+  .worksheet-actions {
+    justify-content: flex-start;
+  }
+
   .plan-scope-switch {
     border-radius: 18px;
   }
@@ -2197,7 +2530,8 @@ button:disabled {
 
   .monitor-card-grid,
   .vault-card-grid,
-  .plan-category-grid {
+  .plan-category-grid,
+  .sheet-log-grid {
     gap: 10px;
   }
 
@@ -2205,6 +2539,9 @@ button:disabled {
   .savings-vault-card,
   .plan-category-card,
   .planning-card,
+  .sheet-reconciliation,
+  .sheet-logs,
+  .sheet-vault-area,
   .recent-preview,
   .savings-vault-section {
     border-radius: 14px;
@@ -2253,7 +2590,8 @@ button:disabled {
 
   .monitor-card-grid,
   .vault-card-grid,
-  .plan-category-grid {
+  .plan-category-grid,
+  .sheet-log-grid {
     grid-template-columns: 1fr;
   }
 

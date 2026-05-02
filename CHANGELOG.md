@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-05-02 · V4.0.0 Sheet-First Finance Cockpit
+
+- Replaced the Planning overview-card model with a Sheet tab built around a compact monthly worksheet.
+- Added a top reconciliation strip for selected month, balance status, income, allocation, reserved savings, and non-zero gap only.
+- Rendered Income, Spend, Debt, Save, and Investment as sheet-like sections with compact Item / Plan / Actual / Mode rows.
+- Added inline worksheet editing for item names, plan formulas, Spend pinning, and Save vault toggles.
+- Added Monthly Logs below the worksheet for pinned Spend items while keeping Monitor focused on daily control.
+- Kept Default Plan / This Month automation, Balance Plan, formula inputs, overrides, Savings Vaults, Quick Add, and CSV backup compatible with existing `financeTracker_v3` data.
+- Updated service worker cache to `finance-tracker-cache-v4-0-0`.
+
 ## 2026-05-02 · V3.5.4 Mobile Layout Repair
 
 - Repaired mobile header controls so the month chip no longer overlaps with planning state labels.
