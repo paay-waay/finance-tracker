@@ -1,4 +1,4 @@
-const APP_VERSION = "V3.3.3 Year Plan Template";
+const APP_VERSION = "V3.3.4 Premium UI Restyle";
 const SCHEMA_VERSION = 7;
 const STORAGE_KEY = "financeTracker_v3";
 
@@ -476,13 +476,12 @@ function renderPlanningPage() {
 
 function renderAllocationStatusCard(allocation) {
   return `
-    <section class="setup-status-card ${allocation.isReady ? "balanced" : allocation.status}">
+    <section class="setup-status-card premium-status-strip ${allocation.isReady ? "balanced" : allocation.status}">
       <div>
-        <p class="section-kicker">Setup status</p>
-        <h2>${escapeHtml(allocation.displayLabel)}</h2>
-        <span>${escapeHtml(allocation.message)}</span>
+        <p class="section-kicker">${escapeHtml(formatMonthLabel(state.ui.selectedMonth))} Plan</p>
+        <h2>${escapeHtml(allocation.displayLabel)} · ${money(allocation.difference)} gap</h2>
       </div>
-      <button class="action-button" type="button" data-open-setup data-plan-scope="${hasYearPlan() ? "month" : "year"}">${allocation.isReady ? "Edit Plan" : "Continue Setup"}</button>
+      <button class="ghost-button status-edit-action" type="button" data-open-setup data-plan-scope="${hasYearPlan() ? "month" : "year"}">${allocation.isReady ? "Edit Plan" : "Continue Setup"}</button>
     </section>
   `;
 }
@@ -514,11 +513,11 @@ function renderAlmostBalancedHelper(allocation) {
 function renderDashboardSummary() {
   const totals = calculateDashboardTotals();
   return `
-    <section class="dashboard-summary">
+    <section class="dashboard-summary premium-summary-strip">
       <div><span>Setup</span><strong>${escapeHtml(calculateAllocationForProjects(getPlanForScope("month", state.ui.selectedMonth, false)).label)}</strong></div>
-      <div><span>This week spent</span><strong>${money(totals.weekSpent)}</strong></div>
-      <div><span>This month spent</span><strong>${money(totals.monthSpent)}</strong></div>
-      <div><span>Month remaining</span><strong>${money(totals.monthRemaining)}</strong></div>
+      <div><span>Week spent</span><strong>${money(totals.weekSpent)}</strong></div>
+      <div><span>Month spent</span><strong>${money(totals.monthSpent)}</strong></div>
+      <div><span>Remaining</span><strong>${money(totals.monthRemaining)}</strong></div>
     </section>
   `;
 }

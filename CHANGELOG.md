@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-05-01 · V3.3.4 Premium UI Restyle
+
+- Restyled the app with a restrained black, ivory, graphite, and muted gold visual system inspired by private wealth dashboards.
+- Replaced the large Monitor status and summary cards with compact status and metric strips.
+- Reduced typography weight, card radius, status color intensity, and button/nav bulk across the app.
+- Refined block strips, row tables, sheets, and activity rows toward a quieter premium account-list feel.
+- Updated service worker cache version to `finance-tracker-cache-v3-3-4`.
+
 ## 2026-05-01 · V3.3.3 Year Plan Template
 
 - Split planning into a shared Year Plan template plus independent monthly copies that are created only when a month is first opened.
