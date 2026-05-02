@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-05-02 · V3.5.2 Daily Cockpit Cleanup
+
+- Hid the Monitor plan status card when the monthly plan is already balanced, keeping attention on pinned Spend cards.
+- Added a hard six-item cap for pinned Spend items so Monitor remains a 4-6 card daily cockpit.
+- Moved Plan actions behind a compact overflow button and renamed user-facing planning language from blocks/rows/year plan toward categories/items/default plan.
+- Hid empty Savings Vault and Recent Activity sections on Monitor to reduce zero-state noise.
+- Collapsed advanced category actions and Actual Override behind secondary controls inside item detail.
+- Made Planning category overview cards more visual-first by leading with category state and proportion bars instead of large totals.
+- Updated service worker cache to `finance-tracker-cache-v3-5-2`.
+
 ## 2026-05-02 · V3.5.1 Visual Noise Cleanup
 
 - Reduced Monitor card default text and moved pressure notes, exact weekly numbers, and transaction detail behind tap-to-expand details.

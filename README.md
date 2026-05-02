@@ -1,29 +1,28 @@
 # Finance Tracker
 
-A static, private household finance PWA for visual monthly planning, daily spending control, and savings progress.
+A static, private household money cockpit for visual daily spending control, savings vault progress, and lightweight monthly planning.
 
 ## App Structure
 
-Finance Tracker has three main surfaces:
-
-- **Monitor**: visual pinned spending cards, savings vaults, recent activity, and compact plan status.
-- **Quick Add**: fast transaction entry for pinned Spend rows only.
-- **Planning**: Year Plan / Monthly Plan setup, allocation map, category overview cards, Balance Plan, CSV backup, and data tools.
+- **Monitor**: the daily cockpit with 4-6 pinned Spend cards, visual weekly rhythm, savings vaults, and recent activity when it exists.
+- **Quick Add**: fast transaction entry for pinned Spend items only.
+- **Planning**: Default Plan / This Month setup, allocation map, category overview cards, Balance Plan, CSV backup, and low-frequency data tools.
 
 There is no backend, account system, database, serverless function, or third-party service dependency. Data stays in the browser through `localStorage`.
 
 ## Core Logic
 
-- **Year Plan** is the default monthly template.
-- Opening a new month creates an independent **Monthly Plan** copy from the current Year Plan.
-- Editing a Monthly Plan does not change Year Plan or other months.
-- **Apply Year Plan to This Month** replaces only the selected month.
-- **Set as Future Default** copies the selected month back into Year Plan for future uncreated months.
-- Each plan is built from Blocks and Rows: Income, Spend, Debt, Save, and Investment.
-- **Pinned Spend rows** appear in Monitor and Quick Add.
-- **Unpinned rows** default Actual = Plan unless an Actual Override is set.
-- **Save rows** can be shown as Savings Vaults with a manually maintained balance, optional target, and monthly planned contribution.
-- **Balance Plan** handles both surplus and deficit through Save rows.
+- **Default Plan** is the template for future months.
+- Opening a new month creates an independent **Monthly Plan** copy from the current Default Plan.
+- Editing a Monthly Plan does not change the Default Plan or other months.
+- **Reset This Month from Default** replaces only the selected month.
+- **Use This Month as Default** copies the selected month into the Default Plan for future uncreated months.
+- Plans are made from categories and items across Income, Spend, Debt, Save, and Investment.
+- Only pinned Spend items appear in Monitor and Quick Add.
+- Monitor is intentionally capped at 6 pinned Spend items.
+- Unpinned items default Actual = Plan unless an Actual Override is set.
+- Save items can be shown as Savings Vaults with a manually maintained balance, optional target, and monthly planned contribution.
+- Balance Plan handles both surplus and deficit through Save items.
 - Amount fields support plain numbers or safe arithmetic formulas such as `2000+682+113` or `=(750+150)/4`.
 
 ## Data Backup

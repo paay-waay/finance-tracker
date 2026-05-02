@@ -1159,6 +1159,21 @@ button:disabled {
   justify-content: flex-end;
 }
 
+.overflow-button {
+  align-items: center;
+  background: rgba(255, 254, 250, 0.74);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 16px;
+  font-weight: 650;
+  justify-content: center;
+  min-height: 34px;
+  min-width: 44px;
+  padding: 4px 10px;
+}
+
 .plan-category-grid {
   display: grid;
   gap: 12px;
@@ -1210,7 +1225,7 @@ button:disabled {
 }
 
 .plan-category-card strong {
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 650;
 }
 
@@ -1224,6 +1239,63 @@ button:disabled {
 
 .plan-type-list {
   gap: 10px;
+}
+
+.advanced-actions,
+.optional-entry,
+.row-more-actions {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.advanced-actions summary,
+.optional-entry summary,
+.row-more-actions summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.advanced-actions[open],
+.optional-entry[open],
+.row-more-actions[open] {
+  display: grid;
+  gap: 10px;
+}
+
+.row-action-cell {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.row-more-actions {
+  border-top: 0;
+  padding-top: 0;
+  position: relative;
+}
+
+.row-more-actions div {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--soft-shadow);
+  display: grid;
+  gap: 6px;
+  min-width: 132px;
+  padding: 8px;
+  position: absolute;
+  right: 0;
+  z-index: 5;
+}
+
+.checkbox-row.is-disabled {
+  opacity: 0.55;
+}
+
+.compact-monitor-summary {
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
 }
 
 .plan-meta-strip span {
