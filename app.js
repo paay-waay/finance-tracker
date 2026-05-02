@@ -1,5 +1,5 @@
-const APP_VERSION = "V3.3.4 Premium UI Restyle";
-const SCHEMA_VERSION = 7;
+const APP_VERSION = "V3.4.0 Premium Planning System";
+const SCHEMA_VERSION = 8;
 const STORAGE_KEY = "financeTracker_v3";
 
 const PROJECT_TYPES = ["income", "spend", "debt", "save", "investment"];
@@ -19,7 +19,10 @@ const DEFAULT_STATE = {
     lastTransactionTemplate: null
   },
   settings: {
-    yearPlan: [],
+    yearPlan: {
+      blocks: [],
+      updatedAtISO: null
+    },
     monthlyPlans: {}
   },
   transactions: []
@@ -87,7 +90,7 @@ function parseStored(key) {
 
 function normalizeState(raw) {
   const input = isObject(raw) ? raw : {};
-  if (Array.isArray(input.settings?.yearPlan) || isObject(input.settings?.monthlyPlans)) return normalizePlanState(input);
+  if (Array.isArray(input.settings?.yearPlan) || isObject(input.settings?.yearPlan) || isObject(input.settings?.monthlyPlans)) return normalizePlanState(input);
   if (Array.isArray(input.settings?.projects)) return migrateCurrentProjectsState(input);
   return migrateToProjects(input);
 }
@@ -109,7 +112,7 @@ function normalizePlanState(input) {
   next.ui.setupComplete = Boolean(next.ui.setupComplete);
   next.ui.expandedProjects = isObject(input.ui?.expandedProjects || input.ui?.expandedGroups) ? (input.ui.expandedProjects || input.ui.expandedGroups) : {};
   next.ui.lastTransactionTemplate = normalizeTemplate(input.ui?.lastTransactionTemplate);
-  next.settings.yearPlan = Array.isArray(input.settings?.yearPlan) ? input.settings.yearPlan.map(normalizeProject).filter(Boolean).sort(byDisplayOrder) : [];
+  next.settings.yearPlan = normalizeYearPlanRecord(input.settings?.yearPlan);
   next.settings.monthlyPlans = normalizeMonthlyPlans(input.settings?.monthlyPlans);
   next.transactions = Array.isArray(input.transactions) ? input.transactions.map(normalizeTransaction).filter(Boolean) : [];
   return next;
@@ -128,10 +131,10 @@ function migrateCurrentProjectsState(input) {
   next.ui.expandedProjects = isObject(input.ui?.expandedProjects || input.ui?.expandedGroups) ? (input.ui.expandedProjects || input.ui.expandedGroups) : {};
   next.ui.lastTransactionTemplate = normalizeTemplate(input.ui?.lastTransactionTemplate);
   const projects = Array.isArray(input.settings?.projects) ? input.settings.projects.map(normalizeProject).filter(Boolean).sort(byDisplayOrder) : [];
-  next.settings.yearPlan = cloneProjects(projects, true);
-  next.settings.monthlyPlans = { [next.ui.selectedMonth]: cloneProjects(projects, true) };
+  next.settings.yearPlan = makeYearPlanRecord(cloneProjects(projects, true));
+  next.settings.monthlyPlans = { [next.ui.selectedMonth]: makeMonthlyPlanRecord(cloneProjects(projects, true), input.settings?.monthlyPlans?.[next.ui.selectedMonth]) };
   next.transactions = Array.isArray(input.transactions) ? input.transactions.map(normalizeTransaction).filter(Boolean) : [];
-  next.ui.setupComplete = calculateAllocationForProjects(next.settings.monthlyPlans[next.ui.selectedMonth]).isReady;
+  next.ui.setupComplete = calculateAllocationForProjects(next.settings.monthlyPlans[next.ui.selectedMonth].blocks).isReady;
   return next;
 }
 
@@ -143,16 +146,16 @@ function migrateToProjects(input) {
   const itemMap = new Map();
 
   const ensureProject = (label, type) => {
-    const existing = next.settings.yearPlan.find((project) => project.label === label && project.type === type);
+    const existing = next.settings.yearPlan.blocks.find((project) => project.label === label && project.type === type);
     if (existing) return existing;
     const project = normalizeProject({
-      id: uniqueId(slugify(label), next.settings.yearPlan.map((item) => item.id)),
+      id: uniqueId(slugify(label), next.settings.yearPlan.blocks.map((item) => item.id)),
       label,
       type,
-      displayOrder: next.settings.yearPlan.length + 1,
+      displayOrder: next.settings.yearPlan.blocks.length + 1,
       subItems: []
     });
-    next.settings.yearPlan.push(project);
+    next.settings.yearPlan.blocks.push(project);
     return project;
   };
 
@@ -213,8 +216,8 @@ function migrateToProjects(input) {
       note: transaction.note
     })).filter(Boolean)
     : [];
-  next.settings.monthlyPlans = { [next.ui.selectedMonth]: cloneProjects(next.settings.yearPlan, true) };
-  next.ui.setupComplete = calculateAllocationForProjects(next.settings.monthlyPlans[next.ui.selectedMonth]).isReady;
+  next.settings.monthlyPlans = { [next.ui.selectedMonth]: makeMonthlyPlanRecord(cloneProjects(next.settings.yearPlan.blocks, true)) };
+  next.ui.setupComplete = calculateAllocationForProjects(next.settings.monthlyPlans[next.ui.selectedMonth].blocks).isReady;
   return next;
 }
 
@@ -241,16 +244,23 @@ function normalizeSubItem(raw) {
   const label = String(raw.label || raw.name || "").trim();
   const id = String(raw.id || slugify(label)).trim();
   if (!id && !label) return null;
-  const amountInput = String(raw.monthlyAmountInput ?? raw.monthlyBudgetInput ?? raw.monthlyAmount ?? raw.monthlyBudget ?? "0");
+  const amountInput = String(raw.amountInput ?? raw.monthlyAmountInput ?? raw.monthlyBudgetInput ?? raw.monthlyAmount ?? raw.monthlyBudget ?? "0");
   const parsedAmount = parseFormula(amountInput);
+  const frequency = normalizeFrequency(raw.frequency);
+  const baseAmount = roundCents(parsedAmount.ok ? parsedAmount.value : Number(raw.amount ?? raw.monthlyAmount ?? raw.monthlyBudget) || 0);
+  const monthlyAmount = roundCents(frequency === "biweekly" ? baseAmount * 26 / 12 : baseAmount);
+  const pinToMonitor = Boolean(raw.pinToMonitor ?? raw.showOnDashboard ?? raw.recordable ?? false);
   return {
     id: id || uid("item"),
     parentProjectId: String(raw.parentProjectId || raw.groupId || ""),
     label: label || startCase(id),
+    amountInput,
     monthlyAmountInput: amountInput,
-    monthlyAmount: roundCents(Number(raw.monthlyAmount ?? raw.monthlyBudget) || (parsedAmount.ok ? parsedAmount.value : 0)),
-    recordable: Boolean(raw.recordable),
-    showOnDashboard: raw.showOnDashboard !== false,
+    frequency,
+    monthlyAmount,
+    recordable: pinToMonitor,
+    showOnDashboard: pinToMonitor,
+    pinToMonitor,
     active: raw.active !== false,
     archived: Boolean(raw.archived),
     displayOrder: Number(raw.displayOrder) || 1
@@ -278,8 +288,54 @@ function normalizeMonthlyPlans(raw) {
   if (!isObject(raw)) return result;
   Object.entries(raw).forEach(([monthKey, projects]) => {
     const normalizedMonth = normalizeMonthValue(monthKey);
-    if (!normalizedMonth || !Array.isArray(projects)) return;
-    result[normalizedMonth] = projects.map(normalizeProject).filter(Boolean).sort(byDisplayOrder);
+    if (!normalizedMonth) return;
+    result[normalizedMonth] = makeMonthlyPlanRecord(getBlocksFromPlan(projects), projects);
+  });
+  return result;
+}
+
+function normalizeYearPlanRecord(raw) {
+  return makeYearPlanRecord(getBlocksFromPlan(raw), raw);
+}
+
+function getBlocksFromPlan(raw) {
+  if (Array.isArray(raw)) return raw.map(normalizeProject).filter(Boolean).sort(byDisplayOrder);
+  if (isObject(raw) && Array.isArray(raw.blocks)) return raw.blocks.map(normalizeProject).filter(Boolean).sort(byDisplayOrder);
+  return [];
+}
+
+function makeYearPlanRecord(blocks = [], raw = {}) {
+  return {
+    blocks: (blocks || []).map(normalizeProject).filter(Boolean).sort(byDisplayOrder),
+    updatedAtISO: isObject(raw) ? raw.updatedAtISO || null : null
+  };
+}
+
+function makeMonthlyPlanRecord(blocks = [], raw = {}) {
+  const source = isObject(raw) ? raw : {};
+  return {
+    blocks: (blocks || []).map(normalizeProject).filter(Boolean).sort(byDisplayOrder),
+    actualOverrides: normalizeActualOverrides(source.actualOverrides),
+    createdFromYearPlanAtISO: source.createdFromYearPlanAtISO || null,
+    updatedAtISO: source.updatedAtISO || null
+  };
+}
+
+function normalizeActualOverrides(raw) {
+  const result = {};
+  if (!isObject(raw)) return result;
+  Object.entries(raw).forEach(([rowId, override]) => {
+    if (!isObject(override)) return;
+    const amountInput = String(override.amountInput ?? override.amount ?? "");
+    const parsed = parseFormula(amountInput);
+    const amount = roundCents(Number(override.amount) || (parsed.ok ? parsed.value : 0));
+    if (!amountInput || !Number.isFinite(amount)) return;
+    result[rowId] = {
+      amountInput,
+      amount,
+      note: String(override.note || ""),
+      updatedAtISO: override.updatedAtISO || null
+    };
   });
   return result;
 }
@@ -310,7 +366,11 @@ function cloneProjects(projects, preserveIds = false) {
 }
 
 function getYearPlan() {
-  return state.settings.yearPlan;
+  return state.settings.yearPlan.blocks;
+}
+
+function getYearBlocksFrom(source) {
+  return getBlocksFromPlan(source.settings?.yearPlan);
 }
 
 function hasYearPlan() {
@@ -320,10 +380,16 @@ function hasYearPlan() {
 function getMonthPlan(monthKey, createIfMissing = false) {
   const normalizedMonth = normalizeMonthValue(monthKey) || currentMonthKey();
   if (!state.settings.monthlyPlans[normalizedMonth] && createIfMissing && hasYearPlan()) {
-    state.settings.monthlyPlans[normalizedMonth] = cloneProjects(getYearPlan(), false);
+    state.settings.monthlyPlans[normalizedMonth] = makeMonthlyPlanRecord(cloneProjects(getYearPlan(), false), { createdFromYearPlanAtISO: new Date().toISOString() });
     saveState();
   }
-  return state.settings.monthlyPlans[normalizedMonth] || [];
+  return state.settings.monthlyPlans[normalizedMonth]?.blocks || [];
+}
+
+function getMonthPlanRecord(monthKey = state.ui.selectedMonth, createIfMissing = false) {
+  const normalizedMonth = normalizeMonthValue(monthKey) || currentMonthKey();
+  getMonthPlan(normalizedMonth, createIfMissing);
+  return state.settings.monthlyPlans[normalizedMonth] || makeMonthlyPlanRecord([]);
 }
 
 function getPlanForScope(scope, monthKey = state.ui.selectedMonth, createIfMissing = false) {
@@ -331,8 +397,13 @@ function getPlanForScope(scope, monthKey = state.ui.selectedMonth, createIfMissi
 }
 
 function replacePlanForScope(scope, projects, monthKey = state.ui.selectedMonth) {
-  if (scope === "year") state.settings.yearPlan = projects;
-  else state.settings.monthlyPlans[normalizeMonthValue(monthKey) || currentMonthKey()] = projects;
+  const now = new Date().toISOString();
+  if (scope === "year") state.settings.yearPlan = makeYearPlanRecord(projects, { updatedAtISO: now });
+  else {
+    const normalizedMonth = normalizeMonthValue(monthKey) || currentMonthKey();
+    const existing = state.settings.monthlyPlans[normalizedMonth] || {};
+    state.settings.monthlyPlans[normalizedMonth] = makeMonthlyPlanRecord(projects, { ...existing, updatedAtISO: now });
+  }
 }
 
 function saveState() {
@@ -417,8 +488,9 @@ function bindPageEvents() {
   document.querySelectorAll("[data-add-block]").forEach((button) => button.addEventListener("click", () => openAddBlockSheet(button.dataset.addBlock || state.ui.planEditorScope)));
   document.querySelectorAll("[data-open-block]").forEach((button) => button.addEventListener("click", () => openBlockDetailSheet(button.dataset.blockScope || state.ui.planEditorScope, button.dataset.openBlock)));
   document.querySelectorAll("[data-update-year-plan]").forEach((button) => button.addEventListener("click", updateYearPlanFromThisMonth));
+  document.querySelectorAll("[data-apply-year-plan]").forEach((button) => button.addEventListener("click", applyYearPlanToThisMonth));
   document.querySelectorAll("[data-manage-transactions]").forEach((button) => button.addEventListener("click", openTransactionsManager));
-  document.querySelector("[data-add-rounding-buffer]")?.addEventListener("click", addUnallocatedToSavings);
+  document.querySelector("[data-allocate-gap]")?.addEventListener("click", openAllocateGapSheet);
 }
 
 function renderMonitorPage() {
@@ -441,11 +513,13 @@ function renderPlanningPage() {
   const projects = getPlanForScope(scope, state.ui.selectedMonth, scope === "month" && canEditMonth);
   const allocation = calculateAllocationForProjects(projects);
   const monthLabel = formatMonthLabel(state.ui.selectedMonth);
+  const overrides = scope === "month" ? Object.keys(getMonthPlanRecord(state.ui.selectedMonth, false).actualOverrides).length : 0;
+  const pinnedCount = getAllSubItems(projects).filter((item) => item.active && !item.archived && item.pinToMonitor).length;
   return `
     <section class="page planning-page">
       <article class="planning-card monthly-setup-card ${allocation.isReady ? "balanced" : allocation.status}">
         <div class="planning-accordion-head">
-          <div><p class="section-kicker">Plan template</p><h2>${scope === "year" ? "Year Plan" : `${monthLabel} Plan`}</h2></div>
+          <div><p class="section-kicker">${escapeHtml(scope === "year" ? "Default template" : "Monthly copy")}</p><h2>${scope === "year" ? "Year Plan" : `${monthLabel} Plan`}</h2></div>
           <span class="header-status-pill ${allocation.isReady ? "safe" : allocation.status === "overallocated" ? "freeze" : "neutral"}">${escapeHtml(allocation.displayLabel)}</span>
         </div>
         <div class="scope-switch plan-scope-switch" role="tablist" aria-label="Plan scope">
@@ -453,23 +527,19 @@ function renderPlanningPage() {
           <button class="scope-button ${scope === "month" ? "is-active" : ""}" type="button" data-plan-scope="month" ${canEditMonth ? "" : "disabled"}>${escapeHtml(monthLabel)}</button>
         </div>
         ${renderAllocationMetrics(allocation)}
-        ${renderAlmostBalancedHelper(allocation)}
+        <div class="plan-meta-strip"><span>${pinnedCount} pinned rows</span>${overrides ? `<span>${overrides} actual overrides this month</span>` : ""}</div>
+        ${renderAllocateGapAction(allocation)}
         <p class="settings-note">${escapeHtml(allocation.message)}</p>
         <div class="button-row">
           <button class="action-button" type="button" data-add-block="${scope}">Add Block</button>
-          ${scope === "month" && projects.length ? `<button class="ghost-button" type="button" data-update-year-plan>Update Year Plan from This Month</button>` : ""}
+          ${scope === "month" && hasYearPlan() ? `<button class="ghost-button" type="button" data-apply-year-plan>Apply Year Plan to This Month</button>` : ""}
+          ${scope === "month" && projects.length ? `<button class="ghost-button" type="button" data-update-year-plan>Set as Future Default</button>` : ""}
         </div>
       </article>
       ${scope === "month" && !canEditMonth ? `<section class="empty-state hero-empty"><strong>Year Plan required first.</strong><span>Create the Year Plan before creating monthly copies.</span><button class="action-button" type="button" data-plan-scope="year">Open Year Plan</button></section>` : ""}
       ${scope === "month" && canEditMonth && !projects.length ? `<section class="empty-state hero-empty"><strong>${escapeHtml(monthLabel)} will copy from Year Plan.</strong><span>Open this month to create its independent plan copy.</span><button class="action-button" type="button" data-add-block="month">Add Block</button></section>` : ""}
-      ${projects.length ? `<section class="monthly-plan-sheet compact-plan-sheet">${projects.map((project) => renderPlanStrip(project, scope)).join("")}</section>` : ""}
-      <article class="planning-card is-weak data-center-card">
-        <div class="planning-accordion-head">
-          <div><p class="section-kicker">CSV Backup</p><h2>Data Center</h2></div>
-          <button class="mini-button" type="button" data-open-data>Open</button>
-        </div>
-        <div class="accordion-inline-summary"><strong>CSV import / export</strong><span>Backup and restore monthly allocations.</span></div>
-      </article>
+      ${projects.length ? renderGroupedPlanSections(projects, scope) : ""}
+      <div class="data-link-row"><button class="mini-button" type="button" data-open-data>Data / Backup</button></div>
     </section>
   `;
 }
@@ -490,22 +560,18 @@ function renderAllocationMetrics(allocation) {
   return `
     <div class="setup-metrics allocation-metrics">
       <div><span>Total Income</span><strong>${money(allocation.income)}</strong></div>
-      <div><span>Total Spend</span><strong>${money(allocation.spend)}</strong></div>
-      <div><span>Total Debt</span><strong>${money(allocation.debt)}</strong></div>
-      <div><span>Total Save</span><strong>${money(allocation.save)}</strong></div>
-      <div><span>Total Investment</span><strong>${money(allocation.investment)}</strong></div>
       <div><span>Total Allocation</span><strong>${money(allocation.allocation)}</strong></div>
       <div><span>Gap</span><strong>${money(allocation.difference)}</strong></div>
     </div>
   `;
 }
 
-function renderAlmostBalancedHelper(allocation) {
-  if (!(allocation.difference > 0 && allocation.difference < 10)) return "";
+function renderAllocateGapAction(allocation) {
+  if (!(allocation.difference > 0)) return "";
   return `
     <div class="notice-strip success almost-balanced-helper">
-      <span>${money(allocation.difference)} left unallocated. Add to Savings?</span>
-      <button class="action-button" type="button" data-add-rounding-buffer>Add to Savings</button>
+      <span>${money(allocation.difference)} left unallocated.</span>
+      <button class="action-button" type="button" data-allocate-gap>Allocate Gap</button>
     </div>
   `;
 }
@@ -535,7 +601,7 @@ function renderMonitorEmpty() {
 function renderPlanStrip(project, scope) {
   const stats = calculateProjectStats(project.id, getPlanForScope(scope, state.ui.selectedMonth, false));
   return `
-    <article class="plan-strip">
+    <article class="plan-strip type-${project.type}">
       <button class="plan-strip-main" type="button" data-open-block="${project.id}" data-block-scope="${scope}">
         <div>
           <strong>${escapeHtml(project.label)}</strong>
@@ -551,10 +617,31 @@ function renderPlanStrip(project, scope) {
   `;
 }
 
+function renderGroupedPlanSections(projects, scope) {
+  return `
+    <section class="monthly-plan-sheet compact-plan-sheet">
+      ${PROJECT_TYPES.map((type) => renderPlanTypeSection(type, projects.filter((project) => project.active && !project.archived && project.type === type).sort(byDisplayOrder), scope)).join("")}
+    </section>
+  `;
+}
+
+function renderPlanTypeSection(type, projects, scope) {
+  const total = sum(projects.map((project) => calculateProjectStats(project.id, getPlanForScope(scope, state.ui.selectedMonth, false)).budget));
+  return `
+    <section class="plan-type-section type-${type}">
+      <div class="plan-type-head">
+        <div><span class="type-pill">${escapeHtml(blockTypeLabel(type))}</span><strong>${money(total)}</strong></div>
+        <em>${projects.length} blocks</em>
+      </div>
+      ${projects.length ? projects.map((project) => renderPlanStrip(project, scope)).join("") : `<div class="plan-type-empty">No ${escapeHtml(blockTypeLabel(type).toLowerCase())} blocks yet.</div>`}
+    </section>
+  `;
+}
+
 function renderProjectCard(project) {
-  const stats = calculateProjectStats(project.id);
+  const stats = calculatePinnedProjectStats(project.id);
   const expanded = state.ui.expandedProjects[project.id] !== false;
-  const items = project.subItems.filter((item) => item.active && !item.archived && item.showOnDashboard);
+  const items = project.subItems.filter((item) => item.active && !item.archived && item.pinToMonitor);
   return `
     <article class="group-card">
       <button class="group-card-head" type="button" data-toggle-project="${project.id}">
@@ -567,10 +654,19 @@ function renderProjectCard(project) {
   `;
 }
 
+function calculatePinnedProjectStats(projectId, projects = getPlanForScope("month", state.ui.selectedMonth, false), monthKey = state.ui.selectedMonth) {
+  const project = getProjectById(projectId, projects);
+  if (!project) return { budget: 0, spent: 0, remaining: 0 };
+  const items = project.subItems.filter((item) => item.active && !item.archived && item.pinToMonitor);
+  const budget = sum(items.map((item) => item.monthlyAmount));
+  const spent = sum(items.map((item) => getRowActual(item, projects, monthKey)));
+  return { budget, spent, remaining: Math.max(0, budget - spent) };
+}
+
 function renderSubItemProgress(project, item) {
   const stats = calculateSubItemStats(item.id);
   const percent = item.monthlyAmount ? stats.monthSpent / item.monthlyAmount * 100 : 0;
-  const weekly = project.type === "spend" && item.recordable
+  const weekly = project.type === "spend" && item.pinToMonitor
     ? `${money(stats.weekSpent)} this week · ${money(stats.weekRemaining)} left this week · ${money(stats.monthRemaining)} left this month`
     : `${money(stats.monthRemaining)} remaining`;
   return `
@@ -663,20 +759,24 @@ function openBlockDetailSheet(scope, blockId, options = {}) {
 
 function renderBlockDetailSheet(scope, project) {
   const stats = calculateProjectStats(project.id, getPlanForScope(scope, state.ui.selectedMonth, false));
+  const actualTotal = scope === "year" ? stats.budget : stats.spent;
   return renderSheet(scope === "year" ? "Year Plan Block" : `${formatMonthLabel(state.ui.selectedMonth)} Block`, `
     <div class="section-head"><div><h3>${escapeHtml(project.label)}</h3><p class="settings-note">${escapeHtml(blockTypeLabel(project.type))} · ${project.subItems.length} rows</p></div><strong>${money(stats.budget)}</strong></div>
     <div class="plan-table">
-      <div class="plan-row plan-header"><span>Item</span><span>Plan</span><span>Actual</span><span></span></div>
-      ${project.subItems.length ? project.subItems.map((item) => renderBlockDetailRow(project, item, scope)).join("") : `<div class="plan-row plan-empty"><span>No rows yet.</span><span></span><span></span><span></span></div>`}
-      <div class="plan-row plan-total"><span>Total</span><span>${money(stats.budget)}</span><span>${money(stats.spent)}</span><span></span></div>
+      <div class="plan-row plan-header"><span>Item</span><span>Plan</span><span>Actual</span><span>Status</span><span></span></div>
+      ${project.subItems.length ? project.subItems.map((item) => renderBlockDetailRow(project, item, scope)).join("") : `<div class="plan-row plan-empty"><span>No rows yet.</span><span></span><span></span><span></span><span></span></div>`}
+      <div class="plan-row plan-total"><span>Total</span><span>${money(stats.budget)}</span><span>${money(actualTotal)}</span><span></span><span></span></div>
     </div>
     <form class="quick-form block-detail-form" data-add-row-form="${project.id}" data-plan-scope="${scope}">
       <div class="section-head"><h3>Add Row</h3><span class="tiny-label">Stay in block</span></div>
       <label class="field"><span>Item name</span><input id="blockRowName" name="label" required /></label>
-      <label class="field formula-field"><span>Plan amount</span><input name="monthlyAmount" type="text" inputmode="decimal" data-formula-input required /><small class="formula-preview"></small></label>
+      <label class="field formula-field"><span>Amount</span><input name="monthlyAmount" type="text" inputmode="decimal" data-formula-input required /><small class="formula-preview"></small></label>
+      <label class="field"><span>Frequency</span><select name="frequency"><option value="monthly">Monthly</option><option value="biweekly">Biweekly</option></select></label>
+      <label class="checkbox-row"><input name="pinToMonitor" type="checkbox" /><span>Pin to Monitor</span></label>
       <button class="action-button sheet-save" type="submit">Add Row</button>
     </form>
     <div class="button-row">
+      <button class="ghost-button" type="button" data-open-paste-rows="${project.id}" data-block-scope="${scope}">Paste Rows</button>
       <button class="ghost-button" type="button" data-rename-block="${project.id}" data-block-scope="${scope}">Rename</button>
       <button class="ghost-button" type="button" data-change-block-type="${project.id}" data-block-scope="${scope}">Change Type</button>
       <button class="ghost-button" type="button" data-move-block="${project.id}" data-direction="-1" data-block-scope="${scope}">Move Up</button>
@@ -690,14 +790,15 @@ function renderBlockDetailSheet(scope, project) {
 }
 
 function renderBlockDetailRow(project, item, scope) {
-  const stats = calculateSubItemStats(item.id, getPlanForScope(scope, state.ui.selectedMonth, false), state.ui.selectedMonth);
-  const actual = scope === "year" || project.type === "income" ? 0 : stats.monthSpent;
+  const actual = scope === "year" ? item.monthlyAmount : getRowActual(item, getPlanForScope(scope, state.ui.selectedMonth, false), state.ui.selectedMonth);
+  const status = scope === "month" && getActualOverride(item.id) ? "Override" : item.pinToMonitor ? "Pinned" : "Plan";
   return `
     <div class="plan-row">
       <span>${escapeHtml(item.label)}</span>
-      <span>${money(item.monthlyAmount)}</span>
+      <span>${money(item.monthlyAmount)}<small>${escapeHtml(frequencyLabel(item.frequency))}</small></span>
       <span>${money(actual)}</span>
-      <span><button class="mini-button" type="button" data-edit-row="${item.id}" data-row-scope="${scope}">Edit</button><button class="mini-button danger-text" type="button" data-delete-item="${item.id}" data-row-scope="${scope}">×</button></span>
+      <span><em class="row-status">${escapeHtml(status)}</em></span>
+      <span><button class="mini-button" type="button" data-edit-row="${item.id}" data-row-scope="${scope}">Edit</button>${scope === "month" ? `<button class="mini-button" type="button" data-override-row="${item.id}">Override</button>` : ""}<button class="mini-button danger-text" type="button" data-delete-item="${item.id}" data-row-scope="${scope}">×</button></span>
     </div>
   `;
 }
@@ -750,7 +851,9 @@ function openEditRowSheet(id, scope = state.ui.planEditorScope) {
   modalRoot.innerHTML = renderSheet("Edit Row", `
     <form id="rowEditForm" class="quick-form" data-row-id="${escapeHtml(item.id)}" data-row-scope="${scope}">
       <label class="field"><span>Item name</span><input name="label" value="${escapeHtml(item.label)}" required /></label>
-      <label class="field formula-field"><span>Plan amount</span><input name="monthlyAmount" type="text" inputmode="decimal" value="${escapeHtml(item.monthlyAmountInput || item.monthlyAmount)}" data-formula-input required /><small class="formula-preview"></small></label>
+      <label class="field formula-field"><span>Amount</span><input name="monthlyAmount" type="text" inputmode="decimal" value="${escapeHtml(item.amountInput || item.monthlyAmountInput || item.monthlyAmount)}" data-formula-input required /><small class="formula-preview"></small></label>
+      <label class="field"><span>Frequency</span><select name="frequency"><option value="monthly" ${item.frequency === "monthly" ? "selected" : ""}>Monthly</option><option value="biweekly" ${item.frequency === "biweekly" ? "selected" : ""}>Biweekly</option></select></label>
+      <label class="checkbox-row"><input name="pinToMonitor" type="checkbox" ${item.pinToMonitor ? "checked" : ""} /><span>Pin to Monitor</span></label>
       <button class="action-button sheet-save" type="submit">Save Row</button>
     </form>
   `, "Plan");
@@ -805,6 +908,13 @@ function bindSheetEvents() {
   modalRoot.querySelectorAll("[data-rename-block]").forEach((button) => button.addEventListener("click", () => renameBlock(button.dataset.renameBlock, button.dataset.blockScope || sheetContext?.scope || state.ui.planEditorScope)));
   modalRoot.querySelectorAll("[data-change-block-type]").forEach((button) => button.addEventListener("click", () => changeBlockType(button.dataset.changeBlockType, button.dataset.blockScope || sheetContext?.scope || state.ui.planEditorScope)));
   modalRoot.querySelectorAll("[data-move-block]").forEach((button) => button.addEventListener("click", () => moveBlock(button.dataset.moveBlock, Number(button.dataset.direction), button.dataset.blockScope || sheetContext?.scope || state.ui.planEditorScope)));
+  modalRoot.querySelectorAll("[data-override-row]").forEach((button) => button.addEventListener("click", () => openOverrideSheet(button.dataset.overrideRow)));
+  modalRoot.querySelectorAll("[data-open-paste-rows]").forEach((button) => button.addEventListener("click", () => openPasteRowsSheet(button.dataset.openPasteRows, button.dataset.blockScope || sheetContext?.scope || state.ui.planEditorScope)));
+  modalRoot.querySelectorAll("[data-allocate-to-row]").forEach((button) => button.addEventListener("click", () => allocateGapToRow(button.dataset.allocateToRow)));
+  modalRoot.querySelector("[data-create-save-row]")?.addEventListener("click", createSaveRowForGap);
+  modalRoot.querySelector("#overrideForm")?.addEventListener("submit", saveOverride);
+  modalRoot.querySelector("#clearOverrideButton")?.addEventListener("click", clearOverride);
+  modalRoot.querySelector("#pasteRowsForm")?.addEventListener("submit", pasteRows);
   modalRoot.querySelector("#transactionForm")?.addEventListener("submit", saveTransaction);
   modalRoot.querySelectorAll("[data-item-chip]").forEach((button) => button.addEventListener("click", () => {
     modalRoot.querySelector("input[name='subItemId']").value = button.dataset.itemChip;
@@ -828,7 +938,6 @@ function bindSheetEvents() {
   modalRoot.querySelector("#resetButton")?.addEventListener("click", resetData);
   modalRoot.querySelector("#confirmCsvImportButton")?.addEventListener("click", confirmCsvImport);
   modalRoot.querySelector("#cancelCsvImportButton")?.addEventListener("click", cancelCsvImport);
-  modalRoot.querySelector("[data-add-rounding-buffer]")?.addEventListener("click", addUnallocatedToSavings);
 }
 
 function closeSheet() {
@@ -861,19 +970,24 @@ function addSubItem(event) {
   const project = getProjectById(event.currentTarget.dataset.addRowForm, projects);
   const label = String(form.get("label") || "").trim();
   const parsedAmount = parseAmountField(event.currentTarget.querySelector("input[name='monthlyAmount']"));
+  const frequency = normalizeFrequency(form.get("frequency"));
+  const monthlyAmount = monthlyAmountFromParsed(parsedAmount, frequency);
   if (!project || !label) return;
   if (!parsedAmount.ok) {
     showToast("Invalid formula.");
     return;
   }
   project.subItems.push(normalizeSubItem({
-    id: uniqueId(slugify(label), getAllSubItems().map((item) => item.id)),
+    id: uniqueId(slugify(label), getAllSubItems(projects).map((item) => item.id)),
     parentProjectId: project.id,
     label,
+    amountInput: parsedAmount.input,
     monthlyAmountInput: parsedAmount.input,
-    monthlyAmount: parsedAmount.value,
-    recordable: project.type === "spend",
-    showOnDashboard: true,
+    frequency,
+    monthlyAmount,
+    pinToMonitor: Boolean(form.get("pinToMonitor")),
+    recordable: Boolean(form.get("pinToMonitor")) && project.type === "spend",
+    showOnDashboard: Boolean(form.get("pinToMonitor")),
     displayOrder: project.subItems.length + 1
   }));
   replacePlanForScope(scope, projects, state.ui.selectedMonth);
@@ -886,8 +1000,11 @@ function saveRowEdit(event) {
   const scope = event.currentTarget.dataset.rowScope || sheetContext?.scope || state.ui.planEditorScope;
   const projects = getPlanForScope(scope, state.ui.selectedMonth, scope === "month");
   const item = getSubItemById(event.currentTarget.dataset.rowId, projects);
-  const label = String(new FormData(event.currentTarget).get("label") || "").trim();
+  const form = new FormData(event.currentTarget);
+  const label = String(form.get("label") || "").trim();
   const parsedAmount = parseAmountField(event.currentTarget.querySelector("input[name='monthlyAmount']"));
+  const frequency = normalizeFrequency(form.get("frequency"));
+  const pinToMonitor = Boolean(form.get("pinToMonitor"));
   if (!item || !label) return;
   if (!parsedAmount.ok) {
     showToast("Invalid formula.");
@@ -897,8 +1014,13 @@ function saveRowEdit(event) {
   const realItem = project?.subItems.find((row) => row.id === item.id);
   if (!realItem) return;
   realItem.label = label;
+  realItem.amountInput = parsedAmount.input;
   realItem.monthlyAmountInput = parsedAmount.input;
-  realItem.monthlyAmount = parsedAmount.value;
+  realItem.frequency = frequency;
+  realItem.monthlyAmount = monthlyAmountFromParsed(parsedAmount, frequency);
+  realItem.pinToMonitor = pinToMonitor;
+  realItem.recordable = pinToMonitor && project.type === "spend";
+  realItem.showOnDashboard = pinToMonitor;
   replacePlanForScope(scope, projects, state.ui.selectedMonth);
   saveState();
   openBlockDetailSheet(scope, project.id);
@@ -923,6 +1045,7 @@ function deleteSubItem(id, scope = state.ui.planEditorScope) {
   });
   replacePlanForScope(scope, projects, state.ui.selectedMonth);
   if (scope === "month") state.transactions = state.transactions.filter((tx) => tx.subItemId !== id);
+  if (scope === "month") delete getMonthPlanRecord(state.ui.selectedMonth, true).actualOverrides[id];
   saveState();
   if (sheetContext?.kind === "block-detail" && sheetContext.blockId) openBlockDetailSheet(scope, sheetContext.blockId);
   else closeSheet();
@@ -953,8 +1076,9 @@ function changeBlockType(id, scope = state.ui.planEditorScope) {
   }
   project.type = normalized;
   project.subItems.forEach((item) => {
-    item.recordable = normalized === "spend";
-    item.showOnDashboard = true;
+    item.pinToMonitor = item.pinToMonitor && normalized === "spend";
+    item.recordable = item.pinToMonitor;
+    item.showOnDashboard = item.pinToMonitor;
   });
   replacePlanForScope(scope, projects, state.ui.selectedMonth);
   saveState();
@@ -986,30 +1110,55 @@ function finishSetup() {
   closeSheet();
 }
 
-function addUnallocatedToSavings() {
+function openAllocateGapSheet() {
   const scope = state.ui.activeTab === "planning" ? state.ui.planEditorScope : "month";
   const projects = getPlanForScope(scope, state.ui.selectedMonth, scope === "month");
   const allocation = calculateAllocationForProjects(projects);
-  if (!(allocation.difference > 0 && allocation.difference < 10)) return;
+  if (!(allocation.difference > 0)) return;
+  sheetContext = { kind: "allocate-gap", scope, amount: allocation.difference };
+  const saveRows = getAllSubItems(projects).filter((item) => item.active && !item.archived && getProjectById(item.parentProjectId, projects)?.type === "save");
+  modalRoot.innerHTML = renderSheet("Allocate Gap", `
+    <div class="readonly-card weak-card"><div class="section-head"><h3>${money(allocation.difference)} available</h3><span class="tiny-label">Save</span></div></div>
+    <div class="manager-list">
+      ${saveRows.length ? saveRows.map((item) => `<button class="manager-row" type="button" data-allocate-to-row="${item.id}"><span><strong>${escapeHtml(item.label)}</strong><small>${money(item.monthlyAmount)} planned</small></span><b>Add gap</b></button>`).join("") : `<div class="empty-state">No Save rows yet.</div>`}
+    </div>
+    <button class="action-button" type="button" data-create-save-row>+ Create New Save Item</button>
+  `, "Plan");
+  bindSheetEvents();
+}
+
+function allocateGapToRow(rowId) {
+  const scope = sheetContext?.scope || state.ui.planEditorScope;
+  const projects = getPlanForScope(scope, state.ui.selectedMonth, scope === "month");
+  const allocation = calculateAllocationForProjects(projects);
+  const project = projects.find((block) => block.subItems.some((row) => row.id === rowId));
+  const item = project?.subItems.find((row) => row.id === rowId);
+  if (!item || !(allocation.difference > 0)) return;
+  item.monthlyAmount = roundCents(item.monthlyAmount + allocation.difference);
+  item.amountInput = String(item.monthlyAmount);
+  item.monthlyAmountInput = item.amountInput;
+  item.frequency = "monthly";
+  replacePlanForScope(scope, projects, state.ui.selectedMonth);
+  saveState();
+  showToast("Gap allocated.");
+  closeSheet();
+}
+
+function createSaveRowForGap() {
+  const scope = sheetContext?.scope || state.ui.planEditorScope;
+  const projects = getPlanForScope(scope, state.ui.selectedMonth, scope === "month");
+  const allocation = calculateAllocationForProjects(projects);
+  if (!(allocation.difference > 0)) return;
   let project = projects.find((item) => item.active && !item.archived && item.type === "save");
   if (!project) {
     project = normalizeProject({ id: uniqueId("savings", projects.map((item) => item.id)), label: "Savings", type: "save", displayOrder: projects.length + 1, subItems: [] });
     projects.push(project);
   }
-  let buffer = project.subItems.find((item) => item.active && !item.archived && item.label.toLowerCase() === "rounding buffer");
-  if (!buffer) {
-    buffer = normalizeSubItem({ id: uniqueId("rounding-buffer", getAllSubItems(projects).map((item) => item.id)), parentProjectId: project.id, label: "Rounding Buffer", monthlyAmountInput: "0", monthlyAmount: 0, recordable: false, showOnDashboard: false, active: true, archived: false, displayOrder: project.subItems.length + 1 });
-    project.subItems.push(buffer);
-  }
-  buffer.monthlyAmount = roundCents(buffer.monthlyAmount + allocation.difference);
-  buffer.monthlyAmountInput = String(buffer.monthlyAmount);
+  project.subItems.push(normalizeSubItem({ id: uniqueId("allocated-gap", getAllSubItems(projects).map((item) => item.id)), parentProjectId: project.id, label: "Allocated Gap", amountInput: String(allocation.difference), frequency: "monthly", monthlyAmount: allocation.difference, pinToMonitor: false, active: true, archived: false, displayOrder: project.subItems.length + 1 }));
   replacePlanForScope(scope, projects, state.ui.selectedMonth);
-  state.ui.setupComplete = calculateAllocationForProjects(getPlanForScope("month", state.ui.selectedMonth, false)).isReady;
   saveState();
-  showToast("Rounding Buffer updated.");
-  if (sheetContext?.kind === "block-detail") openBlockDetailSheet(scope, project.id);
-  else if (state.ui.activeTab === "planning") render();
-  else render();
+  showToast("Save row created.");
+  closeSheet();
 }
 
 function updateYearPlanFromThisMonth() {
@@ -1018,10 +1167,128 @@ function updateYearPlanFromThisMonth() {
     showToast("Create this month before updating Year Plan.");
     return;
   }
-  state.settings.yearPlan = cloneProjects(monthProjects, true);
+  state.settings.yearPlan = makeYearPlanRecord(cloneProjects(monthProjects, true), { updatedAtISO: new Date().toISOString() });
   saveState();
-  showToast("Year Plan updated from this month.");
+  showToast("Future default updated.");
   render();
+}
+
+function applyYearPlanToThisMonth() {
+  if (!hasYearPlan()) return;
+  const monthKey = state.ui.selectedMonth;
+  const existing = getMonthPlanRecord(monthKey, false);
+  const hasMonthData = existing.blocks.length || Object.keys(existing.actualOverrides || {}).length || state.transactions.some((tx) => tx.dateISO.startsWith(monthKey));
+  if (hasMonthData && !window.confirm("Replace this month's plan with the current Year Plan? Transactions stay saved, but this month’s blocks and overrides will be replaced.")) return;
+  state.settings.monthlyPlans[monthKey] = makeMonthlyPlanRecord(cloneProjects(getYearPlan(), false), {
+    createdFromYearPlanAtISO: new Date().toISOString(),
+    updatedAtISO: new Date().toISOString()
+  });
+  saveState();
+  showToast("Year Plan applied to this month.");
+  render();
+}
+
+function openOverrideSheet(rowId) {
+  const projects = getPlanForScope("month", state.ui.selectedMonth, true);
+  const item = getSubItemById(rowId, projects);
+  if (!item) return;
+  const actual = getRowActual(item, projects, state.ui.selectedMonth);
+  const override = getActualOverride(rowId);
+  sheetContext = { kind: "override", scope: "month", rowId, blockId: item.parentProjectId };
+  modalRoot.innerHTML = renderSheet("Override Actual", `
+    <form id="overrideForm" class="quick-form" data-row-id="${escapeHtml(rowId)}">
+      <div class="readonly-card weak-card"><div class="section-head"><h3>${escapeHtml(item.label)}</h3><span class="tiny-label">Actual</span></div><p class="settings-note">Plan ${money(item.monthlyAmount)} · Current ${money(actual)}</p></div>
+      <label class="field formula-field"><span>Override actual</span><input name="amount" type="text" inputmode="decimal" value="${escapeHtml(override?.amountInput || "")}" data-formula-input required /><small class="formula-preview"></small></label>
+      <label class="field"><span>Note</span><input name="note" type="text" value="${escapeHtml(override?.note || "")}" /></label>
+      <div class="button-row"><button class="action-button" type="submit">Save Override</button><button id="clearOverrideButton" class="ghost-button" type="button">Clear Override</button></div>
+    </form>
+  `, "Plan");
+  bindSheetEvents();
+}
+
+function saveOverride(event) {
+  event.preventDefault();
+  const rowId = event.currentTarget.dataset.rowId;
+  const parsed = parseAmountField(event.currentTarget.querySelector("input[name='amount']"));
+  if (!parsed.ok) {
+    showToast("Invalid formula.");
+    return;
+  }
+  const month = getMonthPlanRecord(state.ui.selectedMonth, true);
+  month.actualOverrides[rowId] = {
+    amountInput: parsed.input,
+    amount: parsed.value,
+    note: String(new FormData(event.currentTarget).get("note") || "").trim(),
+    updatedAtISO: new Date().toISOString()
+  };
+  saveState();
+  showToast("Actual override saved.");
+  openBlockDetailSheet("month", sheetContext?.blockId);
+}
+
+function clearOverride() {
+  const rowId = sheetContext?.rowId;
+  const blockId = sheetContext?.blockId;
+  if (!rowId) return;
+  const month = getMonthPlanRecord(state.ui.selectedMonth, true);
+  delete month.actualOverrides[rowId];
+  month.updatedAtISO = new Date().toISOString();
+  saveState();
+  showToast("Override cleared.");
+  openBlockDetailSheet("month", blockId);
+}
+
+function openPasteRowsSheet(blockId, scope) {
+  const project = getProjectById(blockId, getPlanForScope(scope, state.ui.selectedMonth, scope === "month"));
+  if (!project) return;
+  sheetContext = { kind: "paste-rows", scope, blockId };
+  modalRoot.innerHTML = renderSheet("Paste Rows", `
+    <form id="pasteRowsForm" class="quick-form">
+      <p class="settings-note">One row per line: item name, amount, frequency, optional pin.</p>
+      <label class="field"><span>Rows</span><textarea name="rows" rows="8" placeholder="Groceries,750,monthly,pin&#10;Paycheque,2300,biweekly"></textarea></label>
+      <button class="action-button" type="submit">Add Rows</button>
+    </form>
+  `, "Plan");
+  bindSheetEvents();
+}
+
+function pasteRows(event) {
+  event.preventDefault();
+  const scope = sheetContext?.scope || state.ui.planEditorScope;
+  const blockId = sheetContext?.blockId;
+  const projects = getPlanForScope(scope, state.ui.selectedMonth, scope === "month");
+  const project = getProjectById(blockId, projects);
+  if (!project) return;
+  const lines = String(new FormData(event.currentTarget).get("rows") || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  let added = 0;
+  let skipped = 0;
+  lines.forEach((line) => {
+    const [labelRaw, amountRaw, frequencyRaw, pinRaw] = line.split(",").map((part) => String(part || "").trim());
+    const parsed = parseFormula(amountRaw);
+    if (!labelRaw || !parsed.ok) {
+      skipped += 1;
+      return;
+    }
+    const frequency = normalizeFrequency(frequencyRaw);
+    const pinToMonitor = /^pin|yes|true|monitor$/i.test(pinRaw || "");
+    project.subItems.push(normalizeSubItem({
+      id: uniqueId(slugify(labelRaw), getAllSubItems(projects).map((item) => item.id)),
+      parentProjectId: project.id,
+      label: labelRaw,
+      amountInput: parsed.input,
+      frequency,
+      monthlyAmount: monthlyAmountFromParsed(parsed, frequency),
+      pinToMonitor,
+      recordable: pinToMonitor && project.type === "spend",
+      showOnDashboard: pinToMonitor,
+      displayOrder: project.subItems.length + 1
+    }));
+    added += 1;
+  });
+  replacePlanForScope(scope, projects, state.ui.selectedMonth);
+  saveState();
+  showToast(skipped ? `${added} rows added, ${skipped} skipped.` : `${added} rows added.`);
+  openBlockDetailSheet(scope, blockId, { focusRowInput: true });
 }
 
 function saveTransaction(event) {
@@ -1114,8 +1381,8 @@ function importCSV(event) {
 
 function renderImportPreviewSheet() {
   const imported = pendingCsvImport.state;
-  const monthlyBlockCount = Object.values(imported.settings.monthlyPlans || {}).reduce((total, projects) => total + projects.length, 0);
-  const stats = [["Year Blocks", imported.settings.yearPlan.length], ["Month Blocks", monthlyBlockCount], ["Rows", getAllSubItems(imported.settings.yearPlan).length + Object.values(imported.settings.monthlyPlans || {}).reduce((total, projects) => total + getAllSubItems(projects).length, 0)], ["Transactions", imported.transactions.length], ["Skipped rows", pendingCsvImport.skipped]];
+  const monthlyBlockCount = Object.values(imported.settings.monthlyPlans || {}).reduce((total, plan) => total + getBlocksFromPlan(plan).length, 0);
+  const stats = [["Year Blocks", getYearBlocksFrom(imported).length], ["Month Blocks", monthlyBlockCount], ["Rows", getAllSubItems(getYearBlocksFrom(imported)).length + Object.values(imported.settings.monthlyPlans || {}).reduce((total, plan) => total + getAllSubItems(getBlocksFromPlan(plan)).length, 0)], ["Transactions", imported.transactions.length], ["Skipped rows", pendingCsvImport.skipped]];
   return renderSheet("Import Preview", `
     <div class="import-preview-grid">${stats.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${value}</strong></div>`).join("")}</div>
     <div class="notice-strip warning">Importing will replace current local data.</div>
@@ -1142,28 +1409,29 @@ function cancelCsvImport() {
 
 function downloadSampleCSV() {
   const sample = structuredClone(DEFAULT_STATE);
-  sample.settings.yearPlan.push(normalizeProject({ id: "income", label: "Income", type: "income", displayOrder: 1, subItems: [{ id: "salary", parentProjectId: "income", label: "Salary", monthlyAmountInput: "1000", monthlyAmount: 1000, active: true }] }));
-  sample.settings.yearPlan.push(normalizeProject({ id: "spend", label: "Spend", type: "spend", displayOrder: 2, subItems: [{ id: "groceries", parentProjectId: "spend", label: "Groceries", monthlyAmountInput: "1000", monthlyAmount: 1000, recordable: true, showOnDashboard: true, active: true }] }));
-  sample.settings.monthlyPlans[state.ui.selectedMonth] = cloneProjects(sample.settings.yearPlan, true);
+  sample.settings.yearPlan.blocks.push(normalizeProject({ id: "income", label: "Income", type: "income", displayOrder: 1, subItems: [{ id: "salary", parentProjectId: "income", label: "Salary", amountInput: "1000", frequency: "monthly", monthlyAmount: 1000, active: true }] }));
+  sample.settings.yearPlan.blocks.push(normalizeProject({ id: "spend", label: "Spend", type: "spend", displayOrder: 2, subItems: [{ id: "groceries", parentProjectId: "spend", label: "Groceries", amountInput: "1000", frequency: "monthly", monthlyAmount: 1000, pinToMonitor: true, active: true }] }));
+  sample.settings.monthlyPlans[state.ui.selectedMonth] = makeMonthlyPlanRecord(cloneProjects(sample.settings.yearPlan.blocks, true));
   sample.transactions.push({ id: "sample-transaction", dateISO: `${state.ui.selectedMonth}-01`, amount: 25, subItemId: "groceries", note: "Example transaction" });
   downloadText("finance-tracker-v3-sample.csv", serializeStateToCSV(sample), "text/csv");
   showToast("Sample CSV downloaded.");
 }
 
 function serializeStateToCSV(source) {
-  const columns = ["record_type", "plan_scope", "plan_month", "id", "parent_id", "label", "amount", "amount_input", "monthly_amount", "monthly_amount_input", "date", "sub_item_id", "project_type", "recordable", "show_on_dashboard", "active", "archived", "display_order"];
+  const columns = ["record_type", "plan_scope", "plan_month", "id", "parent_id", "label", "amount", "amount_input", "monthly_amount", "monthly_amount_input", "frequency", "date", "sub_item_id", "project_type", "pin_to_monitor", "active", "archived", "display_order", "note"];
   const rows = [columns];
-  source.settings.yearPlan.forEach((project) => {
-    rows.push(["project", "year", "", project.id, "", project.label, "", "", "", "", "", "", project.type, "", "", project.active, project.archived, project.displayOrder]);
-    project.subItems.forEach((item) => rows.push(["sub_item", "year", "", item.id, project.id, item.label, "", "", item.monthlyAmount, item.monthlyAmountInput || item.monthlyAmount, "", "", "", item.recordable, item.showOnDashboard, item.active, item.archived, item.displayOrder]));
+  getYearBlocksFrom(source).forEach((project) => {
+    rows.push(["project", "year", "", project.id, "", project.label, "", "", "", "", "", "", "", project.type, "", project.active, project.archived, project.displayOrder, ""]);
+    project.subItems.forEach((item) => rows.push(["sub_item", "year", "", item.id, project.id, item.label, "", "", item.monthlyAmount, item.amountInput || item.monthlyAmountInput || item.monthlyAmount, item.frequency || "monthly", "", "", "", item.pinToMonitor, item.active, item.archived, item.displayOrder, ""]));
   });
   Object.entries(source.settings.monthlyPlans || {}).forEach(([monthKey, projects]) => {
-    projects.forEach((project) => {
-      rows.push(["project", "month", monthKey, project.id, "", project.label, "", "", "", "", "", "", project.type, "", "", project.active, project.archived, project.displayOrder]);
-      project.subItems.forEach((item) => rows.push(["sub_item", "month", monthKey, item.id, project.id, item.label, "", "", item.monthlyAmount, item.monthlyAmountInput || item.monthlyAmount, "", "", "", item.recordable, item.showOnDashboard, item.active, item.archived, item.displayOrder]));
+    getBlocksFromPlan(projects).forEach((project) => {
+      rows.push(["project", "month", monthKey, project.id, "", project.label, "", "", "", "", "", "", "", project.type, "", project.active, project.archived, project.displayOrder, ""]);
+      project.subItems.forEach((item) => rows.push(["sub_item", "month", monthKey, item.id, project.id, item.label, "", "", item.monthlyAmount, item.amountInput || item.monthlyAmountInput || item.monthlyAmount, item.frequency || "monthly", "", "", "", item.pinToMonitor, item.active, item.archived, item.displayOrder, ""]));
     });
+    Object.entries(projects.actualOverrides || {}).forEach(([rowId, override]) => rows.push(["actual_override", "month", monthKey, rowId, "", "", override.amount, override.amountInput || override.amount, "", "", "", "", "", "", "", true, false, "", override.note || ""]));
   });
-  source.transactions.forEach((tx) => rows.push(["transaction", "", "", tx.id, "", "", tx.amount, tx.amountInput || tx.amount, "", "", tx.dateISO, tx.subItemId, "", "", "", true, false, ""]));
+  source.transactions.forEach((tx) => rows.push(["transaction", "", "", tx.id, "", "", tx.amount, tx.amountInput || tx.amount, "", "", "", tx.dateISO, tx.subItemId, "", "", true, false, "", tx.note || ""]));
   return rows.map((row) => row.map(csvEscape).join(",")).join("\n");
 }
 
@@ -1180,20 +1448,23 @@ function parseCSVToState(text) {
       const scope = row.plan_scope === "month" ? "month" : "year";
       const monthKey = normalizeMonthValue(row.plan_month) || state.ui.selectedMonth;
       const targetProjects = scope === "year"
-        ? next.settings.yearPlan
-        : (next.settings.monthlyPlans[monthKey] ||= []);
+        ? next.settings.yearPlan.blocks
+        : ((next.settings.monthlyPlans[monthKey] ||= makeMonthlyPlanRecord([])).blocks);
       const targetMap = scope === "year"
         ? projectMaps.year
         : (projectMaps.month[monthKey] ||= new Map());
       if (row.record_type === "project" || row.record_type === "budget_group") {
-        const project = normalizeProject({ id: row.id, label: row.label, type: row.project_type || row.group_type || "spend", active: bool(row.active), archived: bool(row.archived), displayOrder: number(row.display_order) || 1, subItems: [] });
+        const project = normalizeProject({ id: row.id, label: row.label, type: row.project_type || row.group_type || "spend", active: row.active === "" ? true : bool(row.active), archived: bool(row.archived), displayOrder: number(row.display_order) || 1, subItems: [] });
         targetProjects.push(project);
         targetMap.set(project.id, project);
       } else if (row.record_type === "sub_item" || row.record_type === "subcategory") {
         const project = targetMap.get(row.parent_id);
-        const item = normalizeSubItem({ id: row.id, parentProjectId: row.parent_id, label: row.label, monthlyAmountInput: row.monthly_amount_input || row.monthly_amount || row.monthly_budget, monthlyAmount: number(row.monthly_amount || row.monthly_budget), recordable: bool(row.recordable), showOnDashboard: row.show_on_dashboard === "" ? true : bool(row.show_on_dashboard), active: bool(row.active), archived: bool(row.archived), displayOrder: number(row.display_order) || 1 });
+        const item = normalizeSubItem({ id: row.id, parentProjectId: row.parent_id, label: row.label, amountInput: row.monthly_amount_input || row.amount_input || row.monthly_amount || row.monthly_budget, frequency: row.frequency, monthlyAmount: number(row.monthly_amount || row.monthly_budget), pinToMonitor: row.pin_to_monitor === "" ? bool(row.recordable) || bool(row.show_on_dashboard) : bool(row.pin_to_monitor), active: row.active === "" ? true : bool(row.active), archived: bool(row.archived), displayOrder: number(row.display_order) || 1 });
         if (project && item) project.subItems.push(item);
         else skipped += 1;
+      } else if (row.record_type === "actual_override") {
+        const plan = next.settings.monthlyPlans[monthKey] ||= makeMonthlyPlanRecord([]);
+        plan.actualOverrides[row.id] = { amountInput: row.amount_input || row.amount, amount: number(row.amount), note: row.note || "", updatedAtISO: new Date().toISOString() };
       } else if (row.record_type === "transaction") {
         const tx = normalizeTransaction({ id: row.id, amountInput: row.amount_input || row.amount, amount: number(row.amount), dateISO: row.date, subItemId: row.sub_item_id || row.subcategory_id });
         if (tx) next.transactions.push(tx);
@@ -1249,7 +1520,9 @@ function calculateAllocationForProjects(projects = []) {
 }
 
 function calculateAllocation(source = state) {
-  return calculateAllocationForProjects(getPlanForScope("month", source.ui?.selectedMonth || state.ui.selectedMonth, false));
+  const monthKey = source.ui?.selectedMonth || state.ui.selectedMonth;
+  const plan = source === state ? getPlanForScope("month", monthKey, false) : getBlocksFromPlan(source.settings?.monthlyPlans?.[monthKey]);
+  return calculateAllocationForProjects(plan);
 }
 
 function calculateDashboardTotals() {
@@ -1257,7 +1530,7 @@ function calculateDashboardTotals() {
   const weekKey = getWeekKey(getReferenceDateISO(month));
   const weekEnd = getWeekEnd(weekKey);
   const monthProjects = getPlanForScope("month", month, false);
-  const spendItems = new Set(getAllSubItems(monthProjects).filter((item) => getProjectById(item.parentProjectId, monthProjects)?.type === "spend").map((item) => item.id));
+  const spendItems = new Set(getAllSubItems(monthProjects).filter((item) => item.pinToMonitor && getProjectById(item.parentProjectId, monthProjects)?.type === "spend").map((item) => item.id));
   const monthSpent = sum(state.transactions.filter((tx) => spendItems.has(tx.subItemId) && tx.dateISO.startsWith(month)).map((tx) => tx.amount));
   const weekSpent = sum(state.transactions.filter((tx) => spendItems.has(tx.subItemId) && tx.dateISO >= weekKey && tx.dateISO <= weekEnd).map((tx) => tx.amount));
   const spendBudget = calculateAllocation().spend;
@@ -1268,14 +1541,14 @@ function calculateProjectStats(projectId, projects = getPlanForScope("month", st
   const project = getProjectById(projectId, projects);
   if (!project) return { budget: 0, spent: 0, remaining: 0 };
   const budget = sum(project.subItems.filter((item) => item.active && !item.archived).map((item) => item.monthlyAmount));
-  const spent = project.type === "income" ? 0 : sum(state.transactions.filter((tx) => project.subItems.some((item) => item.id === tx.subItemId) && tx.dateISO.startsWith(monthKey)).map((tx) => tx.amount));
+  const spent = sum(project.subItems.filter((item) => item.active && !item.archived).map((item) => getRowActual(item, projects, monthKey)));
   return { budget, spent, remaining: Math.max(0, budget - spent) };
 }
 
 function calculateSubItemStats(subItemId, projects = getPlanForScope("month", state.ui.selectedMonth, false), monthKey = state.ui.selectedMonth) {
   const item = getSubItemById(subItemId, projects);
   if (!item) return { monthSpent: 0, weekSpent: 0, weeklyAllowance: 0, weekRemaining: 0, monthRemaining: 0 };
-  const monthSpent = sum(state.transactions.filter((tx) => tx.subItemId === subItemId && tx.dateISO.startsWith(monthKey)).map((tx) => tx.amount));
+  const monthSpent = getRowActual(item, projects, monthKey);
   const weekKey = getWeekKey(getReferenceDateISO(monthKey));
   const weekEnd = getWeekEnd(weekKey);
   const weekSpent = sum(state.transactions.filter((tx) => tx.subItemId === subItemId && tx.dateISO >= weekKey && tx.dateISO <= weekEnd).map((tx) => tx.amount));
@@ -1289,7 +1562,7 @@ function getActiveProjects() {
 }
 
 function getDashboardProjects(projects = getPlanForScope("month", state.ui.selectedMonth, false)) {
-  return (projects || []).filter((project) => project.active && !project.archived && project.subItems.some((item) => item.active && !item.archived && item.showOnDashboard));
+  return (projects || []).filter((project) => project.active && !project.archived && project.subItems.some((item) => item.active && !item.archived && item.pinToMonitor));
 }
 
 function getProjectById(id, projects = getPlanForScope("month", state.ui.selectedMonth, false)) {
@@ -1297,13 +1570,13 @@ function getProjectById(id, projects = getPlanForScope("month", state.ui.selecte
 }
 
 function getAllSubItems(source = getPlanForScope("month", state.ui.selectedMonth, false)) {
-  const projects = Array.isArray(source) ? source : Array.isArray(source.settings?.projects) ? source.settings.projects : Array.isArray(source.settings?.yearPlan) ? source.settings.yearPlan : [];
+  const projects = Array.isArray(source) ? source : Array.isArray(source.settings?.projects) ? source.settings.projects : getBlocksFromPlan(source.settings?.yearPlan);
   return projects.flatMap((project) => project.subItems.map((item) => ({ ...item, parentProjectId: project.id, projectLabel: project.label, projectType: project.type })));
 }
 
 function getRecordableItems() {
   const monthProjects = getPlanForScope("month", state.ui.selectedMonth, true);
-  return getAllSubItems(monthProjects).filter((item) => item.active && !item.archived && item.recordable && getProjectById(item.parentProjectId, monthProjects)?.type === "spend").sort(byDisplayOrder);
+  return getAllSubItems(monthProjects).filter((item) => item.active && !item.archived && item.pinToMonitor && getProjectById(item.parentProjectId, monthProjects)?.type === "spend").sort(byDisplayOrder);
 }
 
 function getSubItemById(id, projects = getPlanForScope("month", state.ui.selectedMonth, false)) {
@@ -1312,6 +1585,17 @@ function getSubItemById(id, projects = getPlanForScope("month", state.ui.selecte
 
 function getSubItemLabel(id) {
   return getSubItemById(id)?.label || startCase(id || "Unknown");
+}
+
+function getActualOverride(rowId, monthKey = state.ui.selectedMonth) {
+  return getMonthPlanRecord(monthKey, false).actualOverrides?.[rowId] || null;
+}
+
+function getRowActual(item, projects = getPlanForScope("month", state.ui.selectedMonth, false), monthKey = state.ui.selectedMonth) {
+  const override = getActualOverride(item.id, monthKey);
+  if (override) return override.amount;
+  if (item.pinToMonitor) return sum(state.transactions.filter((tx) => tx.subItemId === item.id && tx.dateISO.startsWith(monthKey)).map((tx) => tx.amount));
+  return item.monthlyAmount;
 }
 
 function getScopedTransactions() {
@@ -1357,10 +1641,23 @@ function blockTypeLabel(type) {
   return type === "save" ? "Save" : startCase(type);
 }
 
+function normalizeFrequency(value) {
+  return String(value || "").toLowerCase() === "biweekly" ? "biweekly" : "monthly";
+}
+
+function frequencyLabel(value) {
+  return normalizeFrequency(value) === "biweekly" ? "Biweekly" : "Monthly";
+}
+
+function monthlyAmountFromParsed(parsed, frequency) {
+  return roundCents(normalizeFrequency(frequency) === "biweekly" ? parsed.value * 26 / 12 : parsed.value);
+}
+
 function bindFormulaInputs(root = document) {
   root.querySelectorAll("[data-formula-input]").forEach((input) => {
     const update = () => updateFormulaPreview(input);
     input.addEventListener("input", update);
+    input.closest("form")?.querySelector("select[name='frequency']")?.addEventListener("change", update);
     update();
   });
 }
@@ -1379,7 +1676,8 @@ function updateFormulaPreview(input, parsed = parseFormula(input?.value || "")) 
   if (!parsed.input) {
     preview.textContent = "";
   } else if (parsed.ok) {
-    preview.textContent = `= ${money(parsed.value)}`;
+    const frequency = normalizeFrequency(input.closest("form")?.querySelector("select[name='frequency']")?.value);
+    preview.textContent = frequency === "biweekly" ? `${money(parsed.value)} biweekly = ${money(monthlyAmountFromParsed(parsed, frequency))} monthly` : `= ${money(parsed.value)}`;
   } else {
     preview.textContent = "Invalid formula";
   }

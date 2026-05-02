@@ -803,11 +803,87 @@ button:disabled {
 }
 
 .compact-plan-sheet {
-  gap: 10px;
+  gap: 16px;
 }
 
 .plan-scope-switch {
   justify-self: start;
+}
+
+.plan-meta-strip {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 8px;
+}
+
+.plan-meta-strip span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 8px;
+}
+
+.data-link-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.plan-type-section {
+  display: grid;
+  gap: 8px;
+}
+
+.plan-type-head {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding: 0 2px 8px;
+}
+
+.plan-type-head div {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.plan-type-head strong {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.plan-type-head em,
+.plan-type-empty {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.plan-type-section.type-save .type-pill,
+.plan-strip.type-save {
+  border-color: var(--gold-line);
+}
+
+.plan-type-section.type-debt .type-pill,
+.plan-strip.type-debt {
+  border-color: #d9c9c4;
+}
+
+.plan-type-section.type-investment .type-pill,
+.plan-strip.type-investment {
+  border-color: #c9cfd1;
+}
+
+.plan-type-section.type-income .type-pill,
+.plan-strip.type-income {
+  border-color: #d0d2cf;
+}
+
+.plan-type-section.type-spend .type-pill,
+.plan-strip.type-spend {
+  border-color: #d9d1c7;
 }
 
 .plan-strip {
@@ -815,6 +891,29 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: 14px;
   overflow: hidden;
+  position: relative;
+}
+
+.plan-strip::before {
+  background: var(--line-strong);
+  bottom: 0;
+  content: "";
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: 2px;
+}
+
+.plan-strip.type-save::before {
+  background: var(--gold);
+}
+
+.plan-strip.type-debt::before {
+  background: #b8998f;
+}
+
+.plan-strip.type-investment::before {
+  background: #717b7d;
 }
 
 .plan-strip-main {
@@ -912,7 +1011,7 @@ button:disabled {
   border-bottom: 1px solid var(--line);
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(0, 1.4fr) minmax(62px, 0.7fr) minmax(62px, 0.7fr) 78px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(62px, 0.7fr) minmax(62px, 0.7fr) minmax(62px, 0.55fr) 132px;
   min-height: 38px;
   padding: 8px 10px;
 }
@@ -926,6 +1025,23 @@ button:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.plan-row small {
+  color: var(--muted);
+  display: block;
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.row-status {
+  background: var(--slate-soft);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 11px;
+  font-style: normal;
+  padding: 4px 7px;
 }
 
 .plan-header,
@@ -1010,6 +1126,15 @@ button:disabled {
   .plan-strip-main em {
     grid-column: 1 / -1;
     justify-self: start;
+  }
+
+  .plan-row {
+    grid-template-columns: minmax(0, 1.2fr) minmax(58px, 0.7fr) minmax(58px, 0.7fr);
+  }
+
+  .plan-row span:nth-child(4),
+  .plan-row span:nth-child(5) {
+    grid-column: 1 / -1;
   }
 }
 

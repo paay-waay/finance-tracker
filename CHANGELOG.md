@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-05-01 · V3.4.0 Premium Planning System
+
+- Migrated planning data into `yearPlan.blocks` plus independent monthly plan records with per-month actual overrides.
+- Added frequency-aware rows with monthly and biweekly conversion while preserving formula input text.
+- Replaced row tracking internals with the user-facing `Pin to Monitor` toggle; pinned rows appear in Monitor and Quick Add, unpinned rows use Plan as Actual.
+- Added per-month Actual Override sheets, Apply Year Plan to This Month, Set as Future Default, Allocate Gap, and Paste Rows.
+- Grouped Planning blocks into restrained Income, Spend, Debt, Save, and Investment sections with premium compact strips.
+- Updated service worker cache version to `finance-tracker-cache-v3-4-0`.
+
 ## 2026-05-01 · V3.3.4 Premium UI Restyle
 
 - Restyled the app with a restrained black, ivory, graphite, and muted gold visual system inspired by private wealth dashboards.
