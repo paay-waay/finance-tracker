@@ -1,4 +1,4 @@
-const APP_VERSION = "V3.4.0 Premium Planning System";
+const APP_VERSION = "V3.5.0 Visual Monitor + Savings Dashboard";
 const SCHEMA_VERSION = 8;
 const STORAGE_KEY = "financeTracker_v3";
 
@@ -196,7 +196,16 @@ function migrateToProjects(input) {
 
   if (Array.isArray(input.settings?.reserveVaults)) {
     const save = ensureProject("Savings", "save");
-    input.settings.reserveVaults.forEach((vault) => addItem(save, { ...vault, label: vault.name, monthlyAmount: vault.currentAmount }, vault.name, vault.currentAmount, false, vault.includeInMonitor !== false));
+    input.settings.reserveVaults.forEach((vault) => addItem(save, {
+      ...vault,
+      label: vault.name,
+      monthlyAmount: vault.monthlyAmount || 0,
+      currentBalance: vault.currentAmount ?? vault.currentBalance,
+      currentBalanceInput: vault.currentAmountInput ?? vault.currentBalanceInput ?? vault.currentAmount ?? vault.currentBalance,
+      targetAmount: vault.targetAmount,
+      targetAmountInput: vault.targetAmountInput ?? vault.targetAmount,
+      showAsVault: vault.includeInMonitor !== false
+    }, vault.name, vault.monthlyAmount || 0, false, false));
   }
 
   if (Array.isArray(input.settings?.backgroundSections)) {
@@ -250,6 +259,10 @@ function normalizeSubItem(raw) {
   const baseAmount = roundCents(parsedAmount.ok ? parsedAmount.value : Number(raw.amount ?? raw.monthlyAmount ?? raw.monthlyBudget) || 0);
   const monthlyAmount = roundCents(frequency === "biweekly" ? baseAmount * 26 / 12 : baseAmount);
   const pinToMonitor = Boolean(raw.pinToMonitor ?? raw.showOnDashboard ?? raw.recordable ?? false);
+  const targetAmountInput = raw.targetAmountInput == null || raw.targetAmountInput === "" ? "" : String(raw.targetAmountInput ?? raw.targetAmount ?? "");
+  const parsedTarget = targetAmountInput ? parseFormula(targetAmountInput) : { ok: true, value: 0 };
+  const currentBalanceInput = raw.currentBalanceInput == null || raw.currentBalanceInput === "" ? "" : String(raw.currentBalanceInput ?? raw.currentBalance ?? raw.currentAmount ?? "");
+  const parsedCurrent = currentBalanceInput ? parseFormula(currentBalanceInput) : { ok: true, value: 0 };
   return {
     id: id || uid("item"),
     parentProjectId: String(raw.parentProjectId || raw.groupId || ""),
@@ -261,6 +274,11 @@ function normalizeSubItem(raw) {
     recordable: pinToMonitor,
     showOnDashboard: pinToMonitor,
     pinToMonitor,
+    targetAmountInput,
+    targetAmount: roundCents(parsedTarget.ok ? parsedTarget.value : Number(raw.targetAmount) || 0),
+    currentBalanceInput,
+    currentBalance: roundCents(parsedCurrent.ok ? parsedCurrent.value : Number(raw.currentBalance ?? raw.currentAmount) || 0),
+    showAsVault: Boolean(raw.showAsVault ?? raw.includeInMonitor ?? false),
     active: raw.active !== false,
     archived: Boolean(raw.archived),
     displayOrder: Number(raw.displayOrder) || 1
@@ -480,6 +498,12 @@ function bindPageEvents() {
     saveState();
     render();
   }));
+  document.querySelectorAll("[data-toggle-monitor-row]").forEach((button) => button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    state.ui.expandedProjects[button.dataset.toggleMonitorRow] = !state.ui.expandedProjects[button.dataset.toggleMonitorRow];
+    saveState();
+    render();
+  }));
   document.querySelectorAll("[data-plan-scope]").forEach((button) => button.addEventListener("click", () => {
     state.ui.planEditorScope = button.dataset.planScope === "month" ? "month" : "year";
     saveState();
@@ -490,18 +514,20 @@ function bindPageEvents() {
   document.querySelectorAll("[data-update-year-plan]").forEach((button) => button.addEventListener("click", updateYearPlanFromThisMonth));
   document.querySelectorAll("[data-apply-year-plan]").forEach((button) => button.addEventListener("click", applyYearPlanToThisMonth));
   document.querySelectorAll("[data-manage-transactions]").forEach((button) => button.addEventListener("click", openTransactionsManager));
-  document.querySelector("[data-allocate-gap]")?.addEventListener("click", openAllocateGapSheet);
+  document.querySelector("[data-balance-plan]")?.addEventListener("click", openBalancePlanSheet);
 }
 
 function renderMonitorPage() {
   const projects = getPlanForScope("month", state.ui.selectedMonth, true);
   const allocation = calculateAllocationForProjects(projects);
-  const tracked = getDashboardProjects(projects);
+  const pinnedSpendRows = getPinnedSpendRows(projects).slice(0, 6);
+  const vaults = getSavingsVaultRows(projects);
   return `
     <section class="page monitor-page">
       ${renderAllocationStatusCard(allocation)}
-      ${tracked.length ? renderDashboardSummary() : renderMonitorEmpty()}
-      ${tracked.length ? `<section class="group-dashboard">${tracked.map(renderProjectCard).join("")}</section>` : ""}
+      ${pinnedSpendRows.length ? renderDashboardSummary() : renderMonitorEmpty()}
+      ${pinnedSpendRows.length ? `<section class="monitor-card-grid">${pinnedSpendRows.map(renderSpendMonitorCard).join("")}</section>` : ""}
+      ${renderSavingsVaultSection(vaults)}
       ${renderRecentActivity()}
     </section>
   `;
@@ -526,9 +552,10 @@ function renderPlanningPage() {
           <button class="scope-button ${scope === "year" ? "is-active" : ""}" type="button" data-plan-scope="year">Year Plan</button>
           <button class="scope-button ${scope === "month" ? "is-active" : ""}" type="button" data-plan-scope="month" ${canEditMonth ? "" : "disabled"}>${escapeHtml(monthLabel)}</button>
         </div>
+        ${renderAllocationMap(allocation)}
         ${renderAllocationMetrics(allocation)}
         <div class="plan-meta-strip"><span>${pinnedCount} pinned rows</span>${overrides ? `<span>${overrides} actual overrides this month</span>` : ""}</div>
-        ${renderAllocateGapAction(allocation)}
+        ${renderBalancePlanAction(allocation)}
         <p class="settings-note">${escapeHtml(allocation.message)}</p>
         <div class="button-row">
           <button class="action-button" type="button" data-add-block="${scope}">Add Block</button>
@@ -566,13 +593,37 @@ function renderAllocationMetrics(allocation) {
   `;
 }
 
-function renderAllocateGapAction(allocation) {
-  if (!(allocation.difference > 0)) return "";
+function renderBalancePlanAction(allocation) {
+  if (allocation.difference === 0) return "";
   return `
-    <div class="notice-strip success almost-balanced-helper">
-      <span>${money(allocation.difference)} left unallocated.</span>
-      <button class="action-button" type="button" data-allocate-gap>Allocate Gap</button>
+    <div class="notice-strip ${allocation.difference > 0 ? "success" : "danger"} almost-balanced-helper">
+      <span>${allocation.difference > 0 ? `${money(allocation.difference)} left unallocated.` : `${money(Math.abs(allocation.difference))} overallocated.`}</span>
+      <button class="action-button" type="button" data-balance-plan>Balance Plan</button>
     </div>
+  `;
+}
+
+function renderAllocationMap(allocation) {
+  const income = Math.max(0, allocation.income);
+  const base = Math.max(income, allocation.allocation, 1);
+  const segments = [
+    ["Spend", allocation.spend, "spend"],
+    ["Debt", allocation.debt, "debt"],
+    ["Save", allocation.save, "save"],
+    ["Investment", allocation.investment, "investment"]
+  ].filter(([, value]) => value > 0);
+  const unallocated = allocation.difference > 0 ? allocation.difference : 0;
+  const overallocated = allocation.difference < 0 ? Math.abs(allocation.difference) : 0;
+  return `
+    <section class="allocation-map ${allocation.status}">
+      <div class="allocation-map-head"><span>Allocation Map</span><strong>${escapeHtml(allocation.displayLabel)}</strong></div>
+      <div class="allocation-track" aria-label="Allocation map">
+        ${segments.map(([label, value, type]) => `<span class="allocation-segment type-${type}" style="width:${clampPercent(value / base * 100)}%" title="${escapeHtml(label)} ${money(value)}"></span>`).join("")}
+        ${unallocated ? `<span class="allocation-segment type-gap" style="width:${clampPercent(unallocated / base * 100)}%" title="Unallocated ${money(unallocated)}"></span>` : ""}
+        ${overallocated ? `<span class="allocation-overflow" style="width:${clampPercent(overallocated / base * 100)}%" title="Overallocated ${money(overallocated)}"></span>` : ""}
+      </div>
+      <div class="allocation-legend">${segments.map(([label, value, type]) => `<span><i class="type-${type}"></i>${escapeHtml(label)} ${money(value)}</span>`).join("")}${unallocated ? `<span><i class="type-gap"></i>Unallocated ${money(unallocated)}</span>` : ""}${overallocated ? `<span><i class="type-over"></i>Over ${money(overallocated)}</span>` : ""}</div>
+    </section>
   `;
 }
 
@@ -585,6 +636,73 @@ function renderDashboardSummary() {
       <div><span>Month spent</span><strong>${money(totals.monthSpent)}</strong></div>
       <div><span>Remaining</span><strong>${money(totals.monthRemaining)}</strong></div>
     </section>
+  `;
+}
+
+function renderSpendMonitorCard(entry) {
+  const { item, project } = entry;
+  const stats = calculateSubItemStats(item.id);
+  const budget = item.monthlyAmount || 0;
+  const spent = stats.monthSpent;
+  const remaining = Math.max(0, budget - spent);
+  const percent = budget ? spent / budget * 100 : 0;
+  const status = getSpendStatus(spent, budget);
+  const expanded = Boolean(state.ui.expandedProjects[item.id]);
+  const recent = state.transactions.filter((tx) => tx.subItemId === item.id && tx.dateISO.startsWith(state.ui.selectedMonth)).sort(byDateDesc).slice(0, 3);
+  return `
+    <article class="monitor-spend-card ${status.key}" data-toggle-monitor-row="${item.id}">
+      <div class="monitor-card-head">
+        <div><h2>${escapeHtml(item.label)}</h2><span>${escapeHtml(project.label)}</span></div>
+        <em class="monitor-status">${escapeHtml(status.label)}</em>
+      </div>
+      <div class="visual-spend">
+        <div class="budget-bar"><div class="budget-fill" style="width:${clampPercent(percent)}%"></div></div>
+        <div class="spend-figures"><strong>${money(spent)} / ${money(budget)}</strong><span>${money(remaining)} remaining</span></div>
+      </div>
+      <p class="visual-note">${escapeHtml(status.note)}</p>
+      ${expanded ? `<div class="monitor-details">
+        <span><em>This week</em><strong>${money(stats.weekSpent)} / ${money(stats.weeklyAllowance)}</strong></span>
+        <span><em>Left this week</em><strong>${money(stats.weekRemaining)}</strong></span>
+        <span><em>Month remaining</em><strong>${money(stats.monthRemaining)}</strong></span>
+        ${recent.length ? `<div class="mini-activity">${recent.map((tx) => `<small>${formatDate(tx.dateISO)} · ${money(tx.amount)}${tx.note ? ` · ${escapeHtml(tx.note)}` : ""}</small>`).join("")}</div>` : `<small>No transactions this month.</small>`}
+      </div>` : ""}
+      <button class="details-affordance" type="button" data-toggle-monitor-row="${item.id}">${expanded ? "Hide ˄" : "Details ˅"}</button>
+    </article>
+  `;
+}
+
+function renderSavingsVaultSection(vaults) {
+  if (!vaults.length) {
+    return `
+      <section class="savings-vault-section empty-vault-section">
+        <div class="section-head"><div><p class="section-kicker">Savings</p><h2>Savings Vaults</h2></div></div>
+        <div class="empty-state"><strong>No savings vaults yet.</strong><span>Turn a Save row into a Savings Vault from Planning.</span><button class="ghost-button" type="button" data-open-setup data-plan-scope="${hasYearPlan() ? "month" : "year"}">Open Planning</button></div>
+      </section>
+    `;
+  }
+  return `
+    <section class="savings-vault-section">
+      <div class="section-head"><div><p class="section-kicker">Savings</p><h2>Vaults</h2></div><span class="reserve-pill gold">${vaults.length} active</span></div>
+      <div class="vault-card-grid">${vaults.map(renderSavingsVaultCard).join("")}</div>
+    </section>
+  `;
+}
+
+function renderSavingsVaultCard(entry) {
+  const { item, project } = entry;
+  const target = Number(item.targetAmount) || 0;
+  const current = Number(item.currentBalance) || 0;
+  const percent = target ? current / target * 100 : 0;
+  const remaining = Math.max(0, target - current);
+  const label = target ? current >= target ? "Complete" : "Building" : "Tracking";
+  return `
+    <article class="savings-vault-card">
+      <div class="vault-preview-head"><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(label)}</span></div>
+      <div class="vault-amount">${target ? `${money(current)} / ${money(target)}` : money(current)}</div>
+      <div class="budget-bar vault-bar"><div class="budget-fill gold-fill" style="width:${clampPercent(percent)}%"></div></div>
+      <p>${target ? `${Math.round(clampPercent(percent))}% funded · ${money(remaining)} left` : "No target set"}</p>
+      <p>${money(item.monthlyAmount)} monthly contribution · ${escapeHtml(project.label)}</p>
+    </article>
   `;
 }
 
@@ -626,13 +744,16 @@ function renderGroupedPlanSections(projects, scope) {
 }
 
 function renderPlanTypeSection(type, projects, scope) {
-  const total = sum(projects.map((project) => calculateProjectStats(project.id, getPlanForScope(scope, state.ui.selectedMonth, false)).budget));
+  const plan = getPlanForScope(scope, state.ui.selectedMonth, false);
+  const total = sum(projects.map((project) => calculateProjectStats(project.id, plan).budget));
+  const income = Math.max(1, calculateAllocationForProjects(plan).income);
   return `
     <section class="plan-type-section type-${type}">
       <div class="plan-type-head">
         <div><span class="type-pill">${escapeHtml(blockTypeLabel(type))}</span><strong>${money(total)}</strong></div>
         <em>${projects.length} blocks</em>
       </div>
+      <div class="type-share-bar"><span style="width:${clampPercent(total / income * 100)}%"></span></div>
       ${projects.length ? projects.map((project) => renderPlanStrip(project, scope)).join("") : `<div class="plan-type-empty">No ${escapeHtml(blockTypeLabel(type).toLowerCase())} blocks yet.</div>`}
     </section>
   `;
@@ -772,7 +893,8 @@ function renderBlockDetailSheet(scope, project) {
       <label class="field"><span>Item name</span><input id="blockRowName" name="label" required /></label>
       <label class="field formula-field"><span>Amount</span><input name="monthlyAmount" type="text" inputmode="decimal" data-formula-input required /><small class="formula-preview"></small></label>
       <label class="field"><span>Frequency</span><select name="frequency"><option value="monthly">Monthly</option><option value="biweekly">Biweekly</option></select></label>
-      <label class="checkbox-row"><input name="pinToMonitor" type="checkbox" /><span>Pin to Monitor</span></label>
+      ${project.type === "spend" ? `<label class="checkbox-row"><input name="pinToMonitor" type="checkbox" /><span>Pin to Monitor</span></label>` : ""}
+      ${project.type === "save" ? renderVaultFields() : ""}
       <button class="action-button sheet-save" type="submit">Add Row</button>
     </form>
     <div class="button-row">
@@ -791,7 +913,7 @@ function renderBlockDetailSheet(scope, project) {
 
 function renderBlockDetailRow(project, item, scope) {
   const actual = scope === "year" ? item.monthlyAmount : getRowActual(item, getPlanForScope(scope, state.ui.selectedMonth, false), state.ui.selectedMonth);
-  const status = scope === "month" && getActualOverride(item.id) ? "Override" : item.pinToMonitor ? "Pinned" : "Plan";
+  const status = scope === "month" && getActualOverride(item.id) ? "Override" : item.showAsVault && project.type === "save" ? "Vault" : item.pinToMonitor ? "Pinned" : "Plan";
   return `
     <div class="plan-row">
       <span>${escapeHtml(item.label)}</span>
@@ -800,6 +922,14 @@ function renderBlockDetailRow(project, item, scope) {
       <span><em class="row-status">${escapeHtml(status)}</em></span>
       <span><button class="mini-button" type="button" data-edit-row="${item.id}" data-row-scope="${scope}">Edit</button>${scope === "month" ? `<button class="mini-button" type="button" data-override-row="${item.id}">Override</button>` : ""}<button class="mini-button danger-text" type="button" data-delete-item="${item.id}" data-row-scope="${scope}">×</button></span>
     </div>
+  `;
+}
+
+function renderVaultFields(item = {}) {
+  return `
+    <label class="checkbox-row"><input name="showAsVault" type="checkbox" ${item.showAsVault ? "checked" : ""} /><span>Show as Savings Vault</span></label>
+    <label class="field formula-field"><span>Target amount</span><input name="targetAmount" type="text" inputmode="decimal" value="${escapeHtml(item.targetAmountInput || "")}" data-formula-input /><small class="formula-preview"></small></label>
+    <label class="field formula-field"><span>Current balance</span><input name="currentBalance" type="text" inputmode="decimal" value="${escapeHtml(item.currentBalanceInput || "")}" data-formula-input /><small class="formula-preview"></small></label>
   `;
 }
 
@@ -847,13 +977,15 @@ function renderPlanRow(project, item) {
 function openEditRowSheet(id, scope = state.ui.planEditorScope) {
   const item = getSubItemById(id, getPlanForScope(scope, state.ui.selectedMonth, false));
   if (!item) return;
+  const project = getProjectById(item.parentProjectId, getPlanForScope(scope, state.ui.selectedMonth, false));
   sheetContext = { kind: "row-edit", scope, rowId: id, blockId: item.parentProjectId };
   modalRoot.innerHTML = renderSheet("Edit Row", `
     <form id="rowEditForm" class="quick-form" data-row-id="${escapeHtml(item.id)}" data-row-scope="${scope}">
       <label class="field"><span>Item name</span><input name="label" value="${escapeHtml(item.label)}" required /></label>
       <label class="field formula-field"><span>Amount</span><input name="monthlyAmount" type="text" inputmode="decimal" value="${escapeHtml(item.amountInput || item.monthlyAmountInput || item.monthlyAmount)}" data-formula-input required /><small class="formula-preview"></small></label>
       <label class="field"><span>Frequency</span><select name="frequency"><option value="monthly" ${item.frequency === "monthly" ? "selected" : ""}>Monthly</option><option value="biweekly" ${item.frequency === "biweekly" ? "selected" : ""}>Biweekly</option></select></label>
-      <label class="checkbox-row"><input name="pinToMonitor" type="checkbox" ${item.pinToMonitor ? "checked" : ""} /><span>Pin to Monitor</span></label>
+      ${project?.type === "spend" ? `<label class="checkbox-row"><input name="pinToMonitor" type="checkbox" ${item.pinToMonitor ? "checked" : ""} /><span>Pin to Monitor</span></label>` : ""}
+      ${project?.type === "save" ? renderVaultFields(item) : ""}
       <button class="action-button sheet-save" type="submit">Save Row</button>
     </form>
   `, "Plan");
@@ -970,13 +1102,16 @@ function addSubItem(event) {
   const project = getProjectById(event.currentTarget.dataset.addRowForm, projects);
   const label = String(form.get("label") || "").trim();
   const parsedAmount = parseAmountField(event.currentTarget.querySelector("input[name='monthlyAmount']"));
+  const parsedTarget = parseOptionalAmountField(event.currentTarget.querySelector("input[name='targetAmount']"));
+  const parsedCurrent = parseOptionalAmountField(event.currentTarget.querySelector("input[name='currentBalance']"));
   const frequency = normalizeFrequency(form.get("frequency"));
   const monthlyAmount = monthlyAmountFromParsed(parsedAmount, frequency);
   if (!project || !label) return;
-  if (!parsedAmount.ok) {
+  if (!parsedAmount.ok || !parsedTarget.ok || !parsedCurrent.ok) {
     showToast("Invalid formula.");
     return;
   }
+  const pinToMonitor = project.type === "spend" && Boolean(form.get("pinToMonitor"));
   project.subItems.push(normalizeSubItem({
     id: uniqueId(slugify(label), getAllSubItems(projects).map((item) => item.id)),
     parentProjectId: project.id,
@@ -985,9 +1120,14 @@ function addSubItem(event) {
     monthlyAmountInput: parsedAmount.input,
     frequency,
     monthlyAmount,
-    pinToMonitor: Boolean(form.get("pinToMonitor")),
-    recordable: Boolean(form.get("pinToMonitor")) && project.type === "spend",
-    showOnDashboard: Boolean(form.get("pinToMonitor")),
+    pinToMonitor,
+    recordable: pinToMonitor,
+    showOnDashboard: pinToMonitor,
+    showAsVault: project.type === "save" && Boolean(form.get("showAsVault")),
+    targetAmountInput: parsedTarget.input,
+    targetAmount: parsedTarget.value,
+    currentBalanceInput: parsedCurrent.input,
+    currentBalance: parsedCurrent.value,
     displayOrder: project.subItems.length + 1
   }));
   replacePlanForScope(scope, projects, state.ui.selectedMonth);
@@ -1003,14 +1143,16 @@ function saveRowEdit(event) {
   const form = new FormData(event.currentTarget);
   const label = String(form.get("label") || "").trim();
   const parsedAmount = parseAmountField(event.currentTarget.querySelector("input[name='monthlyAmount']"));
+  const parsedTarget = parseOptionalAmountField(event.currentTarget.querySelector("input[name='targetAmount']"));
+  const parsedCurrent = parseOptionalAmountField(event.currentTarget.querySelector("input[name='currentBalance']"));
   const frequency = normalizeFrequency(form.get("frequency"));
-  const pinToMonitor = Boolean(form.get("pinToMonitor"));
+  const project = getProjectById(item.parentProjectId, projects);
+  const pinToMonitor = project?.type === "spend" && Boolean(form.get("pinToMonitor"));
   if (!item || !label) return;
-  if (!parsedAmount.ok) {
+  if (!parsedAmount.ok || !parsedTarget.ok || !parsedCurrent.ok) {
     showToast("Invalid formula.");
     return;
   }
-  const project = getProjectById(item.parentProjectId, projects);
   const realItem = project?.subItems.find((row) => row.id === item.id);
   if (!realItem) return;
   realItem.label = label;
@@ -1021,6 +1163,11 @@ function saveRowEdit(event) {
   realItem.pinToMonitor = pinToMonitor;
   realItem.recordable = pinToMonitor && project.type === "spend";
   realItem.showOnDashboard = pinToMonitor;
+  realItem.showAsVault = project.type === "save" && Boolean(form.get("showAsVault"));
+  realItem.targetAmountInput = parsedTarget.input;
+  realItem.targetAmount = parsedTarget.value;
+  realItem.currentBalanceInput = parsedCurrent.input;
+  realItem.currentBalance = parsedCurrent.value;
   replacePlanForScope(scope, projects, state.ui.selectedMonth);
   saveState();
   openBlockDetailSheet(scope, project.id);
@@ -1110,19 +1257,21 @@ function finishSetup() {
   closeSheet();
 }
 
-function openAllocateGapSheet() {
+function openBalancePlanSheet() {
   const scope = state.ui.activeTab === "planning" ? state.ui.planEditorScope : "month";
   const projects = getPlanForScope(scope, state.ui.selectedMonth, scope === "month");
   const allocation = calculateAllocationForProjects(projects);
-  if (!(allocation.difference > 0)) return;
-  sheetContext = { kind: "allocate-gap", scope, amount: allocation.difference };
+  if (allocation.difference === 0) return;
+  const isSurplus = allocation.difference > 0;
+  const amount = Math.abs(allocation.difference);
+  sheetContext = { kind: "balance-plan", scope, amount: allocation.difference };
   const saveRows = getAllSubItems(projects).filter((item) => item.active && !item.archived && getProjectById(item.parentProjectId, projects)?.type === "save");
-  modalRoot.innerHTML = renderSheet("Allocate Gap", `
-    <div class="readonly-card weak-card"><div class="section-head"><h3>${money(allocation.difference)} available</h3><span class="tiny-label">Save</span></div></div>
+  modalRoot.innerHTML = renderSheet("Balance Plan", `
+    <div class="readonly-card weak-card"><div class="section-head"><h3>${isSurplus ? `${money(amount)} available` : `${money(amount)} shortage`}</h3><span class="tiny-label">${isSurplus ? "Add to Save" : "Reduce Save"}</span></div></div>
     <div class="manager-list">
-      ${saveRows.length ? saveRows.map((item) => `<button class="manager-row" type="button" data-allocate-to-row="${item.id}"><span><strong>${escapeHtml(item.label)}</strong><small>${money(item.monthlyAmount)} planned</small></span><b>Add gap</b></button>`).join("") : `<div class="empty-state">No Save rows yet.</div>`}
+      ${saveRows.length ? saveRows.map((item) => `<button class="manager-row" type="button" data-allocate-to-row="${item.id}"><span><strong>${escapeHtml(item.label)}</strong><small>${money(item.monthlyAmount)} planned</small></span><b>${isSurplus ? "Add surplus" : "Reduce"}</b></button>`).join("") : `<div class="empty-state">No Save rows yet.</div>`}
     </div>
-    <button class="action-button" type="button" data-create-save-row>+ Create New Save Item</button>
+    ${isSurplus ? `<button class="action-button" type="button" data-create-save-row>+ Create New Save Item</button>` : `<p class="settings-note">Create or edit a Save row manually if no row can absorb the shortage.</p>`}
   `, "Plan");
   bindSheetEvents();
 }
@@ -1133,14 +1282,18 @@ function allocateGapToRow(rowId) {
   const allocation = calculateAllocationForProjects(projects);
   const project = projects.find((block) => block.subItems.some((row) => row.id === rowId));
   const item = project?.subItems.find((row) => row.id === rowId);
-  if (!item || !(allocation.difference > 0)) return;
+  if (!item || allocation.difference === 0) return;
+  if (allocation.difference < 0 && item.monthlyAmount < Math.abs(allocation.difference)) {
+    showToast("That Save row would become negative. Choose another row or edit manually.");
+    return;
+  }
   item.monthlyAmount = roundCents(item.monthlyAmount + allocation.difference);
   item.amountInput = String(item.monthlyAmount);
   item.monthlyAmountInput = item.amountInput;
   item.frequency = "monthly";
   replacePlanForScope(scope, projects, state.ui.selectedMonth);
   saveState();
-  showToast("Gap allocated.");
+  showToast("Plan balanced.");
   closeSheet();
 }
 
@@ -1411,6 +1564,7 @@ function downloadSampleCSV() {
   const sample = structuredClone(DEFAULT_STATE);
   sample.settings.yearPlan.blocks.push(normalizeProject({ id: "income", label: "Income", type: "income", displayOrder: 1, subItems: [{ id: "salary", parentProjectId: "income", label: "Salary", amountInput: "1000", frequency: "monthly", monthlyAmount: 1000, active: true }] }));
   sample.settings.yearPlan.blocks.push(normalizeProject({ id: "spend", label: "Spend", type: "spend", displayOrder: 2, subItems: [{ id: "groceries", parentProjectId: "spend", label: "Groceries", amountInput: "1000", frequency: "monthly", monthlyAmount: 1000, pinToMonitor: true, active: true }] }));
+  sample.settings.yearPlan.blocks.push(normalizeProject({ id: "save", label: "Savings", type: "save", displayOrder: 3, subItems: [{ id: "travel", parentProjectId: "save", label: "Travel Fund", amountInput: "0", frequency: "monthly", monthlyAmount: 0, showAsVault: true, currentBalanceInput: "300", currentBalance: 300, targetAmountInput: "1000", targetAmount: 1000, active: true }] }));
   sample.settings.monthlyPlans[state.ui.selectedMonth] = makeMonthlyPlanRecord(cloneProjects(sample.settings.yearPlan.blocks, true));
   sample.transactions.push({ id: "sample-transaction", dateISO: `${state.ui.selectedMonth}-01`, amount: 25, subItemId: "groceries", note: "Example transaction" });
   downloadText("finance-tracker-v3-sample.csv", serializeStateToCSV(sample), "text/csv");
@@ -1418,20 +1572,20 @@ function downloadSampleCSV() {
 }
 
 function serializeStateToCSV(source) {
-  const columns = ["record_type", "plan_scope", "plan_month", "id", "parent_id", "label", "amount", "amount_input", "monthly_amount", "monthly_amount_input", "frequency", "date", "sub_item_id", "project_type", "pin_to_monitor", "active", "archived", "display_order", "note"];
+  const columns = ["record_type", "plan_scope", "plan_month", "id", "parent_id", "label", "amount", "amount_input", "monthly_amount", "monthly_amount_input", "frequency", "date", "sub_item_id", "project_type", "pin_to_monitor", "show_as_vault", "target_amount", "target_amount_input", "current_balance", "current_balance_input", "active", "archived", "display_order", "note"];
   const rows = [columns];
   getYearBlocksFrom(source).forEach((project) => {
-    rows.push(["project", "year", "", project.id, "", project.label, "", "", "", "", "", "", "", project.type, "", project.active, project.archived, project.displayOrder, ""]);
-    project.subItems.forEach((item) => rows.push(["sub_item", "year", "", item.id, project.id, item.label, "", "", item.monthlyAmount, item.amountInput || item.monthlyAmountInput || item.monthlyAmount, item.frequency || "monthly", "", "", "", item.pinToMonitor, item.active, item.archived, item.displayOrder, ""]));
+    rows.push(["project", "year", "", project.id, "", project.label, "", "", "", "", "", "", "", project.type, "", "", "", "", "", "", project.active, project.archived, project.displayOrder, ""]);
+    project.subItems.forEach((item) => rows.push(["sub_item", "year", "", item.id, project.id, item.label, "", "", item.monthlyAmount, item.amountInput || item.monthlyAmountInput || item.monthlyAmount, item.frequency || "monthly", "", "", "", item.pinToMonitor, item.showAsVault, item.targetAmount || "", item.targetAmountInput || "", item.currentBalance || "", item.currentBalanceInput || "", item.active, item.archived, item.displayOrder, ""]));
   });
   Object.entries(source.settings.monthlyPlans || {}).forEach(([monthKey, projects]) => {
     getBlocksFromPlan(projects).forEach((project) => {
-      rows.push(["project", "month", monthKey, project.id, "", project.label, "", "", "", "", "", "", "", project.type, "", project.active, project.archived, project.displayOrder, ""]);
-      project.subItems.forEach((item) => rows.push(["sub_item", "month", monthKey, item.id, project.id, item.label, "", "", item.monthlyAmount, item.amountInput || item.monthlyAmountInput || item.monthlyAmount, item.frequency || "monthly", "", "", "", item.pinToMonitor, item.active, item.archived, item.displayOrder, ""]));
+      rows.push(["project", "month", monthKey, project.id, "", project.label, "", "", "", "", "", "", "", project.type, "", "", "", "", "", "", project.active, project.archived, project.displayOrder, ""]);
+      project.subItems.forEach((item) => rows.push(["sub_item", "month", monthKey, item.id, project.id, item.label, "", "", item.monthlyAmount, item.amountInput || item.monthlyAmountInput || item.monthlyAmount, item.frequency || "monthly", "", "", "", item.pinToMonitor, item.showAsVault, item.targetAmount || "", item.targetAmountInput || "", item.currentBalance || "", item.currentBalanceInput || "", item.active, item.archived, item.displayOrder, ""]));
     });
-    Object.entries(projects.actualOverrides || {}).forEach(([rowId, override]) => rows.push(["actual_override", "month", monthKey, rowId, "", "", override.amount, override.amountInput || override.amount, "", "", "", "", "", "", "", true, false, "", override.note || ""]));
+    Object.entries(projects.actualOverrides || {}).forEach(([rowId, override]) => rows.push(["actual_override", "month", monthKey, rowId, "", "", override.amount, override.amountInput || override.amount, "", "", "", "", "", "", "", "", "", "", "", "", true, false, "", override.note || ""]));
   });
-  source.transactions.forEach((tx) => rows.push(["transaction", "", "", tx.id, "", "", tx.amount, tx.amountInput || tx.amount, "", "", "", tx.dateISO, tx.subItemId, "", "", true, false, "", tx.note || ""]));
+  source.transactions.forEach((tx) => rows.push(["transaction", "", "", tx.id, "", "", tx.amount, tx.amountInput || tx.amount, "", "", "", tx.dateISO, tx.subItemId, "", "", "", "", "", "", "", true, false, "", tx.note || ""]));
   return rows.map((row) => row.map(csvEscape).join(",")).join("\n");
 }
 
@@ -1459,7 +1613,7 @@ function parseCSVToState(text) {
         targetMap.set(project.id, project);
       } else if (row.record_type === "sub_item" || row.record_type === "subcategory") {
         const project = targetMap.get(row.parent_id);
-        const item = normalizeSubItem({ id: row.id, parentProjectId: row.parent_id, label: row.label, amountInput: row.monthly_amount_input || row.amount_input || row.monthly_amount || row.monthly_budget, frequency: row.frequency, monthlyAmount: number(row.monthly_amount || row.monthly_budget), pinToMonitor: row.pin_to_monitor === "" ? bool(row.recordable) || bool(row.show_on_dashboard) : bool(row.pin_to_monitor), active: row.active === "" ? true : bool(row.active), archived: bool(row.archived), displayOrder: number(row.display_order) || 1 });
+        const item = normalizeSubItem({ id: row.id, parentProjectId: row.parent_id, label: row.label, amountInput: row.monthly_amount_input || row.amount_input || row.monthly_amount || row.monthly_budget, frequency: row.frequency, monthlyAmount: number(row.monthly_amount || row.monthly_budget), pinToMonitor: row.pin_to_monitor === "" ? bool(row.recordable) || bool(row.show_on_dashboard) : bool(row.pin_to_monitor), showAsVault: bool(row.show_as_vault), targetAmount: number(row.target_amount), targetAmountInput: row.target_amount_input || row.target_amount, currentBalance: number(row.current_balance), currentBalanceInput: row.current_balance_input || row.current_balance, active: row.active === "" ? true : bool(row.active), archived: bool(row.archived), displayOrder: number(row.display_order) || 1 });
         if (project && item) project.subItems.push(item);
         else skipped += 1;
       } else if (row.record_type === "actual_override") {
@@ -1565,6 +1719,35 @@ function getDashboardProjects(projects = getPlanForScope("month", state.ui.selec
   return (projects || []).filter((project) => project.active && !project.archived && project.subItems.some((item) => item.active && !item.archived && item.pinToMonitor));
 }
 
+function getPinnedSpendRows(projects = getPlanForScope("month", state.ui.selectedMonth, false)) {
+  return (projects || [])
+    .filter((project) => project.active && !project.archived && project.type === "spend")
+    .sort(byDisplayOrder)
+    .flatMap((project) => project.subItems
+      .filter((item) => item.active && !item.archived && item.pinToMonitor)
+      .sort(byDisplayOrder)
+      .map((item) => ({ project, item })));
+}
+
+function getSavingsVaultRows(projects = getPlanForScope("month", state.ui.selectedMonth, false)) {
+  return (projects || [])
+    .filter((project) => project.active && !project.archived && project.type === "save")
+    .sort(byDisplayOrder)
+    .flatMap((project) => project.subItems
+      .filter((item) => item.active && !item.archived && item.showAsVault)
+      .sort(byDisplayOrder)
+      .map((item) => ({ project, item })));
+}
+
+function getSpendStatus(spent, budget) {
+  if (!budget) return { key: "info", label: "On track", note: "No monthly budget set." };
+  const ratio = spent / budget;
+  if (ratio > 1) return { key: "over", label: "Over", note: "Budget is over plan." };
+  if (ratio >= 0.9) return { key: "risk", label: "Risk", note: "Close to monthly limit." };
+  if (ratio >= 0.7) return { key: "watch", label: "Watch", note: "Spending is building." };
+  return { key: "ok", label: "On track", note: "Pressure is low." };
+}
+
 function getProjectById(id, projects = getPlanForScope("month", state.ui.selectedMonth, false)) {
   return (projects || []).find((project) => project.id === id) || null;
 }
@@ -1666,6 +1849,15 @@ function parseAmountField(input) {
   const parsed = parseFormula(input?.value || "");
   updateFormulaPreview(input, parsed);
   return parsed;
+}
+
+function parseOptionalAmountField(input) {
+  const value = String(input?.value || "").trim();
+  if (!value) {
+    updateFormulaPreview(input, { ok: true, input: "", value: 0 });
+    return { ok: true, input: "", value: 0 };
+  }
+  return parseAmountField(input);
 }
 
 function updateFormulaPreview(input, parsed = parseFormula(input?.value || "")) {

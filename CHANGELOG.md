@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-05-01 · V3.5.0 Visual Monitor + Savings Dashboard
+
+- Rebuilt Monitor around visual pinned Spend cards with progress bars, remaining budget, pressure status, and expandable transaction detail.
+- Added Savings Vaults powered by Save rows, including current balance, target, progress, remaining-to-target, and muted gold vault styling.
+- Replaced Allocate Gap with Balance Plan, supporting both surplus allocation into Save rows and shortage reduction from Save rows.
+- Added a visual Planning Allocation Map with Spend, Debt, Save, Investment, unallocated, and overallocated segments.
+- Extended CSV and row editing to preserve Savings Vault fields; updated service worker cache to `finance-tracker-cache-v3-5-0`.
+
 ## 2026-05-01 · V3.4.0 Premium Planning System
 
 - Migrated planning data into `yearPlan.blocks` plus independent monthly plan records with per-month actual overrides.
