@@ -208,6 +208,14 @@ textarea {
   color: var(--paper);
 }
 
+.header-mode-label {
+  align-self: end;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 2px 12px;
+}
+
 .page,
 .stack {
   display: grid;
@@ -416,6 +424,33 @@ textarea {
   display: grid;
   gap: 5px;
   padding-top: 8px;
+}
+
+.weekly-visual {
+  align-items: center;
+  display: grid;
+  gap: 7px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.weekly-visual span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.week-track {
+  background: rgba(23, 23, 21, 0.06);
+  border-radius: 999px;
+  height: 4px;
+  overflow: hidden;
+}
+
+.week-track i {
+  background: var(--gold);
+  display: block;
+  height: 100%;
 }
 
 .group-card {
@@ -1051,6 +1086,78 @@ button:disabled {
   flex-wrap: wrap;
   font-size: 12px;
   gap: 8px;
+}
+
+.plan-actions-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.plan-category-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.plan-category-card {
+  background: rgba(255, 254, 250, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: grid;
+  gap: 10px;
+  min-height: 128px;
+  padding: 14px;
+  position: relative;
+  text-align: left;
+}
+
+.plan-category-card::before {
+  background: var(--line-strong);
+  content: "";
+  height: 2px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.plan-category-card.type-save {
+  border-color: var(--gold-line);
+}
+
+.plan-category-card.type-save::before {
+  background: var(--gold);
+}
+
+.plan-category-card.type-debt::before {
+  background: #b8998f;
+}
+
+.plan-category-card.type-investment::before {
+  background: #717b7d;
+}
+
+.plan-category-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.plan-category-card strong {
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.plan-category-card em,
+.plan-category-card small {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.plan-type-list {
+  gap: 10px;
 }
 
 .plan-meta-strip span {
