@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-05-02 · V4.0.1 Weekly Discipline Monitor
+
+- Rebuilt Monitor Spend cards around natural-week budget discipline instead of simple month-progress cards.
+- Added current-week adjusted budget, spent, remaining or over amount, carry-in penalty, and month-to-date usage to each compact Monitor card.
+- Implemented carryover penalties that reduce future week budgets, including multi-week carry-forward when an overage exceeds the next week's base budget.
+- Added bottom-sheet weekly breakdown detail for each monitored category with base budget, carryover, adjusted budget, spent, remaining or over, and week status.
+- Kept the dashboard compact by hiding zero carryover from the default card view and showing past weekly overages only inside the detail sheet.
+- Updated service worker cache to `finance-tracker-cache-v4-0-1`.
+
 ## 2026-05-02 · V4.0.0 Sheet-First Finance Cockpit
 
 - Replaced the Planning overview-card model with a Sheet tab built around a compact monthly worksheet.

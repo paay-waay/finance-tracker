@@ -1,4 +1,4 @@
-const APP_VERSION = "V4.0.0 Sheet-First Finance Cockpit";
+const APP_VERSION = "V4.0.1 Weekly Discipline Monitor";
 const SCHEMA_VERSION = 8;
 const STORAGE_KEY = "financeTracker_v3";
 
@@ -487,11 +487,9 @@ function bindPageEvents() {
     saveState();
     render();
   }));
-  document.querySelectorAll("[data-toggle-monitor-row]").forEach((button) => button.addEventListener("click", (event) => {
+  document.querySelectorAll("[data-open-monitor-detail]").forEach((button) => button.addEventListener("click", (event) => {
     event.stopPropagation();
-    state.ui.expandedProjects[button.dataset.toggleMonitorRow] = !state.ui.expandedProjects[button.dataset.toggleMonitorRow];
-    saveState();
-    render();
+    openMonitorDisciplineSheet(button.dataset.openMonitorDetail);
   }));
   document.querySelectorAll("[data-plan-scope]").forEach((button) => button.addEventListener("click", () => {
     state.ui.planEditorScope = button.dataset.planScope === "month" ? "month" : "year";
@@ -667,37 +665,32 @@ function renderDashboardSummary() {
 
 function renderSpendMonitorCard(entry) {
   const { item, project } = entry;
-  const stats = calculateSubItemStats(item.id);
-  const budget = item.monthlyAmount || 0;
-  const spent = stats.monthSpent;
-  const remaining = Math.max(0, budget - spent);
-  const percent = budget ? spent / budget * 100 : 0;
-  const rhythm = calculateWeeklyRhythm(item.id, budget);
-  const status = getSpendStatus(spent, budget);
-  const expanded = Boolean(state.ui.expandedProjects[item.id]);
-  const recent = state.transactions.filter((tx) => tx.subItemId === item.id && tx.dateISO.startsWith(state.ui.selectedMonth)).sort(byDateDesc).slice(0, 3);
+  const discipline = calculateWeeklyDiscipline(item.id);
+  const currentWeek = discipline.focusWeek;
+  const rhythm = discipline.weeks;
+  const over = currentWeek.overAmount > 0;
+  const remainingText = over ? `${money(currentWeek.overAmount)} over` : `${money(currentWeek.remaining)} left`;
   return `
-    <article class="monitor-spend-card ${status.key}" data-toggle-monitor-row="${item.id}">
+    <article class="monitor-spend-card ${currentWeek.statusKey}" data-open-monitor-detail="${item.id}">
       <div class="monitor-card-head">
-        <div><h2>${escapeHtml(item.label)}</h2><span>${escapeHtml(project.label)}</span></div>
-        <em class="monitor-status">${escapeHtml(status.label)}</em>
+        <div><h2>${escapeHtml(item.label)}</h2><span>${escapeHtml(formatWeekRange(currentWeek.weekStartISO, currentWeek.weekEndISO))}</span></div>
+        <em class="monitor-status">${escapeHtml(currentWeek.statusLabel)}</em>
       </div>
       <div class="visual-spend">
-        <div class="budget-bar"><div class="budget-fill" style="width:${clampPercent(percent)}%"></div></div>
-        <div class="spend-figures"><strong>${money(spent)} / ${money(budget)}</strong><span>${money(remaining)} remaining</span></div>
+        <div class="budget-bar"><div class="budget-fill" style="width:${clampPercent(discipline.monthUsagePercent)}%"></div></div>
+        <div class="spend-figures"><strong>${money(currentWeek.spent)} / ${money(currentWeek.adjustedBudget)}</strong><span>${escapeHtml(remainingText)}</span></div>
       </div>
-      <div class="weekly-visual" aria-label="Weekly pace">
-        <span>Rhythm</span>
-        <div class="week-rhythm">${rhythm.map((segment) => `<i class="${segment.status}" title="${escapeHtml(segment.label)}"></i>`).join("")}</div>
+      <div class="monitor-metrics">
+        <span><em>Month budget</em><strong>${money(discipline.monthlyBudget)}</strong></span>
+        <span><em>Used this month</em><strong>${discipline.monthUsageLabel}</strong></span>
       </div>
-      ${expanded ? `<div class="monitor-details">
-        <span><em>Status</em><strong>${escapeHtml(status.note)}</strong></span>
-        <span><em>This week</em><strong>${money(stats.weekSpent)} / ${money(stats.weeklyAllowance)}</strong></span>
-        <span><em>Left this week</em><strong>${money(stats.weekRemaining)}</strong></span>
-        <span><em>Month remaining</em><strong>${money(stats.monthRemaining)}</strong></span>
-        ${recent.length ? `<div class="mini-activity">${recent.map((tx) => `<small>${formatDate(tx.dateISO)} · ${money(tx.amount)}${tx.note ? ` · ${escapeHtml(tx.note)}` : ""}</small>`).join("")}</div>` : `<small>No transactions this month.</small>`}
-      </div>` : ""}
-      <button class="details-affordance" type="button" data-toggle-monitor-row="${item.id}">${expanded ? "Hide ˄" : "Details ˅"}</button>
+      ${currentWeek.carryInPenalty > 0 ? `<p class="carryover-note">Carry-in penalty ${money(currentWeek.carryInPenalty)}</p>` : ""}
+      <div class="weekly-visual is-discipline" aria-label="Weekly rhythm">
+        <span>Week rhythm</span>
+        <div class="week-rhythm" style="grid-template-columns: repeat(${rhythm.length}, minmax(0, 1fr));">${rhythm.map((segment) => `<i class="${segment.statusKey}${segment.isCurrent ? " is-current" : ""}" title="${escapeHtml(segment.summaryLabel)}"></i>`).join("")}</div>
+      </div>
+      <p class="monitor-status-sentence">${escapeHtml(currentWeek.statusSentence)}</p>
+      <button class="details-affordance" type="button" data-open-monitor-detail="${item.id}">Weekly breakdown ˅</button>
     </article>
   `;
 }
@@ -716,12 +709,45 @@ function openMorePinnedSheet() {
   modalRoot.innerHTML = renderSheet("More Pinned Items", `
     <div class="manager-list">
       ${rows.map(({ item, project }) => {
-        const stats = calculateSubItemStats(item.id);
-        return `<button class="manager-row" type="button" data-toggle-monitor-row="${item.id}"><span><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(project.label)} · ${money(stats.monthSpent)} / ${money(item.monthlyAmount)}</small></span><b>View</b></button>`;
+        const discipline = calculateWeeklyDiscipline(item.id);
+        return `<button class="manager-row" type="button" data-open-monitor-detail="${item.id}"><span><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(project.label)} · ${money(discipline.focusWeek.spent)} / ${money(discipline.focusWeek.adjustedBudget)}</small></span><b>${escapeHtml(discipline.focusWeek.statusLabel)}</b></button>`;
       }).join("")}
     </div>
   `, "Monitor");
   bindSheetEvents();
+}
+
+function openMonitorDisciplineSheet(rowId) {
+  const projects = getPlanForScope("month", state.ui.selectedMonth, false);
+  const item = getSubItemById(rowId, projects);
+  const project = item ? getProjectById(item.parentProjectId, projects) : null;
+  if (!item || !project) return;
+  const discipline = calculateWeeklyDiscipline(rowId, state.ui.selectedMonth, projects);
+  modalRoot.innerHTML = renderSheet(item.label, `
+    <div class="readonly-card weak-card">
+      <div class="section-head"><div><h3>${escapeHtml(item.label)}</h3><p class="settings-note">${escapeHtml(project.label)} · ${money(discipline.monthlyBudget)} monthly</p></div><span class="tiny-label">${escapeHtml(discipline.monthUsageLabel)} used</span></div>
+    </div>
+    <div class="weekly-breakdown-list">
+      ${discipline.weeks.map((week) => renderWeeklyBreakdownRow(week)).join("")}
+    </div>
+  `, "Monitor");
+  bindSheetEvents();
+}
+
+function renderWeeklyBreakdownRow(week) {
+  return `
+    <article class="weekly-breakdown-card ${week.statusKey}${week.isCurrent ? " is-current" : ""}${week.isUpcoming ? " is-upcoming" : ""}">
+      <div class="vault-preview-head"><strong>${escapeHtml(formatWeekRange(week.weekStartISO, week.weekEndISO))}</strong><span>${escapeHtml(week.statusLabel)}</span></div>
+      <div class="weekly-breakdown-grid">
+        <span><em>Base</em><strong>${money(week.baseBudget)}</strong></span>
+        <span><em>Carryover</em><strong>${money(week.carryInPenalty)}</strong></span>
+        <span><em>Adjusted</em><strong>${money(week.adjustedBudget)}</strong></span>
+        <span><em>Spent</em><strong>${money(week.spent)}</strong></span>
+        <span><em>${week.overAmount > 0 ? "Over" : "Remaining"}</em><strong>${money(week.overAmount > 0 ? week.overAmount : week.remaining)}</strong></span>
+        <span><em>Status</em><strong>${escapeHtml(week.statusSentence)}</strong></span>
+      </div>
+    </article>
+  `;
 }
 
 function renderSavingsVaultSection(vaults) {
@@ -1253,6 +1279,7 @@ function bindSheetEvents() {
   modalRoot.querySelectorAll("[data-close-sheet]").forEach((button) => button.addEventListener("click", closeSheet));
   modalRoot.querySelectorAll("[data-open-data]").forEach((button) => button.addEventListener("click", openDataCenter));
   modalRoot.querySelectorAll("[data-open-block]").forEach((button) => button.addEventListener("click", () => openBlockDetailSheet(button.dataset.blockScope || sheetContext?.scope || state.ui.planEditorScope, button.dataset.openBlock)));
+  modalRoot.querySelectorAll("[data-open-monitor-detail]").forEach((button) => button.addEventListener("click", () => openMonitorDisciplineSheet(button.dataset.openMonitorDetail)));
   modalRoot.querySelectorAll("[data-toggle-monitor-row]").forEach((button) => button.addEventListener("click", () => {
     state.ui.expandedProjects[button.dataset.toggleMonitorRow] = true;
     saveState();
@@ -2005,26 +2032,81 @@ function calculateDashboardTotals() {
   return { weekSpent, monthSpent, monthRemaining: Math.max(0, spendBudget - monthSpent), spendBudget };
 }
 
-function calculateWeeklyRhythm(subItemId, monthlyBudget) {
-  const weeks = getWeeksOverlappingMonth(state.ui.selectedMonth);
-  const allowance = (Number(monthlyBudget) || 0) / Math.max(1, weeks.length);
-  const referenceDate = getReferenceDateISO(state.ui.selectedMonth);
-  const buckets = [0, 1, 2, 3].map((index) => {
-    const bucketWeeks = index === 3 ? weeks.slice(3) : weeks.slice(index, index + 1);
-    const weekStart = bucketWeeks[0] || weeks[weeks.length - 1] || `${state.ui.selectedMonth}-01`;
-    const weekEnd = bucketWeeks.length ? getWeekEnd(bucketWeeks[bucketWeeks.length - 1]) : weekStart;
-    const spent = sum(state.transactions.filter((tx) => tx.subItemId === subItemId && bucketWeeks.some((week) => tx.dateISO >= week && tx.dateISO <= getWeekEnd(week))).map((tx) => tx.amount));
-    const bucketAllowance = allowance * Math.max(1, bucketWeeks.length);
-    let status = "empty";
-    if (weekStart > referenceDate) status = "future";
-    else if (spent === 0) status = "empty";
-    else {
-      const ratio = bucketAllowance ? spent / bucketAllowance : 0;
-      status = ratio > 1 ? "over" : ratio > 0.9 ? "risk" : ratio > 0.7 ? "watch" : "on-track";
-    }
-    return { status, label: `${formatDate(weekStart)}-${formatDate(weekEnd)} ${money(spent)}` };
+function calculateWeeklyDiscipline(subItemId, monthKey = state.ui.selectedMonth, projects = getPlanForScope("month", monthKey, false)) {
+  const item = getSubItemById(subItemId, projects);
+  if (!item) {
+    return {
+      monthlyBudget: 0,
+      dailyBudget: 0,
+      monthSpent: 0,
+      monthUsagePercent: 0,
+      monthUsageLabel: "0%",
+      weeks: [],
+      focusWeek: makeEmptyWeekSummary(monthKey)
+    };
+  }
+  const monthlyBudget = roundCents(Number(item.monthlyAmount) || 0);
+  const daysInMonth = getDaysInMonthCount(monthKey);
+  const dailyBudget = daysInMonth ? roundCents(monthlyBudget / daysInMonth) : 0;
+  const relation = getMonthRelation(monthKey);
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const currentWeekKey = relation === "current" ? getWeekKey(todayISO) : "";
+  const weeks = getWeeksOverlappingMonth(monthKey);
+  let carryPenalty = 0;
+  const summaries = weeks.map((weekKey) => {
+    const daysInsideMonth = getDaysInWeekWithinMonth(weekKey, monthKey);
+    const baseBudget = roundCents(dailyBudget * daysInsideMonth);
+    const carryInPenalty = roundCents(carryPenalty);
+    const adjustedBudget = roundCents(Math.max(0, baseBudget - carryInPenalty));
+    const carryRemainderBeforeSpent = roundCents(Math.max(0, carryInPenalty - baseBudget));
+    const spent = getWeekSpentForMonth(subItemId, weekKey, monthKey);
+    const remaining = roundCents(Math.max(0, adjustedBudget - spent));
+    const overAmount = roundCents(Math.max(0, spent - adjustedBudget));
+    const carryOutPenalty = roundCents(carryRemainderBeforeSpent + overAmount);
+    const isCurrent = relation === "current" && weekKey === currentWeekKey;
+    const isUpcoming = relation === "future" || (relation === "current" && weekKey > currentWeekKey);
+    const isPast = relation === "past" || (relation === "current" && weekKey < currentWeekKey);
+    const statusKey = getWeeklyStatusKey({ isCurrent, isUpcoming, spent, adjustedBudget, carryInPenalty, overAmount });
+    const statusLabel = getWeeklyStatusLabel(statusKey, isCurrent, isUpcoming);
+    const statusSentence = getWeeklyStatusSentence({ statusKey, carryInPenalty, overAmount, remaining, adjustedBudget, isUpcoming });
+    carryPenalty = carryOutPenalty;
+    return {
+      weekStartISO: weekKey,
+      weekEndISO: getWeekEnd(weekKey),
+      daysInsideMonth,
+      baseBudget,
+      carryInPenalty,
+      adjustedBudget,
+      spent,
+      remaining,
+      overAmount,
+      carryOutPenalty,
+      isCurrent,
+      isUpcoming,
+      isPast,
+      statusKey,
+      statusLabel,
+      statusSentence,
+      summaryLabel: `${formatWeekRange(weekKey, getWeekEnd(weekKey))} · ${money(spent)} / ${money(adjustedBudget)}`
+    };
   });
-  return buckets;
+  const monthSpent = getRowActual(item, projects, monthKey);
+  const monthUsagePercent = monthlyBudget ? clampPercent(monthSpent / monthlyBudget * 100) : 0;
+  const focusWeek = summaries.find((week) => week.isCurrent)
+    || (relation === "past" ? summaries[summaries.length - 1] : null)
+    || summaries.find((week) => !week.isUpcoming)
+    || summaries[0]
+    || makeEmptyWeekSummary(monthKey);
+  return {
+    item,
+    monthlyBudget,
+    dailyBudget,
+    monthSpent,
+    monthUsagePercent,
+    monthUsageLabel: monthlyBudget ? `${Math.round(monthSpent / monthlyBudget * 100)}%` : "0%",
+    weeks: summaries,
+    focusWeek
+  };
 }
 
 function calculateProjectStats(projectId, projects = getPlanForScope("month", state.ui.selectedMonth, false), monthKey = state.ui.selectedMonth) {
@@ -2039,12 +2121,9 @@ function calculateSubItemStats(subItemId, projects = getPlanForScope("month", st
   const item = getSubItemById(subItemId, projects);
   if (!item) return { monthSpent: 0, weekSpent: 0, weeklyAllowance: 0, weekRemaining: 0, monthRemaining: 0 };
   const monthSpent = getRowActual(item, projects, monthKey);
-  const weekKey = getWeekKey(getReferenceDateISO(monthKey));
-  const weekEnd = getWeekEnd(weekKey);
-  const weekSpent = sum(state.transactions.filter((tx) => tx.subItemId === subItemId && tx.dateISO >= weekKey && tx.dateISO <= weekEnd).map((tx) => tx.amount));
-  const weeks = getWeeksOverlappingMonth(monthKey).length || 1;
-  const weeklyAllowance = (item?.monthlyAmount || 0) / weeks;
-  return { monthSpent, weekSpent, weeklyAllowance, weekRemaining: Math.max(0, weeklyAllowance - weekSpent), monthRemaining: Math.max(0, (item?.monthlyAmount || 0) - monthSpent) };
+  const discipline = calculateWeeklyDiscipline(subItemId, monthKey, projects);
+  const focusWeek = discipline.focusWeek;
+  return { monthSpent, weekSpent: focusWeek.spent, weeklyAllowance: focusWeek.adjustedBudget, weekRemaining: Math.max(0, focusWeek.remaining), monthRemaining: Math.max(0, (item?.monthlyAmount || 0) - monthSpent) };
 }
 
 function getActiveProjects() {
@@ -2086,6 +2165,89 @@ function getSpendStatus(spent, budget) {
   if (ratio >= 0.9) return { key: "risk", label: "Risk", note: "Close to monthly limit." };
   if (ratio >= 0.7) return { key: "watch", label: "Watch", note: "Spending is building." };
   return { key: "ok", label: "On track", note: "Pressure is low." };
+}
+
+function getWeeklyStatusKey({ isCurrent, isUpcoming, spent, adjustedBudget, carryInPenalty, overAmount }) {
+  if (isUpcoming) return "upcoming";
+  if (overAmount > 0) return "over";
+  if (adjustedBudget <= 0 && carryInPenalty > 0) return isCurrent ? "risk" : "watch";
+  const ratio = adjustedBudget > 0 ? spent / adjustedBudget : 0;
+  if (ratio >= 0.9 || carryInPenalty > 0) return isCurrent ? "risk" : "watch";
+  if (ratio >= 0.7) return "watch";
+  return "ok";
+}
+
+function getWeeklyStatusLabel(statusKey, isCurrent, isUpcoming) {
+  if (isUpcoming || statusKey === "upcoming") return "Upcoming";
+  if (statusKey === "over") return "Over";
+  if (statusKey === "risk") return isCurrent ? "Risk" : "Watch";
+  if (statusKey === "watch") return "Watch";
+  return isCurrent ? "Current" : "On track";
+}
+
+function getWeeklyStatusSentence({ statusKey, carryInPenalty, overAmount, remaining, adjustedBudget, isUpcoming }) {
+  if (isUpcoming || statusKey === "upcoming") return "Upcoming week. Budget has not started yet.";
+  if (statusKey === "over") return "This week is over budget and next week will tighten.";
+  if (statusKey === "risk" && carryInPenalty > 0) return "Carryover is already tightening this week.";
+  if (statusKey === "risk") return "This week is close to the adjusted limit.";
+  if (statusKey === "watch" && carryInPenalty > 0) return "Carryover is reducing this week's room.";
+  if (statusKey === "watch") return "This week is still within budget, but getting tight.";
+  if (adjustedBudget === 0) return "No room is left in this week's budget.";
+  return remaining > 0 ? "This week is within budget." : "This week is fully used.";
+}
+
+function getWeekSpentForMonth(subItemId, weekKey, monthKey) {
+  const weekEnd = getWeekEnd(weekKey);
+  return roundCents(sum(state.transactions.filter((tx) => tx.subItemId === subItemId && tx.dateISO.startsWith(monthKey) && tx.dateISO >= weekKey && tx.dateISO <= weekEnd).map((tx) => tx.amount)));
+}
+
+function getMonthRelation(monthKey) {
+  const current = currentMonthKey();
+  if (monthKey < current) return "past";
+  if (monthKey > current) return "future";
+  return "current";
+}
+
+function getDaysInMonthCount(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Date(year, month, 0).getDate();
+}
+
+function getDaysInWeekWithinMonth(weekKey, monthKey) {
+  let count = 0;
+  const cursor = new Date(`${weekKey}T00:00:00`);
+  for (let index = 0; index < 7; index += 1) {
+    const dateISO = cursor.toISOString().slice(0, 10);
+    if (dateISO.startsWith(monthKey)) count += 1;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+}
+
+function formatWeekRange(weekStartISO, weekEndISO) {
+  return `${formatDate(weekStartISO)} - ${formatDate(weekEndISO)}`;
+}
+
+function makeEmptyWeekSummary(monthKey) {
+  const weekStartISO = getWeekKey(getReferenceDateISO(monthKey));
+  return {
+    weekStartISO,
+    weekEndISO: getWeekEnd(weekStartISO),
+    baseBudget: 0,
+    carryInPenalty: 0,
+    adjustedBudget: 0,
+    spent: 0,
+    remaining: 0,
+    overAmount: 0,
+    carryOutPenalty: 0,
+    isCurrent: true,
+    isUpcoming: false,
+    isPast: false,
+    statusKey: "ok",
+    statusLabel: "Current",
+    statusSentence: "This week is within budget.",
+    summaryLabel: `${formatWeekRange(weekStartISO, getWeekEnd(weekStartISO))} · ${money(0)} / ${money(0)}`
+  };
 }
 
 function getProjectById(id, projects = getPlanForScope("month", state.ui.selectedMonth, false)) {

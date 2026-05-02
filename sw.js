@@ -1,4 +1,4 @@
-const CACHE_NAME = "finance-tracker-cache-v4-0-0";
+const CACHE_NAME = "finance-tracker-cache-v4-0-1";
 const BASE_PATH = "/finance-tracker/";
 const APP_SHELL = [
   BASE_PATH,
