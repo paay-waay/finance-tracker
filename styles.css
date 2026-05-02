@@ -287,7 +287,7 @@ textarea {
   border-radius: 14px;
   display: grid;
   gap: 0;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   padding: 0;
 }
 
@@ -440,7 +440,8 @@ textarea {
   text-transform: uppercase;
 }
 
-.week-track {
+.week-track,
+.week-rhythm {
   background: rgba(23, 23, 21, 0.06);
   border-radius: 999px;
   height: 4px;
@@ -451,6 +452,71 @@ textarea {
   background: var(--gold);
   display: block;
   height: 100%;
+}
+
+.week-rhythm {
+  background: transparent;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  height: 8px;
+  overflow: visible;
+}
+
+.week-rhythm i {
+  background: rgba(23, 23, 21, 0.08);
+  border-radius: 999px;
+  display: block;
+  height: 8px;
+}
+
+.week-rhythm i.future {
+  background: rgba(23, 23, 21, 0.04);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.week-rhythm i.on-track {
+  background: #5f635f;
+}
+
+.week-rhythm i.watch {
+  background: var(--gold-line);
+}
+
+.week-rhythm i.risk {
+  background: var(--gold);
+}
+
+.week-rhythm i.over {
+  background: #9a756d;
+}
+
+.summary-pressure {
+  min-width: 0;
+}
+
+.more-pinned-card {
+  align-items: center;
+  background: rgba(255, 254, 250, 0.72);
+  border: 1px dashed var(--line-strong);
+  border-radius: 16px;
+  color: var(--muted);
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  min-height: 132px;
+  padding: 13px;
+}
+
+.more-pinned-card strong {
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.more-pinned-card span {
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .group-card {

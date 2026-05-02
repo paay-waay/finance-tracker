@@ -1,4 +1,4 @@
-const APP_VERSION = "V3.5.0 Visual Monitor + Savings Dashboard";
+const APP_VERSION = "V3.5.1 Visual Noise Cleanup";
 const SCHEMA_VERSION = 8;
 const STORAGE_KEY = "financeTracker_v3";
 
@@ -503,6 +503,7 @@ function bindPageEvents() {
   document.querySelectorAll("[data-open-block]").forEach((button) => button.addEventListener("click", () => openBlockDetailSheet(button.dataset.blockScope || state.ui.planEditorScope, button.dataset.openBlock)));
   document.querySelectorAll("[data-open-plan-type]").forEach((button) => button.addEventListener("click", () => openPlanTypeSheet(button.dataset.openPlanType, button.dataset.typeScope || state.ui.planEditorScope)));
   document.querySelector("[data-open-plan-actions]")?.addEventListener("click", openPlanActionsSheet);
+  document.querySelector("[data-open-more-pinned]")?.addEventListener("click", openMorePinnedSheet);
   document.querySelectorAll("[data-update-year-plan]").forEach((button) => button.addEventListener("click", updateYearPlanFromThisMonth));
   document.querySelectorAll("[data-apply-year-plan]").forEach((button) => button.addEventListener("click", applyYearPlanToThisMonth));
   document.querySelectorAll("[data-manage-transactions]").forEach((button) => button.addEventListener("click", openTransactionsManager));
@@ -512,13 +513,14 @@ function bindPageEvents() {
 function renderMonitorPage() {
   const projects = getPlanForScope("month", state.ui.selectedMonth, true);
   const allocation = calculateAllocationForProjects(projects);
-  const pinnedSpendRows = getPinnedSpendRows(projects).slice(0, 6);
+  const allPinnedSpendRows = getPinnedSpendRows(projects);
+  const pinnedSpendRows = allPinnedSpendRows.slice(0, 6);
   const vaults = getSavingsVaultRows(projects);
   return `
     <section class="page monitor-page">
       ${renderAllocationStatusCard(allocation)}
       ${pinnedSpendRows.length ? renderDashboardSummary() : renderMonitorEmpty()}
-      ${pinnedSpendRows.length ? `<section class="monitor-card-grid">${pinnedSpendRows.map(renderSpendMonitorCard).join("")}</section>` : ""}
+      ${pinnedSpendRows.length ? `<section class="monitor-card-grid">${pinnedSpendRows.map(renderSpendMonitorCard).join("")}${allPinnedSpendRows.length > 6 ? renderMorePinnedCard(allPinnedSpendRows.length - 6) : ""}</section>` : ""}
       ${renderSavingsVaultSection(vaults)}
       ${renderRecentActivity()}
     </section>
@@ -621,12 +623,14 @@ function renderAllocationMap(allocation) {
 
 function renderDashboardSummary() {
   const totals = calculateDashboardTotals();
+  const allocation = calculateAllocationForProjects(getPlanForScope("month", state.ui.selectedMonth, false));
+  const hasSpend = totals.monthSpent > 0;
+  const pressure = totals.spendBudget ? totals.monthSpent / totals.spendBudget * 100 : 0;
   return `
-    <section class="dashboard-summary premium-summary-strip">
-      <div><span>Setup</span><strong>${escapeHtml(calculateAllocationForProjects(getPlanForScope("month", state.ui.selectedMonth, false)).label)}</strong></div>
-      <div><span>Week spent</span><strong>${money(totals.weekSpent)}</strong></div>
-      <div><span>Month spent</span><strong>${money(totals.monthSpent)}</strong></div>
-      <div><span>Remaining</span><strong>${money(totals.monthRemaining)}</strong></div>
+    <section class="dashboard-summary premium-summary-strip compact-monitor-summary">
+      <div><span>Plan</span><strong>${escapeHtml(allocation.displayLabel)}</strong></div>
+      <div class="summary-pressure"><span>Month pressure</span><div class="budget-bar"><div class="budget-fill" style="width:${clampPercent(pressure)}%"></div></div></div>
+      <div><span>${hasSpend ? "Remaining" : "Available"}</span><strong>${money(totals.monthRemaining)}</strong></div>
     </section>
   `;
 }
@@ -638,7 +642,7 @@ function renderSpendMonitorCard(entry) {
   const spent = stats.monthSpent;
   const remaining = Math.max(0, budget - spent);
   const percent = budget ? spent / budget * 100 : 0;
-  const weekPercent = stats.weeklyAllowance ? stats.weekSpent / stats.weeklyAllowance * 100 : 0;
+  const rhythm = calculateWeeklyRhythm(item.id, budget);
   const status = getSpendStatus(spent, budget);
   const expanded = Boolean(state.ui.expandedProjects[item.id]);
   const recent = state.transactions.filter((tx) => tx.subItemId === item.id && tx.dateISO.startsWith(state.ui.selectedMonth)).sort(byDateDesc).slice(0, 3);
@@ -653,11 +657,11 @@ function renderSpendMonitorCard(entry) {
         <div class="spend-figures"><strong>${money(spent)} / ${money(budget)}</strong><span>${money(remaining)} remaining</span></div>
       </div>
       <div class="weekly-visual" aria-label="Weekly pace">
-        <span>Week</span>
-        <div class="week-track"><i style="width:${clampPercent(weekPercent)}%"></i></div>
+        <span>Rhythm</span>
+        <div class="week-rhythm">${rhythm.map((segment) => `<i class="${segment.status}" title="${escapeHtml(segment.label)}"></i>`).join("")}</div>
       </div>
-      <p class="visual-note">${escapeHtml(status.note)}</p>
       ${expanded ? `<div class="monitor-details">
+        <span><em>Status</em><strong>${escapeHtml(status.note)}</strong></span>
         <span><em>This week</em><strong>${money(stats.weekSpent)} / ${money(stats.weeklyAllowance)}</strong></span>
         <span><em>Left this week</em><strong>${money(stats.weekRemaining)}</strong></span>
         <span><em>Month remaining</em><strong>${money(stats.monthRemaining)}</strong></span>
@@ -666,6 +670,28 @@ function renderSpendMonitorCard(entry) {
       <button class="details-affordance" type="button" data-toggle-monitor-row="${item.id}">${expanded ? "Hide ˄" : "Details ˅"}</button>
     </article>
   `;
+}
+
+function renderMorePinnedCard(count) {
+  return `
+    <button class="more-pinned-card" type="button" data-open-more-pinned>
+      <strong>+${count} more</strong>
+      <span>pinned items</span>
+    </button>
+  `;
+}
+
+function openMorePinnedSheet() {
+  const rows = getPinnedSpendRows(getPlanForScope("month", state.ui.selectedMonth, false)).slice(6);
+  modalRoot.innerHTML = renderSheet("More Pinned Items", `
+    <div class="manager-list">
+      ${rows.map(({ item, project }) => {
+        const stats = calculateSubItemStats(item.id);
+        return `<button class="manager-row" type="button" data-toggle-monitor-row="${item.id}"><span><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(project.label)} · ${money(stats.monthSpent)} / ${money(item.monthlyAmount)}</small></span><b>View</b></button>`;
+      }).join("")}
+    </div>
+  `, "Monitor");
+  bindSheetEvents();
 }
 
 function renderSavingsVaultSection(vaults) {
@@ -697,8 +723,8 @@ function renderSavingsVaultCard(entry) {
       <div class="vault-preview-head"><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(label)}</span></div>
       <div class="vault-amount">${target ? `${money(current)} / ${money(target)}` : money(current)}</div>
       <div class="budget-bar vault-bar"><div class="budget-fill gold-fill" style="width:${clampPercent(percent)}%"></div></div>
-      <p>${target ? `${Math.round(clampPercent(percent))}% funded · ${money(remaining)} left` : "No target set"}</p>
-      <p>${money(item.monthlyAmount)} monthly contribution · ${escapeHtml(project.label)}</p>
+      <p>Monthly plan: ${money(item.monthlyAmount)}</p>
+      <p>${target ? `Balance: ${money(current)} / ${money(target)} · ${money(remaining)} to go` : `Balance: ${money(current)} · no target`}</p>
     </article>
   `;
 }
@@ -1082,6 +1108,11 @@ function bindSheetEvents() {
   modalRoot.querySelectorAll("[data-close-sheet]").forEach((button) => button.addEventListener("click", closeSheet));
   modalRoot.querySelectorAll("[data-open-data]").forEach((button) => button.addEventListener("click", openDataCenter));
   modalRoot.querySelectorAll("[data-open-block]").forEach((button) => button.addEventListener("click", () => openBlockDetailSheet(button.dataset.blockScope || sheetContext?.scope || state.ui.planEditorScope, button.dataset.openBlock)));
+  modalRoot.querySelectorAll("[data-toggle-monitor-row]").forEach((button) => button.addEventListener("click", () => {
+    state.ui.expandedProjects[button.dataset.toggleMonitorRow] = true;
+    saveState();
+    closeSheet();
+  }));
   modalRoot.querySelectorAll("[data-add-block]").forEach((button) => button.addEventListener("click", () => openAddBlockSheet(button.dataset.addBlock || sheetContext?.scope || state.ui.planEditorScope, button.dataset.defaultType)));
   modalRoot.querySelectorAll("[data-update-year-plan]").forEach((button) => button.addEventListener("click", updateYearPlanFromThisMonth));
   modalRoot.querySelectorAll("[data-apply-year-plan]").forEach((button) => button.addEventListener("click", applyYearPlanToThisMonth));
@@ -1746,7 +1777,29 @@ function calculateDashboardTotals() {
   const monthSpent = sum(state.transactions.filter((tx) => spendItems.has(tx.subItemId) && tx.dateISO.startsWith(month)).map((tx) => tx.amount));
   const weekSpent = sum(state.transactions.filter((tx) => spendItems.has(tx.subItemId) && tx.dateISO >= weekKey && tx.dateISO <= weekEnd).map((tx) => tx.amount));
   const spendBudget = calculateAllocation().spend;
-  return { weekSpent, monthSpent, monthRemaining: Math.max(0, spendBudget - monthSpent) };
+  return { weekSpent, monthSpent, monthRemaining: Math.max(0, spendBudget - monthSpent), spendBudget };
+}
+
+function calculateWeeklyRhythm(subItemId, monthlyBudget) {
+  const weeks = getWeeksOverlappingMonth(state.ui.selectedMonth);
+  const allowance = (Number(monthlyBudget) || 0) / Math.max(1, weeks.length);
+  const referenceDate = getReferenceDateISO(state.ui.selectedMonth);
+  const buckets = [0, 1, 2, 3].map((index) => {
+    const bucketWeeks = index === 3 ? weeks.slice(3) : weeks.slice(index, index + 1);
+    const weekStart = bucketWeeks[0] || weeks[weeks.length - 1] || `${state.ui.selectedMonth}-01`;
+    const weekEnd = bucketWeeks.length ? getWeekEnd(bucketWeeks[bucketWeeks.length - 1]) : weekStart;
+    const spent = sum(state.transactions.filter((tx) => tx.subItemId === subItemId && bucketWeeks.some((week) => tx.dateISO >= week && tx.dateISO <= getWeekEnd(week))).map((tx) => tx.amount));
+    const bucketAllowance = allowance * Math.max(1, bucketWeeks.length);
+    let status = "empty";
+    if (weekStart > referenceDate) status = "future";
+    else if (spent === 0) status = "empty";
+    else {
+      const ratio = bucketAllowance ? spent / bucketAllowance : 0;
+      status = ratio > 1 ? "over" : ratio > 0.9 ? "risk" : ratio > 0.7 ? "watch" : "on-track";
+    }
+    return { status, label: `${formatDate(weekStart)}-${formatDate(weekEnd)} ${money(spent)}` };
+  });
+  return buckets;
 }
 
 function calculateProjectStats(projectId, projects = getPlanForScope("month", state.ui.selectedMonth, false), monthKey = state.ui.selectedMonth) {

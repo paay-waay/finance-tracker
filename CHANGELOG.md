@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-05-02 · V3.5.1 Visual Noise Cleanup
+
+- Reduced Monitor card default text and moved pressure notes, exact weekly numbers, and transaction detail behind tap-to-expand details.
+- Replaced the single weekly pace bar with a restrained 4-segment weekly rhythm indicator on each pinned Spend card.
+- Simplified the Monitor summary strip and hid zero-gap / zero-spend noise where it does not help the opening view.
+- Added a `+X more pinned items` entry so pinned Spend rows beyond the first six are discoverable in a sheet.
+- Clarified Savings Vault wording around monthly plan, manually maintained balance, target, and remaining amount.
+- Updated README for the V3 planning model, CSV backup, `financeTracker_v3` storage key, and current Monitor / Quick Add / Planning structure.
+- Updated service worker cache to `finance-tracker-cache-v3-5-1`.
+
 ## 2026-05-01 · V3.5.0 Visual Monitor + Savings Dashboard
 
 - Rebuilt Monitor around visual pinned Spend cards with progress bars, remaining budget, pressure status, and expandable transaction detail.
