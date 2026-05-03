@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-05-02 · V4.1.0 Mockup UI System
+
+- Reworked Monitor, category detail, Sheet, Savings, and bottom navigation toward the provided iPhone mockup language.
+- Added a Spending / Savings Monitor switch, full-page pinned category detail view, and gold Savings Vault view.
+- Restyled pinned Spend cards with icon tiles, serif headings, month progress, and four-week rhythm bars.
+- Updated the header, month selector, bottom nav, cards, and vault UI to follow the warm ivory / green / muted gold visual system.
+- Updated service worker cache to `finance-tracker-cache-v4-1-0`.
+
 ## 2026-05-02 · V4.0.1 Weekly Discipline Monitor
 
 - Rebuilt Monitor Spend cards around natural-week budget discipline instead of simple month-progress cards.

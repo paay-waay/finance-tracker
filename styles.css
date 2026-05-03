@@ -23,6 +23,867 @@
   --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* V4.1 mockup-aligned premium mobile system */
+:root {
+  --bg: #fbfaf6;
+  --paper: #fffefa;
+  --paper-soft: #f4f1e9;
+  --ink: #050504;
+  --graphite: #5e6259;
+  --muted: #78746c;
+  --muted-2: #a09a91;
+  --line: #e7dfd4;
+  --line-strong: #d8cec0;
+  --ok: #5f7a63;
+  --watch: #d5a44e;
+  --risk: #b8895b;
+  --over: #8a5548;
+  --gold: #d8a445;
+  --gold-soft: #f6eddd;
+  --gold-deep: #9b6e25;
+  --gold-line: #e2c58b;
+  --serif: Georgia, "Times New Roman", serif;
+  --shadow: 0 18px 42px rgba(27, 23, 15, 0.08);
+  --soft-shadow: 0 10px 26px rgba(27, 23, 15, 0.05);
+}
+
+body {
+  background:
+    radial-gradient(circle at 12% -8%, rgba(233, 225, 207, 0.7), transparent 32%),
+    linear-gradient(180deg, #fffefa 0%, var(--bg) 45%, #fbf8f1 100%);
+}
+
+.app-shell {
+  max-width: 520px;
+  padding: 26px 20px calc(112px + env(safe-area-inset-bottom));
+}
+
+.topbar {
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.topbar-main {
+  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.title-row {
+  display: block;
+}
+
+.title-row h1 {
+  font-family: var(--serif);
+  font-size: 50px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+  white-space: normal;
+}
+
+.title-row h1:empty {
+  display: none;
+}
+
+.title-row .header-status-pill {
+  display: none;
+}
+
+.topbar-controls {
+  justify-content: end;
+}
+
+.month-field span {
+  display: none;
+}
+
+.month-chip {
+  align-items: center;
+  background: rgba(255, 254, 250, 0.72);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 132px;
+  padding: 0 14px 0 18px;
+  width: auto;
+}
+
+.month-field input {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  font-size: 16px;
+  min-height: 42px;
+  padding: 0;
+  text-align: left;
+}
+
+.month-chip b {
+  color: var(--muted);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.page {
+  display: grid;
+  gap: 18px;
+}
+
+.app-icon {
+  align-items: center;
+  background: linear-gradient(135deg, rgba(238, 236, 226, 0.95), rgba(248, 245, 237, 0.9));
+  border-radius: 15px;
+  color: var(--ok);
+  display: inline-grid;
+  flex: 0 0 auto;
+  height: 52px;
+  justify-content: center;
+  width: 52px;
+}
+
+.app-icon svg {
+  fill: none;
+  height: 26px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+  width: 26px;
+}
+
+.icon-safe,
+.savings-vault-card .app-icon,
+.vault-summary-card .app-icon {
+  color: var(--gold-deep);
+}
+
+.monitor-balance-card,
+.vault-summary-card {
+  align-items: center;
+  background: rgba(255, 254, 250, 0.86);
+  border: 1px solid var(--line);
+  border-radius: 25px;
+  box-shadow: var(--soft-shadow);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 78px;
+  padding: 14px 18px;
+  text-align: left;
+}
+
+.monitor-balance-card span,
+.vault-summary-card span {
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 650;
+  min-width: 0;
+}
+
+.monitor-balance-card b,
+.vault-summary-card b {
+  color: var(--ok);
+  font-weight: 650;
+}
+
+.monitor-balance-card em,
+.vault-summary-card em {
+  color: var(--muted);
+  font-size: 38px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.monitor-view-switch {
+  background: rgba(255, 254, 250, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+}
+
+.monitor-view-switch button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 24px;
+  color: var(--ink);
+  display: inline-flex;
+  gap: 10px;
+  justify-content: center;
+  min-height: 52px;
+  padding: 8px 14px;
+}
+
+.monitor-view-switch button.is-active {
+  background: rgba(244, 241, 233, 0.95);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+  color: var(--ok);
+}
+
+.monitor-view-switch .app-icon {
+  background: transparent;
+  border-radius: 0;
+  height: 26px;
+  width: 26px;
+}
+
+.monitor-view-switch .app-icon svg {
+  height: 22px;
+  width: 22px;
+}
+
+.monitor-card-grid {
+  gap: 16px;
+}
+
+.monitor-spend-card {
+  background: rgba(255, 254, 250, 0.9);
+  border-color: var(--line);
+  border-radius: 25px;
+  box-shadow: var(--soft-shadow);
+  gap: 16px;
+  min-height: 250px;
+  padding: 18px 16px;
+}
+
+.monitor-spend-card::before {
+  display: none;
+}
+
+.mock-card-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  justify-content: start;
+}
+
+.mock-card-head h2 {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.mock-card-head span {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.monitor-spend-card .monitor-status {
+  background: var(--paper-soft);
+  border-radius: 999px;
+  font-size: 15px;
+  justify-self: start;
+  padding: 6px 12px;
+}
+
+.monitor-status::before,
+.header-status-pill::before {
+  display: none;
+}
+
+.monitor-spend-card.watch .monitor-status,
+.monitor-spend-card.risk .monitor-status {
+  background: #f7eddc;
+  color: #ae7c25;
+}
+
+.monitor-spend-card.over .monitor-status {
+  background: #f1e4df;
+  color: var(--over);
+}
+
+.mock-spend-figures strong {
+  font-family: var(--serif);
+  font-size: 29px;
+  font-weight: 500;
+}
+
+.mock-spend-figures span {
+  font-size: 17px;
+}
+
+.budget-bar {
+  background: #ebe7df;
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.budget-fill {
+  background: linear-gradient(90deg, #718a75, #5f7a63);
+  border-radius: inherit;
+  height: 100%;
+}
+
+.monitor-spend-card.watch .budget-fill,
+.monitor-spend-card.risk .budget-fill {
+  background: linear-gradient(90deg, #e2b154, #d5a44e);
+}
+
+.monitor-spend-card.over .budget-fill {
+  background: linear-gradient(90deg, #9b6255, #7d4d43);
+}
+
+.mock-week-rhythm {
+  display: grid;
+  gap: 12px;
+}
+
+.mock-week-rhythm > span {
+  color: var(--muted);
+  font-size: 16px;
+  font-style: italic;
+}
+
+.mock-week-bars {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mock-week-bars b {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.mock-week-bars i {
+  background: #ebe7df;
+  border-radius: 999px;
+  height: 8px;
+  width: 100%;
+}
+
+.mock-week-bars i.ok,
+.mock-week-bars i.on-track {
+  background: var(--ok);
+}
+
+.mock-week-bars i.watch,
+.mock-week-bars i.risk {
+  background: var(--watch);
+}
+
+.mock-week-bars i.over {
+  background: var(--over);
+}
+
+.mock-week-bars em {
+  color: var(--muted);
+  font-size: 13px;
+  font-style: normal;
+}
+
+.detail-topline {
+  display: flex;
+  justify-content: space-between;
+}
+
+.round-back-button {
+  align-items: center;
+  background: rgba(255, 254, 250, 0.78);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--graphite);
+  display: inline-grid;
+  font-size: 42px;
+  height: 58px;
+  justify-content: center;
+  line-height: 0.8;
+  width: 58px;
+}
+
+.detail-hero {
+  align-items: center;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin: 10px 4px 20px;
+}
+
+.detail-hero .app-icon {
+  height: 72px;
+  width: 72px;
+}
+
+.detail-hero h2 {
+  font-family: var(--serif);
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+}
+
+.detail-hero span {
+  color: var(--muted);
+  display: block;
+  font-size: 22px;
+  margin-top: 6px;
+}
+
+.detail-progress-card,
+.recent-transactions-card {
+  background: rgba(255, 254, 250, 0.88);
+  border: 1px solid var(--line);
+  border-radius: 25px;
+  box-shadow: var(--soft-shadow);
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+
+.detail-amount-row {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+}
+
+.detail-amount-row strong {
+  font-family: var(--serif);
+  font-size: 38px;
+  font-weight: 500;
+}
+
+.detail-amount-row span {
+  color: var(--muted);
+  font-size: 23px;
+}
+
+.detail-progress-card p {
+  color: var(--muted);
+  font-size: 19px;
+}
+
+.weekly-pace-row {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 18px 0 0;
+  text-align: left;
+}
+
+.weekly-pace-row .app-icon {
+  height: 40px;
+  width: 40px;
+}
+
+.weekly-pace-row span {
+  font-size: 19px;
+}
+
+.weekly-pace-row b {
+  color: var(--muted);
+  font-size: 34px;
+  font-weight: 400;
+}
+
+.recent-detail-head {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.recent-detail-head h2 {
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.soft-action-button {
+  background: var(--paper-soft);
+  border: 0;
+  border-radius: 999px;
+  color: var(--ok);
+  font-size: 16px;
+  font-weight: 650;
+  padding: 10px 14px;
+}
+
+.detail-transaction-list {
+  display: grid;
+}
+
+.detail-transaction-row {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 14px 0;
+}
+
+.detail-transaction-row:last-child {
+  border-bottom: 0;
+}
+
+.detail-transaction-row .app-icon {
+  height: 48px;
+  width: 48px;
+}
+
+.detail-transaction-row strong {
+  display: block;
+  font-family: var(--serif);
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.detail-transaction-row em {
+  color: var(--muted);
+  display: block;
+  font-size: 16px;
+  font-style: normal;
+}
+
+.detail-transaction-row b {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.view-all-row {
+  background: transparent;
+  border: 0;
+  color: var(--ok);
+  font-size: 17px;
+  font-weight: 650;
+  justify-self: center;
+}
+
+.savings-monitor-page .monitor-view-switch {
+  margin-bottom: 10px;
+}
+
+.vault-summary-card {
+  min-height: 70px;
+}
+
+.savings-vault-list,
+.vault-card-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+}
+
+.savings-vault-card {
+  background: rgba(255, 254, 250, 0.9);
+  border-color: var(--line);
+  border-radius: 25px;
+  box-shadow: var(--soft-shadow);
+  gap: 16px;
+  padding: 22px;
+}
+
+.vault-card-main {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.vault-card-main .app-icon {
+  background: radial-gradient(circle at 45% 35%, #ddb15f, #c48a25);
+  color: #fffdf5;
+  height: 78px;
+  width: 78px;
+}
+
+.vault-preview-head strong {
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.vault-preview-head span {
+  background: var(--paper-soft);
+  color: var(--ok);
+  font-size: 14px;
+}
+
+.vault-amount {
+  font-family: var(--serif);
+  font-size: 32px;
+  font-weight: 500;
+}
+
+.gold-fill {
+  background: linear-gradient(90deg, #d8a445, #c99028);
+}
+
+.vault-percent-row {
+  color: var(--gold-deep);
+  display: flex;
+  justify-content: end;
+  margin-top: -6px;
+}
+
+.vault-card-footer {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+  padding-top: 14px;
+}
+
+.vault-card-footer span {
+  align-items: center;
+  display: grid;
+  gap: 2px 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.vault-card-footer .app-icon {
+  height: 42px;
+  width: 42px;
+}
+
+.vault-card-footer b {
+  font-family: var(--serif);
+  font-size: 21px;
+  font-weight: 500;
+}
+
+.vault-card-footer em {
+  color: var(--muted);
+  font-size: 13px;
+  font-style: normal;
+}
+
+.sheet-reconciliation,
+.sheet-logs,
+.sheet-vault-area,
+.worksheet-section,
+.recent-preview,
+.empty-state.hero-empty {
+  border-radius: 25px;
+  box-shadow: var(--soft-shadow);
+}
+
+.sheet-reconciliation-head h2 {
+  font-family: var(--serif);
+  font-size: 27px;
+}
+
+.scope-switch {
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.scope-button.is-active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.sheet-reconcile-strip {
+  border: 0;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.sheet-reconcile-strip div {
+  align-items: center;
+  justify-items: center;
+  padding: 8px 10px;
+}
+
+.sheet-reconcile-strip strong {
+  font-family: var(--serif);
+  font-size: 25px;
+  font-weight: 500;
+}
+
+.worksheet-section-head {
+  background: rgba(255, 254, 250, 0.8);
+  min-height: 58px;
+}
+
+.worksheet-section-head strong {
+  font-family: var(--serif);
+  font-size: 23px;
+}
+
+.type-pill,
+.row-mode,
+.monitor-status {
+  border: 0;
+}
+
+.worksheet-table {
+  border-radius: 16px;
+}
+
+.worksheet-row {
+  min-height: 50px;
+}
+
+.bottom-nav {
+  background: rgba(255, 254, 250, 0.88);
+  border-radius: 34px;
+  box-shadow: 0 14px 38px rgba(27, 23, 15, 0.12);
+  grid-template-columns: 1fr 68px 1fr;
+  max-width: 520px;
+  padding: 8px;
+}
+
+.tab-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 28px;
+  display: inline-flex;
+  gap: 10px;
+  justify-content: center;
+  min-height: 62px;
+}
+
+.tab-button .app-icon {
+  background: transparent;
+  color: currentColor;
+  height: 30px;
+  width: 30px;
+}
+
+.tab-button .app-icon svg {
+  height: 25px;
+  width: 25px;
+}
+
+.tab-button.is-active {
+  background: linear-gradient(135deg, #6d876f, #547157);
+  color: var(--paper);
+}
+
+.quick-add-button {
+  background: radial-gradient(circle at 35% 30%, #e7bf6f, #c78a25);
+  box-shadow: 0 12px 24px rgba(156, 103, 28, 0.2);
+  font-size: 42px;
+  height: 66px;
+  width: 66px;
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .title-row h1 {
+    font-size: 48px;
+  }
+
+  .monitor-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .monitor-spend-card {
+    min-height: 250px;
+    padding: 16px 14px;
+  }
+
+  .mock-card-head {
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+
+  .mock-card-head h2 {
+    font-size: 23px;
+  }
+
+  .mock-card-head span {
+    font-size: 15px;
+  }
+
+  .mock-spend-figures strong {
+    font-size: 27px;
+  }
+
+  .detail-hero h2 {
+    font-size: 42px;
+  }
+}
+
+@media (max-width: 390px) {
+  .app-shell {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .title-row h1 {
+    font-size: 42px;
+  }
+
+  .month-chip {
+    min-width: 116px;
+  }
+
+  .month-field input {
+    font-size: 14px;
+  }
+
+  .monitor-card-grid {
+    gap: 12px;
+  }
+
+  .monitor-spend-card {
+    border-radius: 22px;
+    min-height: 232px;
+    padding: 14px 12px;
+  }
+
+  .mock-card-head {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .app-icon {
+    border-radius: 14px;
+    height: 46px;
+    width: 46px;
+  }
+
+  .app-icon svg {
+    height: 23px;
+    width: 23px;
+  }
+
+  .mock-card-head h2 {
+    font-size: 20px;
+  }
+
+  .monitor-spend-card .monitor-status {
+    font-size: 13px;
+    padding: 5px 10px;
+  }
+
+  .mock-spend-figures strong {
+    font-size: 23px;
+  }
+
+  .mock-week-bars {
+    gap: 10px;
+  }
+
+  .bottom-nav {
+    grid-template-columns: 1fr 60px 1fr;
+  }
+
+  .quick-add-button {
+    height: 58px;
+    width: 58px;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -2694,5 +3555,605 @@ button:disabled {
   .scope-button {
     font-size: 11px;
     padding-inline: 7px;
+  }
+}
+
+/* V4.1 final cascade: keep the mockup system authoritative over legacy rules. */
+body {
+  background:
+    radial-gradient(circle at 12% -8%, rgba(233, 225, 207, 0.7), transparent 32%),
+    linear-gradient(180deg, #fffefa 0%, var(--bg) 45%, #fbf8f1 100%);
+}
+
+.app-shell {
+  max-width: 520px;
+  padding: 26px 20px calc(112px + env(safe-area-inset-bottom));
+}
+
+.topbar {
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.topbar-main {
+  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.title-row {
+  display: block;
+}
+
+.title-row h1 {
+  font-family: var(--serif);
+  font-size: 50px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+  white-space: normal;
+}
+
+.title-row h1:empty,
+.title-row .header-status-pill,
+.month-field span {
+  display: none;
+}
+
+.topbar-controls {
+  justify-content: end;
+}
+
+.month-chip {
+  align-items: center;
+  background: rgba(255, 254, 250, 0.72);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 132px;
+  padding: 0 14px 0 18px;
+  width: auto;
+}
+
+.month-field input {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  font-size: 16px;
+  min-height: 42px;
+  padding: 0;
+  text-align: left;
+}
+
+.month-chip b {
+  color: var(--muted);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.page {
+  display: grid;
+  gap: 18px;
+}
+
+.monitor-balance-card,
+.vault-summary-card {
+  align-items: center;
+  background: rgba(255, 254, 250, 0.86);
+  border: 1px solid var(--line);
+  border-radius: 25px;
+  box-shadow: var(--soft-shadow);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 78px;
+  padding: 14px 18px;
+  text-align: left;
+}
+
+.monitor-balance-card span,
+.vault-summary-card span {
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.monitor-balance-card b,
+.vault-summary-card b {
+  color: var(--ok);
+  font-weight: 650;
+}
+
+.monitor-balance-card em,
+.vault-summary-card em {
+  color: var(--muted);
+  font-size: 38px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.app-icon {
+  align-items: center;
+  background: linear-gradient(135deg, rgba(238, 236, 226, 0.95), rgba(248, 245, 237, 0.9));
+  border-radius: 15px;
+  color: var(--ok);
+  display: inline-grid;
+  flex: 0 0 auto;
+  height: 52px;
+  justify-content: center;
+  width: 52px;
+}
+
+.app-icon svg {
+  fill: none;
+  height: 26px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+  width: 26px;
+}
+
+.monitor-view-switch {
+  background: rgba(255, 254, 250, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+}
+
+.monitor-view-switch button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 24px;
+  display: inline-flex;
+  gap: 10px;
+  justify-content: center;
+  min-height: 52px;
+  padding: 8px 14px;
+}
+
+.monitor-view-switch button.is-active {
+  background: rgba(244, 241, 233, 0.95);
+  color: var(--ok);
+}
+
+.monitor-view-switch .app-icon {
+  background: transparent;
+  height: 26px;
+  width: 26px;
+}
+
+.monitor-card-grid {
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.monitor-spend-card {
+  background: rgba(255, 254, 250, 0.9);
+  border-color: var(--line);
+  border-radius: 25px;
+  box-shadow: var(--soft-shadow);
+  gap: 16px;
+  min-height: 250px;
+  padding: 18px 16px;
+}
+
+.monitor-spend-card::before {
+  display: none;
+}
+
+.mock-card-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  justify-content: start;
+}
+
+.mock-card-head h2 {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.mock-card-head span {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.monitor-spend-card .monitor-status {
+  background: var(--paper-soft);
+  border-radius: 999px;
+  font-size: 15px;
+  justify-self: start;
+  padding: 6px 12px;
+}
+
+.monitor-status::before,
+.header-status-pill::before {
+  display: none;
+}
+
+.monitor-spend-card.watch .monitor-status,
+.monitor-spend-card.risk .monitor-status {
+  background: #f7eddc;
+  color: #ae7c25;
+}
+
+.monitor-spend-card.over .monitor-status {
+  background: #f1e4df;
+  color: var(--over);
+}
+
+.mock-spend-figures strong {
+  font-family: var(--serif);
+  font-size: 29px;
+  font-weight: 500;
+}
+
+.mock-spend-figures span {
+  font-size: 17px;
+}
+
+.budget-bar {
+  background: #ebe7df;
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.budget-fill {
+  background: linear-gradient(90deg, #718a75, #5f7a63);
+}
+
+.monitor-spend-card.watch .budget-fill,
+.monitor-spend-card.risk .budget-fill {
+  background: linear-gradient(90deg, #e2b154, #d5a44e);
+}
+
+.monitor-spend-card.over .budget-fill {
+  background: linear-gradient(90deg, #9b6255, #7d4d43);
+}
+
+.mock-week-rhythm {
+  display: grid;
+  gap: 12px;
+}
+
+.mock-week-rhythm > span {
+  color: var(--muted);
+  font-size: 16px;
+  font-style: italic;
+}
+
+.mock-week-bars {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mock-week-bars b {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.mock-week-bars i {
+  background: #ebe7df;
+  border-radius: 999px;
+  height: 8px;
+  width: 100%;
+}
+
+.mock-week-bars i.ok,
+.mock-week-bars i.on-track {
+  background: var(--ok);
+}
+
+.mock-week-bars i.watch,
+.mock-week-bars i.risk {
+  background: var(--watch);
+}
+
+.mock-week-bars i.over {
+  background: var(--over);
+}
+
+.mock-week-bars em {
+  color: var(--muted);
+  font-size: 13px;
+  font-style: normal;
+}
+
+.detail-progress-card,
+.recent-transactions-card,
+.savings-vault-card,
+.sheet-reconciliation,
+.sheet-logs,
+.sheet-vault-area,
+.worksheet-section {
+  background: rgba(255, 254, 250, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 25px;
+  box-shadow: var(--soft-shadow);
+}
+
+.detail-progress-card,
+.recent-transactions-card {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+
+.round-back-button {
+  background: rgba(255, 254, 250, 0.78);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--graphite);
+  font-size: 42px;
+  height: 58px;
+  line-height: 0.8;
+  width: 58px;
+}
+
+.detail-hero {
+  align-items: center;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin: 10px 4px 20px;
+}
+
+.detail-hero .app-icon {
+  height: 72px;
+  width: 72px;
+}
+
+.detail-hero h2 {
+  font-family: var(--serif);
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+}
+
+.detail-hero span {
+  color: var(--muted);
+  display: block;
+  font-size: 22px;
+  margin-top: 6px;
+}
+
+.detail-amount-row {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+}
+
+.detail-amount-row strong {
+  font-family: var(--serif);
+  font-size: 38px;
+  font-weight: 500;
+}
+
+.detail-amount-row span {
+  color: var(--muted);
+  font-size: 23px;
+}
+
+.weekly-pace-row {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 18px 0 0;
+  text-align: left;
+}
+
+.recent-detail-head,
+.vault-preview-head {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.recent-detail-head h2,
+.vault-preview-head strong {
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.soft-action-button {
+  background: var(--paper-soft);
+  border: 0;
+  border-radius: 999px;
+  color: var(--ok);
+  font-size: 16px;
+  font-weight: 650;
+  padding: 10px 14px;
+}
+
+.detail-transaction-row {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 14px 0;
+}
+
+.detail-transaction-row strong,
+.detail-transaction-row b,
+.vault-amount,
+.vault-card-footer b,
+.sheet-reconciliation-head h2,
+.sheet-reconcile-strip strong,
+.worksheet-section-head strong {
+  font-family: var(--serif);
+  font-weight: 500;
+}
+
+.savings-vault-list,
+.vault-card-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+}
+
+.savings-vault-card {
+  gap: 16px;
+  padding: 22px;
+}
+
+.vault-card-main {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.vault-card-main .app-icon {
+  background: radial-gradient(circle at 45% 35%, #ddb15f, #c48a25);
+  color: #fffdf5;
+  height: 78px;
+  width: 78px;
+}
+
+.vault-amount {
+  font-size: 32px;
+}
+
+.gold-fill {
+  background: linear-gradient(90deg, #d8a445, #c99028);
+}
+
+.vault-percent-row {
+  color: var(--gold-deep);
+  display: flex;
+  justify-content: end;
+  margin-top: -6px;
+}
+
+.vault-card-footer {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+  padding-top: 14px;
+}
+
+.vault-card-footer span {
+  align-items: center;
+  display: grid;
+  gap: 2px 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.vault-card-footer .app-icon {
+  height: 42px;
+  width: 42px;
+}
+
+.bottom-nav {
+  background: rgba(255, 254, 250, 0.88);
+  border-radius: 34px;
+  box-shadow: 0 14px 38px rgba(27, 23, 15, 0.12);
+  grid-template-columns: 1fr 68px 1fr;
+  max-width: 520px;
+  padding: 8px;
+}
+
+.tab-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 28px;
+  display: inline-flex;
+  gap: 10px;
+  justify-content: center;
+  min-height: 62px;
+}
+
+.tab-button .app-icon {
+  background: transparent;
+  color: currentColor;
+  height: 30px;
+  width: 30px;
+}
+
+.tab-button .app-icon svg {
+  height: 25px;
+  width: 25px;
+}
+
+.tab-button.is-active {
+  background: linear-gradient(135deg, #6d876f, #547157);
+  color: var(--paper);
+}
+
+.quick-add-button {
+  background: radial-gradient(circle at 35% 30%, #e7bf6f, #c78a25);
+  box-shadow: 0 12px 24px rgba(156, 103, 28, 0.2);
+  font-size: 42px;
+  height: 66px;
+  width: 66px;
+}
+
+@media (max-width: 390px) {
+  .app-shell {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .title-row h1 {
+    font-size: 42px;
+  }
+
+  .month-chip {
+    min-width: 116px;
+  }
+
+  .monitor-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .monitor-spend-card {
+    border-radius: 22px;
+    min-height: 232px;
+    padding: 14px 12px;
+  }
+
+  .mock-card-head {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .app-icon {
+    border-radius: 14px;
+    height: 46px;
+    width: 46px;
+  }
+
+  .mock-card-head h2 {
+    font-size: 20px;
+  }
+
+  .mock-spend-figures strong {
+    font-size: 23px;
+  }
+
+  .mock-week-bars {
+    gap: 10px;
   }
 }

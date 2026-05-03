@@ -1,4 +1,4 @@
-const APP_VERSION = "V4.0.1 Weekly Discipline Monitor";
+const APP_VERSION = "V4.1.0 Mockup UI System";
 const SCHEMA_VERSION = 8;
 const STORAGE_KEY = "financeTracker_v3";
 
@@ -10,6 +10,8 @@ const DEFAULT_STATE = {
   ui: {
     activeTab: "monitor",
     selectedMonth: currentMonthKey(),
+    monitorView: "spending",
+    monitorDetailRowId: "",
     monitorScope: "week",
     txFilter: "month",
     planEditorScope: "year",
@@ -69,6 +71,7 @@ function bindShellEvents() {
     const tab = event.target.closest("[data-tab]");
     if (!tab) return;
     state.ui.activeTab = tab.dataset.tab;
+    state.ui.monitorDetailRowId = "";
     saveState();
     render();
   });
@@ -107,6 +110,8 @@ function normalizePlanState(input) {
   next.ui = { ...next.ui, ...(isObject(input.ui) ? input.ui : {}) };
   next.ui.activeTab = ["monitor", "planning"].includes(next.ui.activeTab) ? next.ui.activeTab : "monitor";
   next.ui.selectedMonth = normalizeMonthValue(next.ui.selectedMonth) || currentMonthKey();
+  next.ui.monitorView = next.ui.monitorView === "savings" ? "savings" : "spending";
+  next.ui.monitorDetailRowId = String(next.ui.monitorDetailRowId || "");
   next.ui.monitorScope = next.ui.monitorScope === "month" ? "month" : "week";
   next.ui.txFilter = ["week", "month", "all"].includes(next.ui.txFilter) ? next.ui.txFilter : next.ui.monitorScope;
   next.ui.planEditorScope = next.ui.planEditorScope === "month" ? "month" : "year";
@@ -127,6 +132,8 @@ function migrateCurrentProjectsState(input) {
   next.ui = { ...next.ui, ...(isObject(input.ui) ? input.ui : {}) };
   next.ui.activeTab = ["monitor", "planning"].includes(next.ui.activeTab) ? next.ui.activeTab : "monitor";
   next.ui.selectedMonth = normalizeMonthValue(next.ui.selectedMonth) || currentMonthKey();
+  next.ui.monitorView = next.ui.monitorView === "savings" ? "savings" : "spending";
+  next.ui.monitorDetailRowId = String(next.ui.monitorDetailRowId || "");
   next.ui.monitorScope = next.ui.monitorScope === "month" ? "month" : "week";
   next.ui.txFilter = ["week", "month", "all"].includes(next.ui.txFilter) ? next.ui.txFilter : next.ui.monitorScope;
   next.ui.planEditorScope = next.ui.planEditorScope === "month" ? "month" : "year";
@@ -435,7 +442,7 @@ function saveState() {
 function render() {
   if (state.ui.activeTab === "monitor") getMonthPlan(state.ui.selectedMonth, true);
   if (state.ui.activeTab === "planning" && state.ui.planEditorScope === "month" && hasYearPlan()) getMonthPlan(state.ui.selectedMonth, true);
-  pageTitle.textContent = state.ui.activeTab === "planning" ? "Sheet" : "Monitor";
+  pageTitle.textContent = state.ui.activeTab === "planning" ? "Sheet" : state.ui.monitorDetailRowId ? "" : state.ui.monitorView === "savings" ? "Savings" : "Monitor";
   renderHeaderControls();
   renderHeaderStatus();
   renderNav();
@@ -449,6 +456,7 @@ function renderHeaderControls() {
     <label class="month-field month-chip">
       <span>Month</span>
       <input id="monthInputLive" type="month" value="${state.ui.selectedMonth}" />
+      <b aria-hidden="true">⌄</b>
     </label>
   `;
   controls.querySelector("#monthInputLive")?.addEventListener("change", (event) => {
@@ -468,9 +476,9 @@ function renderHeaderStatus() {
 
 function renderNav() {
   bottomNav.innerHTML = `
-    <button class="tab-button ${state.ui.activeTab === "monitor" ? "is-active" : ""}" type="button" data-tab="monitor">Monitor</button>
+    <button class="tab-button ${state.ui.activeTab === "monitor" ? "is-active" : ""}" type="button" data-tab="monitor">${renderAppIcon("wallet")}<span>Monitor</span></button>
     <button class="quick-add-button" type="button" data-quick-add aria-label="Quick Add">+</button>
-    <button class="tab-button ${state.ui.activeTab === "planning" ? "is-active" : ""}" type="button" data-tab="planning">Sheet</button>
+    <button class="tab-button ${state.ui.activeTab === "planning" ? "is-active" : ""}" type="button" data-tab="planning">${renderAppIcon("sheet")}<span>Sheet</span></button>
   `;
 }
 
@@ -487,9 +495,24 @@ function bindPageEvents() {
     saveState();
     render();
   }));
+  document.querySelectorAll("[data-monitor-view]").forEach((button) => button.addEventListener("click", () => {
+    state.ui.monitorView = button.dataset.monitorView === "savings" ? "savings" : "spending";
+    state.ui.monitorDetailRowId = "";
+    saveState();
+    render();
+  }));
+  document.querySelectorAll("[data-back-monitor]").forEach((button) => button.addEventListener("click", () => {
+    state.ui.monitorDetailRowId = "";
+    saveState();
+    render();
+  }));
   document.querySelectorAll("[data-open-monitor-detail]").forEach((button) => button.addEventListener("click", (event) => {
     event.stopPropagation();
-    openMonitorDisciplineSheet(button.dataset.openMonitorDetail);
+    openMonitorCategoryPage(button.dataset.openMonitorDetail);
+  }));
+  document.querySelectorAll("[data-open-weekly-breakdown]").forEach((button) => button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openMonitorDisciplineSheet(button.dataset.openWeeklyBreakdown);
   }));
   document.querySelectorAll("[data-plan-scope]").forEach((button) => button.addEventListener("click", () => {
     state.ui.planEditorScope = button.dataset.planScope === "month" ? "month" : "year";
@@ -518,12 +541,14 @@ function renderMonitorPage() {
   const allPinnedSpendRows = getPinnedSpendRows(projects);
   const pinnedSpendRows = allPinnedSpendRows.slice(0, 6);
   const vaults = getSavingsVaultRows(projects);
+  if (state.ui.monitorDetailRowId) return renderMonitorCategoryDetailPage(state.ui.monitorDetailRowId);
+  if (state.ui.monitorView === "savings") return renderSavingsMonitorPage(vaults);
   return `
     <section class="page monitor-page">
-      ${renderAllocationStatusCard(allocation)}
-      ${pinnedSpendRows.length ? renderDashboardSummary() : renderMonitorEmpty()}
+      ${renderMonitorBalanceCard(allocation)}
+      ${vaults.length ? renderMonitorViewSwitch("spending") : ""}
+      ${pinnedSpendRows.length ? "" : renderMonitorEmpty()}
       ${pinnedSpendRows.length ? `<section class="monitor-card-grid">${pinnedSpendRows.map(renderSpendMonitorCard).join("")}${allPinnedSpendRows.length > 6 ? renderMorePinnedCard(allPinnedSpendRows.length - 6) : ""}</section>` : ""}
-      ${renderSavingsVaultSection(vaults)}
       ${renderRecentActivity()}
     </section>
   `;
@@ -552,6 +577,7 @@ function renderPlanningPage() {
           <button class="scope-button ${scope === "year" ? "is-active" : ""}" type="button" data-plan-scope="year">Default Plan</button>
           <button class="scope-button ${scope === "month" ? "is-active" : ""}" type="button" data-plan-scope="month" ${canEditMonth ? "" : "disabled"}>${escapeHtml(monthLabel)}</button>
         </div>
+        ${renderAllocationMap(allocation)}
         ${renderSheetReconciliationStrip(allocation)}
         ${renderBalancePlanAction(allocation)}
         ${pinnedCount || overrides ? `<div class="plan-meta-strip">${pinnedCount ? `<span>${pinnedCount}/6 pinned manual items</span>` : ""}${overrides ? `<span>${overrides} actual overrides</span>` : ""}</div>` : ""}
@@ -599,6 +625,28 @@ function renderAllocationStatusCard(allocation) {
       </div>
       <button class="ghost-button status-edit-action" type="button" data-open-setup data-plan-scope="${hasYearPlan() ? "month" : "year"}">${allocation.isReady ? "Edit" : "Review"}</button>
     </section>
+  `;
+}
+
+function renderMonitorBalanceCard(allocation) {
+  const totals = calculateDashboardTotals();
+  const remain = Math.max(0, totals.spendBudget - totals.monthSpent);
+  const label = allocation.isReady ? "Balanced" : allocation.displayLabel;
+  return `
+    <button class="monitor-balance-card" type="button" data-open-setup data-plan-scope="${hasYearPlan() ? "month" : "year"}">
+      ${renderAppIcon("wallet")}
+      <span><strong>${escapeHtml(label)}</strong>${allocation.isReady ? ` · <b>${money(remain)}</b> remaining` : allocation.difference ? ` · <b>${money(allocation.difference)}</b>` : ""}</span>
+      <em aria-hidden="true">›</em>
+    </button>
+  `;
+}
+
+function renderMonitorViewSwitch(active) {
+  return `
+    <div class="monitor-view-switch" role="tablist" aria-label="Monitor view">
+      <button class="${active === "spending" ? "is-active" : ""}" type="button" data-monitor-view="spending">${renderAppIcon("bars")}<span>Spending</span></button>
+      <button class="${active === "savings" ? "is-active" : ""}" type="button" data-monitor-view="savings">${renderAppIcon("safe")}<span>Savings</span></button>
+    </div>
   `;
 }
 
@@ -667,31 +715,99 @@ function renderSpendMonitorCard(entry) {
   const { item, project } = entry;
   const discipline = calculateWeeklyDiscipline(item.id);
   const currentWeek = discipline.focusWeek;
-  const rhythm = discipline.weeks;
-  const over = currentWeek.overAmount > 0;
-  const remainingText = over ? `${money(currentWeek.overAmount)} over` : `${money(currentWeek.remaining)} left`;
+  const stats = calculateSubItemStats(item.id);
+  const status = getSpendStatus(stats.monthSpent, item.monthlyAmount);
+  const remainingText = stats.monthSpent > item.monthlyAmount ? `${money(stats.monthSpent - item.monthlyAmount)} over` : `${money(stats.monthRemaining)} left`;
   return `
-    <article class="monitor-spend-card ${currentWeek.statusKey}" data-open-monitor-detail="${item.id}">
-      <div class="monitor-card-head">
-        <div><h2>${escapeHtml(item.label)}</h2><span>${escapeHtml(formatWeekRange(currentWeek.weekStartISO, currentWeek.weekEndISO))}</span></div>
-        <em class="monitor-status">${escapeHtml(currentWeek.statusLabel)}</em>
+    <article class="monitor-spend-card ${status.key}" data-open-monitor-detail="${item.id}">
+      <div class="monitor-card-head mock-card-head">
+        ${renderAppIcon(getSpendIconKey(item.label))}
+        <div><h2>${escapeHtml(item.label)}</h2><span>${escapeHtml(project.label)}</span></div>
       </div>
-      <div class="visual-spend">
-        <div class="budget-bar"><div class="budget-fill" style="width:${clampPercent(discipline.monthUsagePercent)}%"></div></div>
-        <div class="spend-figures"><strong>${money(currentWeek.spent)} / ${money(currentWeek.adjustedBudget)}</strong><span>${escapeHtml(remainingText)}</span></div>
+      <em class="monitor-status">${escapeHtml(status.label)}</em>
+      <div class="spend-figures mock-spend-figures">
+        <strong>${money(stats.monthSpent)} / ${money(item.monthlyAmount)}</strong>
+        <span>${escapeHtml(remainingText)}</span>
       </div>
-      <div class="monitor-metrics">
-        <span><em>Month budget</em><strong>${money(discipline.monthlyBudget)}</strong></span>
-        <span><em>Used this month</em><strong>${discipline.monthUsageLabel}</strong></span>
-      </div>
-      ${currentWeek.carryInPenalty > 0 ? `<p class="carryover-note">Carry-in penalty ${money(currentWeek.carryInPenalty)}</p>` : ""}
-      <div class="weekly-visual is-discipline" aria-label="Weekly rhythm">
-        <span>Week rhythm</span>
-        <div class="week-rhythm" style="grid-template-columns: repeat(${rhythm.length}, minmax(0, 1fr));">${rhythm.map((segment) => `<i class="${segment.statusKey}${segment.isCurrent ? " is-current" : ""}" title="${escapeHtml(segment.summaryLabel)}"></i>`).join("")}</div>
-      </div>
-      <p class="monitor-status-sentence">${escapeHtml(currentWeek.statusSentence)}</p>
-      <button class="details-affordance" type="button" data-open-monitor-detail="${item.id}">Weekly breakdown ˅</button>
+      <div class="budget-bar"><div class="budget-fill" style="width:${clampPercent(discipline.monthUsagePercent)}%"></div></div>
+      ${currentWeek.carryInPenalty > 0 ? `<p class="carryover-note">Carry-in ${money(currentWeek.carryInPenalty)}</p>` : ""}
+      ${renderWeekRhythmWithLabels(discipline)}
     </article>
+  `;
+}
+
+function renderWeekRhythmWithLabels(discipline) {
+  const visibleWeeks = discipline.weeks.slice(0, 4);
+  return `
+    <div class="mock-week-rhythm" aria-label="This week">
+      <span>This week</span>
+      <div class="mock-week-bars">
+        ${visibleWeeks.map((week, index) => `<b><i class="${week.statusKey}${week.isCurrent ? " is-current" : ""}"></i><em>W${index + 1}</em></b>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function openMonitorCategoryPage(rowId) {
+  state.ui.monitorDetailRowId = rowId;
+  state.ui.monitorView = "spending";
+  saveState();
+  render();
+}
+
+function renderMonitorCategoryDetailPage(rowId) {
+  const projects = getPlanForScope("month", state.ui.selectedMonth, false);
+  const item = getSubItemById(rowId, projects);
+  const project = item ? getProjectById(item.parentProjectId, projects) : null;
+  if (!item || !project) {
+    state.ui.monitorDetailRowId = "";
+    return renderMonitorPage();
+  }
+  const discipline = calculateWeeklyDiscipline(rowId, state.ui.selectedMonth, projects);
+  const stats = calculateSubItemStats(rowId, projects);
+  const status = getSpendStatus(stats.monthSpent, item.monthlyAmount);
+  const currentWeek = discipline.focusWeek;
+  const remainingText = stats.monthSpent > item.monthlyAmount ? `${money(stats.monthSpent - item.monthlyAmount)} over` : `${money(stats.monthRemaining)} left`;
+  const weeklyPaceText = currentWeek.overAmount > 0
+    ? `You're ${money(currentWeek.overAmount)} over your weekly pace`
+    : `You're ${money(currentWeek.remaining)} under your weekly pace`;
+  const recent = state.transactions.filter((tx) => tx.subItemId === rowId && tx.dateISO.startsWith(state.ui.selectedMonth)).sort(byDateDesc).slice(0, 3);
+  return `
+    <section class="page monitor-detail-page">
+      <div class="detail-topline">
+        <button class="round-back-button" type="button" data-back-monitor aria-label="Back">‹</button>
+      </div>
+      <header class="detail-hero">
+        ${renderAppIcon(getSpendIconKey(item.label))}
+        <div><h2>${escapeHtml(item.label)}</h2><span>${escapeHtml(project.label)}</span></div>
+        <em class="monitor-status">${escapeHtml(status.label)}</em>
+      </header>
+      <section class="detail-progress-card">
+        <div class="detail-amount-row"><strong>${money(stats.monthSpent)} / ${money(item.monthlyAmount)}</strong><span>${escapeHtml(remainingText)}</span></div>
+        <div class="budget-bar"><div class="budget-fill" style="width:${clampPercent(discipline.monthUsagePercent)}%"></div></div>
+        <p>${escapeHtml(discipline.monthUsageLabel)} of budget used</p>
+        ${renderWeekRhythmWithLabels(discipline)}
+        <button class="weekly-pace-row" type="button" data-open-weekly-breakdown="${item.id}">
+          ${renderAppIcon("trend")}
+          <span>${escapeHtml(weeklyPaceText)}</span>
+          <b aria-hidden="true">›</b>
+        </button>
+      </section>
+      <section class="recent-transactions-card">
+        <div class="recent-detail-head"><h2>Recent transactions</h2><button class="soft-action-button" type="button" data-quick-add-row="${item.id}">+ Add transaction</button></div>
+        ${recent.length ? `<div class="detail-transaction-list">${recent.map((tx) => renderDetailTransaction(tx)).join("")}</div><button class="view-all-row" type="button" data-manage-transactions>View all transactions ›</button>` : `<div class="empty-state">No transactions yet.</div>`}
+      </section>
+    </section>
+  `;
+}
+
+function renderDetailTransaction(transaction) {
+  return `
+    <div class="detail-transaction-row">
+      ${renderAppIcon("leaf")}
+      <span><strong>${escapeHtml(transaction.note || getSubItemLabel(transaction.subItemId))}</strong><em>${formatDate(transaction.dateISO)}</em></span>
+      <b>${money(transaction.amount)}</b>
+    </div>
   `;
 }
 
@@ -760,6 +876,29 @@ function renderSavingsVaultSection(vaults) {
   `;
 }
 
+function renderSavingsMonitorPage(vaults) {
+  const planned = sum(vaults.map(({ item }) => item.monthlyAmount));
+  return `
+    <section class="page savings-monitor-page">
+      ${renderMonitorViewSwitch("savings")}
+      ${vaults.length ? `
+        <button class="vault-summary-card" type="button" data-open-setup data-plan-scope="month">
+          ${renderAppIcon("safe")}
+          <span><strong>Vault progress</strong> · <b>${money(planned)}</b> planned this month</span>
+          <em aria-hidden="true">›</em>
+        </button>
+        <div class="savings-vault-list">${vaults.map(renderSavingsVaultCard).join("")}</div>
+      ` : `
+        <section class="empty-state hero-empty">
+          <strong>No savings vaults yet.</strong>
+          <span>Mark a Save item as a Vault from Sheet.</span>
+          <button class="action-button" type="button" data-open-setup data-plan-scope="month">Open Sheet</button>
+        </section>
+      `}
+    </section>
+  `;
+}
+
 function renderSavingsVaultCard(entry) {
   const { item, project } = entry;
   const target = Number(item.targetAmount) || 0;
@@ -769,11 +908,19 @@ function renderSavingsVaultCard(entry) {
   const label = target ? current >= target ? "Complete" : "Building" : "Tracking";
   return `
     <article class="savings-vault-card">
-      <div class="vault-preview-head"><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(label)}</span></div>
-      <div class="vault-amount">${target ? `${money(current)} / ${money(target)}` : money(current)}</div>
+      <div class="vault-card-main">
+        ${renderAppIcon(getVaultIconKey(item.label))}
+        <div>
+          <div class="vault-preview-head"><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(label === "Building" ? "On track" : label)}</span></div>
+          <div class="vault-amount">${target ? `${money(current)} / ${money(target)}` : money(current)}</div>
+        </div>
+      </div>
       <div class="budget-bar vault-bar"><div class="budget-fill gold-fill" style="width:${clampPercent(percent)}%"></div></div>
-      <p>Monthly plan: ${money(item.monthlyAmount)}</p>
-      <p>${target ? `Balance: ${money(current)} / ${money(target)} · ${money(remaining)} to go` : `Balance: ${money(current)} · no target`}</p>
+      <div class="vault-percent-row"><span>${target ? `${Math.round(percent)}%` : "Tracking"}</span></div>
+      <div class="vault-card-footer">
+        <span>${renderAppIcon("trend")}<b>${target ? money(remaining) : money(current)}</b><em>${target ? "Remaining to goal" : "Current balance"}</em></span>
+        <span>${renderAppIcon("calendar")}<b>${money(item.monthlyAmount)}</b><em>Monthly plan</em></span>
+      </div>
     </article>
   `;
 }
@@ -1279,7 +1426,10 @@ function bindSheetEvents() {
   modalRoot.querySelectorAll("[data-close-sheet]").forEach((button) => button.addEventListener("click", closeSheet));
   modalRoot.querySelectorAll("[data-open-data]").forEach((button) => button.addEventListener("click", openDataCenter));
   modalRoot.querySelectorAll("[data-open-block]").forEach((button) => button.addEventListener("click", () => openBlockDetailSheet(button.dataset.blockScope || sheetContext?.scope || state.ui.planEditorScope, button.dataset.openBlock)));
-  modalRoot.querySelectorAll("[data-open-monitor-detail]").forEach((button) => button.addEventListener("click", () => openMonitorDisciplineSheet(button.dataset.openMonitorDetail)));
+  modalRoot.querySelectorAll("[data-open-monitor-detail]").forEach((button) => button.addEventListener("click", () => {
+    closeSheet();
+    openMonitorCategoryPage(button.dataset.openMonitorDetail);
+  }));
   modalRoot.querySelectorAll("[data-toggle-monitor-row]").forEach((button) => button.addEventListener("click", () => {
     state.ui.expandedProjects[button.dataset.toggleMonitorRow] = true;
     saveState();
@@ -2321,6 +2471,43 @@ function normalizeProjectType(value) {
 
 function blockTypeLabel(type) {
   return type === "save" ? "Save" : startCase(type);
+}
+
+function renderAppIcon(kind = "dot") {
+  const paths = {
+    wallet: `<path d="M4 7.5h13.5A2.5 2.5 0 0 1 20 10v7a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17V7.5Zm0 0A2.5 2.5 0 0 1 6.5 5H16v2.5"/><path d="M15.5 13.5h4"/><circle cx="15.5" cy="13.5" r="1"/>`,
+    sheet: `<path d="M5 4h14v16H5z"/><path d="M5 9h14M5 14h14M10 4v16M15 4v16"/>`,
+    cart: `<path d="M5 6h2l2 9h8l2-6H8"/><circle cx="10" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/>`,
+    bolt: `<path d="M13 3 6 14h6l-1 7 7-12h-6l1-6Z"/>`,
+    clapper: `<path d="M5 8h14v11H5z"/><path d="M5 8l3-4h4L9 8m3 0 3-4h4l-3 4"/><circle cx="12" cy="14" r="1.8"/>`,
+    dots: `<circle cx="7" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="17" cy="12" r="1.4"/>`,
+    bars: `<path d="M6 17V9m4 8V5m4 12v-6m4 6V7"/>`,
+    safe: `<rect x="5" y="4" width="14" height="16" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M12 9v2.4l1.8 1.2M8 7h2M14 7h2"/>`,
+    trend: `<path d="m5 16 5-5 3 3 6-7"/><path d="M15 7h4v4"/>`,
+    leaf: `<path d="M19 5c-7 0-11 4-11 10 0 2 1 4 3 4 6 0 9-7 8-14Z"/><path d="M8 17c2-3 5-5 9-7"/>`,
+    calendar: `<rect x="5" y="6" width="14" height="14" rx="2"/><path d="M8 4v4M16 4v4M5 10h14"/>`,
+    suitcase: `<rect x="5" y="8" width="14" height="11" rx="2"/><path d="M9 8V6h6v2"/>`,
+    shield: `<path d="M12 3 19 6v5c0 5-3 8-7 10-4-2-7-5-7-10V6l7-3Z"/><path d="M12 8v8M8 12h8"/>`,
+    home: `<path d="m4 11 8-7 8 7"/><path d="M6 10v10h12V10"/>`,
+    dot: `<circle cx="12" cy="12" r="4"/>`
+  };
+  return `<span class="app-icon icon-${escapeHtml(kind)}" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false">${paths[kind] || paths.dot}</svg></span>`;
+}
+
+function getSpendIconKey(label = "") {
+  const value = String(label).toLowerCase();
+  if (value.includes("grocery") || value.includes("groceries") || value.includes("food")) return "cart";
+  if (value.includes("charg") || value.includes("407") || value.includes("gas") || value.includes("car")) return "bolt";
+  if (value.includes("entertain") || value.includes("movie") || value.includes("play")) return "clapper";
+  return "dots";
+}
+
+function getVaultIconKey(label = "") {
+  const value = String(label).toLowerCase();
+  if (value.includes("emergency")) return "shield";
+  if (value.includes("travel") || value.includes("trip")) return "suitcase";
+  if (value.includes("home") || value.includes("reno")) return "home";
+  return "safe";
 }
 
 function normalizeFrequency(value) {
