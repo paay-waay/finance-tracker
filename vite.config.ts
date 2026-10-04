@@ -1,0 +1,4 @@
+import {defineConfig} from 'vite';
+import react from '@vitejs/plugin-react';
+import {VitePWA} from 'vite-plugin-pwa';
+export default defineConfig({base:'./',build:{rollupOptions:{output:{chunkFileNames:'assets/chunk-[name]-[hash].js'}}},plugins:[react(),VitePWA({registerType:'prompt',includeAssets:['icon.svg','apple-touch-icon.png'],manifest:{name:'VEWU Finance',short_name:'VEWU',description:'Your household, in balance.',start_url:'./',scope:'./',display:'standalone',background_color:'#f4f5f8',theme_color:'#f4f5f8',icons:[{src:'icon-192.png',sizes:'192x192',type:'image/png'},{src:'icon-512.png',sizes:'512x512',type:'image/png',purpose:'any maskable'}]},workbox:{globPatterns:['**/*.{js,css,html,png,svg,woff2}'],maximumFileSizeToCacheInBytes:4000000,navigateFallback:'index.html',cleanupOutdatedCaches:true}})]});
