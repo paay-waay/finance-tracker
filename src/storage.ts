@@ -1,4 +1,4 @@
-import {migrateV1,validateBook,type Book} from './model';
+import {migrateBook,validateBook,type Book} from './model';
 // Keep the V1 origin/database/store/key unchanged. Never erase data on service-worker updates.
 const db=()=>new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open('vewu-finance',1);r.onupgradeneeded=()=>r.result.createObjectStore('book');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.onblocked=()=>reject(new Error('blocked'));});
 export async function loadBook():Promise<Book|null> {
@@ -6,9 +6,9 @@ export async function loadBook():Promise<Book|null> {
     const tx=d.transaction('book','readwrite'),store=tx.objectStore('book'),r=store.get('current');let result:Book|null=null,failure:unknown=null;
     r.onsuccess=()=>{try{
       if(r.result===undefined)return;
-      const original=r.result;result=migrateV1(original);
-      if(original.schema===1){
-        const key=`v1-before-v2:${original.id}`,snapshot=store.get(key);
+      const original=r.result;result=migrateBook(original);
+      if(original.schema!==3){
+        const key=`before-schema-3:${original.id}`,snapshot=store.get(key);
         snapshot.onsuccess=()=>{if(snapshot.result===undefined)store.put(structuredClone(original),key);store.put(result,'current');};
       }
     }catch(e){failure=e;tx.abort();}};

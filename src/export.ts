@@ -1,4 +1,4 @@
-import {validateBook,MONTHS,type Book} from './model';
+import {validateBook,migrateBook,MONTHS,type Book} from './model';
 const HEADER=['VEWU Finance CSV','2','path','type','value'];
 const forbidden=new Set(['__proto__','constructor','prototype']);
 const quote=(s:string)=>'"'+s.replaceAll('"','""')+'"';
@@ -47,10 +47,10 @@ export function importCSV(text:string):Book {
     if(value&&typeof value==='object')containers.set(path,value);
   }
   for(const value of containers.values())if(Array.isArray(value))for(let i=0;i<value.length;i++)if(!(i in value))throw new Error('csv');
-  const b=validateBook(root);if(b.schema!==2)throw new Error('csvVersion');return b;
+  const b=validateBook(root);if(b.schema===1)throw new Error('csvVersion');return migrateBook(b);
 }
 export function prepareBackup(book:Book,now=new Date()):{book:Book,text:string} {
-  const b=structuredClone(book);b.lastBackup=now.toISOString();b.backedUpRevision=b.dataRevision!;
+  const b=migrateBook(book);b.lastBackup=now.toISOString();b.backedUpRevision=b.dataRevision!;
   for(const id of MONTHS){b.months[id].exportedRevision=b.months[id].revision;b.months[id].exportedAt=b.lastBackup;}
   const text=csv(b);if(csv(importCSV(text))!==text)throw new Error('csv');return {book:b,text};
 }
