@@ -29,3 +29,5 @@ dialog::backdrop{background:#18181366;backdrop-filter:none;-webkit-backdrop-filt
 .amount-entry>.money-input{flex:1;min-width:0}
 .amount-entry .money-input input{width:100%;max-width:100%}
 .amount-entry .formula-result{font-size:.7rem;letter-spacing:0;color:var(--muted);text-align:right}
+
+input::placeholder{color:var(--muted);opacity:1}

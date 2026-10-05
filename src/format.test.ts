@@ -1,0 +1,10 @@
+import {describe,it,expect} from 'vitest';
+import {entryMoney,money,percentage} from './format';
+import {blankBook,calc,actual,allocate,parseAmount} from './model';
+import {csv,importCSV} from './export';
+describe('display precision by source',()=>{
+ it('keeps original entries and user formulas precise while totals are integers',()=>{expect(entryMoney(parseAmount('65*26/12')!)).toBe('$140.83');expect(money(14083)).toBe('$141');expect(entryMoney(10346)).toBe('$103.46');expect(money(10346)).toBe('$103');expect(entryMoney(0)).toBe('$0.00');});
+ it('rounds positive and negative half dollars and never displays negative zero',()=>{expect(money(149)).toBe('$1');expect(money(150)).toBe('$2');expect(money(-149)).toBe('-$1');expect(money(-150)).toBe('-$2');expect(money(-49)).toBe('$0');expect(entryMoney(-0)).toBe('$0.00');});
+ it('rounds calculated percentages while preserving undefined denominators',()=>{expect(percentage(467,1000)).toBe('47%');expect(percentage(-467,1000)).toBe('-47%');expect(percentage(-1,1000)).toBe('0%');expect(percentage(465,1000)).toBe('47%');expect(percentage(-465,1000)).toBe('-47%');expect(percentage(1,0)).toBe('—');expect(percentage(1,-1)).toBe('—');});
+ it('leaves null actuals, savings, exact allocation and CSV untouched after formatting',()=>{const b=blankBook(),m=b.months['2026-10'];Object.assign(m.plan,{pw:300000,mv:200000,investment:14083});m.actual.mv=265046;m.transactions.push({id:'precision-test',date:'2026-10-04',item:'Groceries',category:'Groceries',amount:10346,fund:''});m.shares={General:66.7,Travel:33.3,Pet:0,Irregular:0};const before=csv(b),result=calc(b,'2026-10'),split=allocate(result.surplusPlan,m.shares);expect(entryMoney(actual(m,'investment'))).toBe('$140.83');expect(m.actual.investment).toBeNull();expect(money(result.savings)).toBe('$650');expect(result.savings).toBe(65046);expect(money(actual(m,'groceries'))).toBe('$103');for(const amount of Object.values(split))money(amount);expect(Object.values(split).reduce((a,v)=>a+v,0)).toBe(result.surplusPlan);expect(csv(b)).toBe(before);expect(importCSV(before)).toEqual(b);expect(m.shares.General).toBe(66.7);});
+});

@@ -1,3 +1,4 @@
+export {money,percentage} from './format';
 import {evaluateAmount} from './amount';
 export const MONTHS = ['2026-10', '2026-11', '2026-12'] as const;
 export type MonthId = typeof MONTHS[number];
@@ -23,7 +24,6 @@ export type Month = {categories?:CategoryDefinition[],expanded?:Record<GroupId,b
 export type Book = {schema:1|2|3,currency:'CAD',id:string,opening:{funds:Record<Fund,number>,savings:number,receivables:number,dca:number,mm:number},rules:{mvBaseline:number},months:Record<MonthId,Month>,history:{month:MonthId,revision:number,closedAt:string,snapshot:Month}[],settings:{theme:'system'|'light'|'dark',glass:number,reduceMotion:boolean,reduceTransparency:boolean,language?:Language},lastBackup:string|null,dataRevision?:number,backedUpRevision?:number|null,reminderDismissedOn?:string|null};
 export const cents = (n:number) => Math.round((n + Number.EPSILON) * 100);
 export const dollars = (n:number) => n / 100;
-export const money = (n:number) => new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD',maximumFractionDigits:0,minimumFractionDigits:0}).format(n/100);
 export const shortMonth = (m:MonthId) => ({'2026-10':'October','2026-11':'November','2026-12':'December'}[m]);
 export const monthLabel = (m:MonthId) => `${Number(m.slice(5))}月`;
 export function blankBook():Book {
@@ -39,7 +39,6 @@ export const ledgerCategory=(m:Month,k:string)=>definitions(m).find(c=>c.id===k)
 export function transactionName(m:Month,key:string){return definitions(m).find(c=>(c.transactionKey??c.id)===key)?.name??key;}
 export function actual(m:Month,k:string):number {const c=definitions(m).find(c=>c.id===k);return c?.mode==='ledger'?sum(m.transactions.filter(t=>t.category===(c.transactionKey??c.id)&&!t.fund).map(t=>t.amount)):m.actual[k]??m.plan[k]??0;}
 export function groupTotal(m:Month,g:GroupId,mode:'plan'|'actual'){return sum(groupCategories(m,g).map(c=>mode==='plan'?m.plan[c.id]:actual(m,c.id)));}
-export const percentage=(amount:number,total:number)=>total>0?`${(amount/total*100).toFixed(1)}%`:'—';
 export function calc(book:Book,id:MonthId) {
   const m=book.months[id];
   const savingPlan=Math.max(0,m.plan.mv-book.rules.mvBaseline), savings=Math.max(0,actual(m,'mv')-book.rules.mvBaseline);
